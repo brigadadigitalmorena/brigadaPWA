@@ -1,36 +1,174 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Brigada PWA
 
-## Getting Started
+Progressive Web Application para brigadistas de campo. Permite completar encuestas asignadas con soporte offline-first.
 
-First, run the development server:
+## 🚀 Características
+
+- ✅ **Offline-first**: Trabaja sin conexión, sincroniza automáticamente
+- ✅ **PWA**: Instálala en tu dispositivo como app nativa
+- ✅ **Responsive**: Funciona en móvil, tablet y desktop
+- ✅ **Segura**: Autenticación JWT con refresh tokens
+- ✅ **Sincronización en segundo plano**: Los datos se envían automáticamente
+- ✅ **Gestión de archivos**: Sube fotos y documentos
+- ✅ **GPS**: Captura ubicación automáticamente
+- ✅ **Validaciones**: Valida datos en tiempo real
+
+## 🛠️ Stack Tecnológico
+
+- **Framework**: Next.js 14 (App Router)
+- **Lenguaje**: TypeScript
+- **UI**: React 18 + shadcn/ui + Tailwind CSS
+- **Estado**: Zustand + React Query
+- **Base de datos offline**: Dexie.js (IndexedDB)
+- **Service Worker**: Workbox
+- **Formularios**: React Hook Form + Zod
+- **HTTP**: Axios
+- **Mapas**: MapLibre GL JS
+
+## 📦 Instalación
 
 ```bash
+# Instalar dependencias
+npm install
+
+# Copiar variables de entorno
+cp .env.example .env.local
+
+# Iniciar servidor de desarrollo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🔧 Configuración
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Edita `.env.local` con tus variables:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_TIMEOUT=30000
+```
 
-## Learn More
+## 📱 Uso como PWA
 
-To learn more about Next.js, take a look at the following resources:
+1. Abre la aplicación en tu navegador
+2. Busca el botón "Instalar aplicación" o "Add to Home Screen"
+3. La app se instalará como aplicación nativa
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔄 Sincronización
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+La aplicación sincroniza automáticamente cuando:
+- Hay conexión a internet
+- Hay datos pendientes en la cola
+- El usuario fuerza la sincronización manual
 
-## Deploy on Vercel
+### Estados de sincronización
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Pending**: Datos esperando ser enviados
+- **Syncing**: Datos en proceso de envío
+- **Synced**: Datos enviados exitosamente
+- **Failed**: Error al enviar (se reintentará)
+- **Dead Letter**: Error permanente (requiere intervención)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📂 Estructura del Proyecto
+
+```
+brigada-pwa/
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # Rutas de autenticación
+│   ├── (dashboard)/       # Rutas protegidas
+│   └── layout.tsx         # Layout principal
+├── components/            # Componentes React
+│   ├── ui/               # Componentes shadcn/ui
+│   ├── survey/           # Componentes de encuesta
+│   ├── sync/             # Componentes de sync
+│   └── common/           # Componentes comunes
+├── contexts/             # React Contexts
+├── lib/                  # Utilidades y servicios
+│   ├── api/             # API client
+│   ├── db/              # Dexie.js database
+│   ├── sync/            # Sync engine
+│   └── types/           # TypeScript types
+├── public/              # Archivos estáticos
+│   ├── icons/          # Iconos PWA
+│   ├── manifest.json   # PWA manifest
+│   └── offline.html    # Página offline
+└── workers/            # Service Workers
+```
+
+## 🧪 Testing
+
+```bash
+# Ejecutar tests
+npm test
+
+# Ejecutar tests con coverage
+npm run test:coverage
+
+# Ejecutar E2E tests
+npm run test:e2e
+```
+
+## 🚀 Deployment
+
+### Vercel (Recomendado)
+
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel
+```
+
+### Docker
+
+```bash
+# Build
+docker build -t brigada-pwa .
+
+# Run
+docker run -p 3000:3000 brigada-pwa
+```
+
+## 📝 Scripts Disponibles
+
+- `npm run dev` - Iniciar servidor de desarrollo
+- `npm run build` - Build para producción
+- `npm run start` - Iniciar servidor de producción
+- `npm run lint` - Ejecutar ESLint
+- `npm run type-check` - Verificar tipos TypeScript
+
+## 🔒 Seguridad
+
+- Tokens JWT en localStorage (access) y sessionStorage (refresh)
+- HTTPS obligatorio para Service Workers
+- Content Security Policy configurado
+- Validación de inputs con Zod
+- Sanitización de HTML
+
+## 📊 Monitoreo
+
+La aplicación incluye:
+- Logs estructurados
+- Error tracking (Sentry)
+- Analytics (PostHog)
+- Performance monitoring
+
+## 🤝 Contribuir
+
+1. Fork el repositorio
+2. Crea una rama feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
+4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Privado - Brigada Digital
+
+## 👥 Equipo
+
+Desarrollado por el equipo de Brigada Digital
+
+---
+
+**Nota**: Esta es una PWA que reemplaza/complementa la aplicación móvil nativa, manteniendo la misma experiencia offline-first.
