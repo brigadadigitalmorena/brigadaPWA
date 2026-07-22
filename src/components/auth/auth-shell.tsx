@@ -17,9 +17,10 @@ export function AuthShell({
   const containerClass =
     layout === 'center'
       ? 'relative min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/15 via-background to-background p-4 safe-area-top safe-area-bottom'
-      : 'relative min-h-screen flex items-start md:items-center justify-center overflow-y-auto bg-gradient-to-b from-primary/15 via-background to-background px-4 py-8 safe-area-top safe-area-bottom';
+      : 'relative min-h-screen flex items-start md:items-center justify-center overflow-y-auto bg-gradient-to-b from-primary/15 via-background to-background px-4 pb-8 pt-14 safe-area-top safe-area-bottom';
 
-  const innerClass = layout === 'center' ? 'w-full max-w-md space-y-6' : 'w-full max-w-md';
+  const innerClass =
+    layout === 'center' ? 'w-full max-w-md space-y-6' : 'w-full max-w-md pt-2';
 
   return (
     <div className={containerClass}>
