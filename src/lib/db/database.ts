@@ -128,6 +128,15 @@ export interface KVCache {
   updated_at: string;
 }
 
+// File Blob types (stores actual file content for offline survival)
+export interface FileBlob {
+  id?: number;
+  file_id: string;
+  response_id: string;
+  blob: Blob;
+  created_at: string;
+}
+
 // Database class
 class BrigadaDatabase extends Dexie {
   surveys!: Table<Survey>;
@@ -136,10 +145,11 @@ class BrigadaDatabase extends Dexie {
   local_files!: Table<LocalFile>;
   sync_queue!: Table<SyncQueue>;
   kv_cache!: Table<KVCache>;
+  file_blobs!: Table<FileBlob>;
 
   constructor() {
     super('BrigadaPWA');
-    
+
     this.version(1).stores({
       surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
       responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
@@ -148,6 +158,16 @@ class BrigadaDatabase extends Dexie {
       sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
       kv_cache: 'cache_key, expires_at',
     });
+
+    this.version(2).stores({
+      surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
+      responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
+      response_answers: '++id, response_id, question_key, created_at',
+      local_files: '++id, file_id, response_id, file_type, sync_status, created_at',
+      sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
+      kv_cache: 'cache_key, expires_at',
+      file_blobs: '++id, file_id, response_id, created_at',
+    });
   }
 }
 
@@ -155,7 +175,7 @@ class BrigadaDatabase extends Dexie {
 export const db = new BrigadaDatabase();
 
 // Database version
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 // Initialize database
 export async function initializeDatabase(): Promise<void> {

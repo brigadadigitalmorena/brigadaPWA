@@ -238,6 +238,8 @@ Users can install the PWA:
 - [ ] Push notifications
 - [ ] Background sync improvements
 - [ ] Conflict resolution UI
-- [ ] Signature capture
+- [x] Signature capture
 - [ ] Advanced offline maps
 - [ ] Multi-language support
+- [ ] INE OCR server-side validation
+- [ ] Image compression before upload

@@ -1,42 +1,66 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getMyAssignments } from '@/lib/api/survey.service';
-import { Assignment } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Play, Calendar, Clock } from 'lucide-react';
+import { PageHeader } from '@/components/common/page-header';
+import { EmptyState } from '@/components/common/empty-state';
+import { SkeletonSurveyCard } from '@/components/ui/skeleton';
+import { ClipboardList, Play, Calendar, Users, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface AssignedSurvey {
+  id: number;
+  survey_id: number;
+  survey_title: string;
+  survey_description?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  group_name?: string;
+  version_id?: number;
+}
 
 export default function SurveysPage() {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [surveys, setSurveys] = useState<AssignedSurvey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAssignments();
-  }, []);
-
-  const loadAssignments = async () => {
+  const loadSurveys = useCallback(async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const data = await getMyAssignments();
-      setAssignments(data);
+      setSurveys(data);
     } catch (err) {
-      console.error('Failed to load assignments:', err);
+      console.error('Failed to load surveys:', err);
       setError('Error al cargar las encuestas asignadas');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      loadSurveys();
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [loadSurveys]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Cargando encuestas...</p>
+      <div className="space-y-6">
+        <PageHeader
+          title="Mis Encuestas"
+          description="Cargando encuestas asignadas..."
+        />
+        <div className="flex flex-col gap-4">
+          <SkeletonSurveyCard />
+          <SkeletonSurveyCard />
+          <SkeletonSurveyCard />
         </div>
       </div>
     );
@@ -44,88 +68,124 @@ export default function SurveysPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={loadAssignments} variant="outline">
+      <div className="space-y-6">
+        <PageHeader title="Mis Encuestas" description="No se pudieron cargar tus encuestas" />
+        <EmptyState
+          icon={ClipboardList}
+          title="Error"
+          description={error}
+          action={
+            <Button size="mobile" onClick={loadSurveys} variant="outline" className="w-full sm:w-auto">
               Reintentar
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
     );
   }
 
-  if (assignments.length === 0) {
+  if (surveys.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md text-center">
-          <CardHeader>
-            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <ClipboardList className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle>No tienes encuestas asignadas</CardTitle>
-            <CardDescription>
-              Cuando te asignen encuestas, aparecerán aquí
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="space-y-6">
+        <PageHeader
+          title="Mis Encuestas"
+          description="Encuestas asignadas para completar"
+        />
+        <EmptyState
+          icon={ClipboardList}
+          title="No tienes encuestas asignadas"
+          description="Cuando te asignen encuestas, aparecerán aquí para que puedas completarlas desde tu dispositivo."
+        />
       </div>
     );
   }
+
+  const pendingCount = surveys.filter((s) => s.status !== 'completed').length;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Mis Encuestas</h1>
-        <p className="text-muted-foreground">
-          Encuestas asignadas para completar
-        </p>
-      </div>
+      <PageHeader
+        title="Mis Encuestas"
+        description={
+          pendingCount > 0
+            ? `${pendingCount} encuesta${pendingCount !== 1 ? 's' : ''} pendiente${pendingCount !== 1 ? 's' : ''}`
+            : 'Todas las encuestas completadas'
+        }
+        action={
+          <Button
+            variant="outline"
+            size="mobile"
+            onClick={loadSurveys}
+            className="hidden sm:flex"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Actualizar
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {assignments.map((assignment) => (
-          <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-lg line-clamp-2">
-                  {assignment.survey_title}
-                </CardTitle>
-                <Badge variant={assignment.status === 'completed' ? 'default' : 'secondary'}>
-                  {assignment.status === 'completed' ? 'Completada' : 'Pendiente'}
-                </Badge>
-              </div>
-              <CardDescription className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4" />
-                  <span>
-                    Asignada: {new Date(assignment.created_at).toLocaleDateString()}
-                  </span>
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
+        {surveys.map((survey) => {
+          const isCompleted = survey.status === 'completed';
+
+          return (
+            <Card
+              key={survey.id}
+              className={cn(
+                'overflow-hidden transition-shadow hover:shadow-md',
+                isCompleted && 'opacity-80'
+              )}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <CardTitle className="text-lg leading-snug line-clamp-2">
+                    {survey.survey_title}
+                  </CardTitle>
+                  <Badge
+                    className={cn(
+                      'flex-shrink-0',
+                      isCompleted
+                        ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20'
+                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                    )}
+                    variant="outline"
+                  >
+                    {isCompleted ? 'Completada' : 'Pendiente'}
+                  </Badge>
                 </div>
-                {assignment.due_date && (
+                <CardDescription className="space-y-2 pt-1">
                   <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4" />
+                    <Calendar className="h-4 w-4 flex-shrink-0" />
                     <span>
-                      Vence: {new Date(assignment.due_date).toLocaleDateString()}
+                      Asignada: {new Date(survey.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href={`/surveys/${assignment.survey_id}/fill`}>
-                <Button className="w-full" disabled={assignment.status === 'completed'}>
-                  <Play className="h-4 w-4 mr-2" />
-                  {assignment.status === 'completed' ? 'Completada' : 'Iniciar encuesta'}
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ))}
+                  {survey.group_name && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 flex-shrink-0" />
+                      <span>{survey.group_name}</span>
+                    </div>
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link
+                  href={`/surveys/${survey.survey_id}/fill?title=${encodeURIComponent(survey.survey_title)}`}
+                  className={cn(
+                    'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-all',
+                    'hover:bg-primary/80 active:translate-y-px',
+                    isCompleted && 'pointer-events-none opacity-50 bg-muted text-muted-foreground'
+                  )}
+                  aria-disabled={isCompleted}
+                  tabIndex={isCompleted ? -1 : 0}
+                >
+                  <Play className="h-5 w-5" />
+                  {isCompleted ? 'Completada' : 'Iniciar encuesta'}
+                </Link>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

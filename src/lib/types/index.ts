@@ -68,7 +68,7 @@ export interface SurveyVersion {
   change_summary?: string;
   engine_version: number;
   sections?: SurveySection[];
-  data_lists?: Record<string, any>;
+  data_lists?: Record<string, unknown>;
 }
 
 export interface SurveySection {
@@ -129,7 +129,7 @@ export interface ValidationRules {
   regex?: string;
   regex_message?: string;
   custom_message?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AnswerOption {
@@ -145,7 +145,7 @@ export interface QuestionUI {
   placeholder?: string;
   columns?: number;
   rows?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Assignment types
@@ -197,7 +197,7 @@ export interface ApiError {
   retriable: boolean;
   request_id: string;
   trace_id: string;
-  details?: any;
+  details?: unknown;
 }
 
 // Form types
@@ -205,7 +205,7 @@ export interface SurveyFormData {
   response_id: string;
   survey_id: string;
   survey_version: string;
-  answers: Record<string, any>;
+  answers: Record<string, unknown>;
   files?: FileUpload[];
   location?: LocationData;
   metadata: ResponseMetadata;
@@ -246,8 +246,8 @@ export interface AppConfig {
   splash_message_color: string;
   splash_font_type: string;
   bottom_bar_survey_ids: number[];
-  bottom_bar_menu_items: any[];
-  social_links: any[];
+  bottom_bar_menu_items: unknown[];
+  social_links: unknown[];
   offline_enabled_modules: string[];
   online_enabled_modules: string[];
   management_status_labels: Record<string, string>;

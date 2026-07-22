@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, AuthState } from '@/lib/types';
+import { AuthState } from '@/lib/types';
 import { getCurrentUser, isAuthenticated, login as loginApi, logout as logoutApi } from '@/lib/api/auth.service';
 import { loadTokensFromStorage } from '@/lib/api/client';
 

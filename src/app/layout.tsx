@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/auth.context';
 import { SyncProvider } from '@/contexts/sync.context';
 import { Toaster } from '@/components/ui/sonner';
+import { ServiceWorkerRegistrar } from '@/components/common/service-worker-registrar';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -24,8 +25,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   themeColor: '#FF1B8D',
 };
 
@@ -43,6 +42,7 @@ export default function RootLayout({
           <SyncProvider>
             {children}
             <Toaster />
+            <ServiceWorkerRegistrar />
           </SyncProvider>
         </AuthProvider>
       </body>

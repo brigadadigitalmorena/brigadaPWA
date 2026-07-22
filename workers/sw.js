@@ -109,7 +109,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 // Skip waiting and claim clients
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FF1B8D">
   <title>Sin conexión - Brigada Digital</title>
   <style>
     * {
@@ -10,93 +11,115 @@
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff;
-      padding: 20px;
+      background: linear-gradient(160deg, #FF1B8D 0%, #ff6eb4 40%, #fff5fa 100%);
+      color: #1a1a1a;
+      padding: 24px;
     }
-    
+
     .container {
       text-align: center;
       max-width: 400px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 32px 24px;
+      box-shadow: 0 8px 32px rgba(255, 27, 141, 0.15);
     }
-    
+
     .icon {
-      font-size: 64px;
-      margin-bottom: 20px;
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      background: #FF1B8D;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      font-weight: 700;
+      color: white;
     }
-    
+
     h1 {
-      font-size: 28px;
+      font-size: 24px;
       margin-bottom: 12px;
-      font-weight: 600;
+      font-weight: 700;
+      color: #1a1a1a;
     }
-    
+
     p {
       font-size: 16px;
       line-height: 1.6;
       margin-bottom: 24px;
-      opacity: 0.9;
+      color: #666;
     }
-    
+
     .button {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
       padding: 12px 32px;
-      background: rgba(255, 255, 255, 0.2);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 8px;
+      background: #FF1B8D;
+      border: none;
+      border-radius: 12px;
       color: #fff;
-      text-decoration: none;
+      font-size: 16px;
       font-weight: 600;
-      transition: all 0.3s ease;
       cursor: pointer;
+      transition: background 0.2s ease;
+      width: 100%;
     }
-    
+
     .button:hover {
-      background: rgba(255, 255, 255, 0.3);
-      border-color: rgba(255, 255, 255, 0.5);
-      transform: translateY(-2px);
+      background: #e0157d;
     }
-    
+
+    .button:active {
+      transform: scale(0.98);
+    }
+
     .info {
-      margin-top: 32px;
+      margin-top: 24px;
       padding: 16px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
+      background: #fff0f7;
+      border-radius: 12px;
       font-size: 14px;
+      color: #666;
+      text-align: left;
     }
-    
+
     .info strong {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+      color: #FF1B8D;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="icon">📡</div>
+    <div class="icon">B</div>
     <h1>Sin conexión a internet</h1>
     <p>
-      No podemos conectarnos al servidor. Verifica tu conexión a internet e intenta de nuevo.
+      No podemos conectarnos al servidor. Verifica tu conexión e intenta de nuevo.
     </p>
     <button class="button" onclick="window.location.reload()">
       Reintentar
     </button>
-    
+
     <div class="info">
-      <strong>💡 ¿Sabías que?</strong>
-      Puedes seguir trabajando en modo offline. Los datos se sincronizarán automáticamente cuando recuperes la conexión.
+      <strong>Modo offline</strong>
+      Puedes seguir trabajando en la app. Los datos se sincronizarán automáticamente cuando recuperes la conexión.
     </div>
   </div>
-  
+
   <script>
-    // Auto-retry when connection is restored
     window.addEventListener('online', () => {
       window.location.reload();
     });

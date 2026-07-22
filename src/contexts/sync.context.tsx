@@ -1,9 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db/database';
 import { SyncStatus } from '@/lib/types';
+import { processSyncQueue } from '@/lib/services/sync-engine.service';
 
 interface SyncContextType extends SyncStatus {
   syncNow: () => Promise<void>;
@@ -50,19 +51,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setError(undefined);
 
     try {
-      // TODO: Implement sync logic
-      // 1. Get pending items from sync_queue
-      // 2. Process each item
-      // 3. Update status
-      // 4. Handle errors and retries
+      await processSyncQueue({
+        onProgress: (message) => {
+          console.log('Sync progress:', message);
+        },
+      });
 
-      console.log('Sync started...');
-      
-      // Simulate sync delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
       setLastSyncedAt(new Date().toISOString());
-      console.log('Sync completed');
     } catch (err) {
       console.error('Sync failed:', err);
       setError(err instanceof Error ? err.message : 'Sync failed');
@@ -95,9 +90,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Auto-sync when online
+  const hasAutoSynced = useRef(false);
   useEffect(() => {
-    if (isOnline && pendingCount > 0) {
-      syncNow();
+    if (isOnline && pendingCount > 0 && !hasAutoSynced.current) {
+      hasAutoSynced.current = true;
+      const timeout = setTimeout(() => {
+        syncNow();
+      }, 0);
+      return () => clearTimeout(timeout);
     }
   }, [isOnline, pendingCount, syncNow]);
 

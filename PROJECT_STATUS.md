@@ -98,28 +98,28 @@ brigada-pwa/
 - [x] PWA manifest + Service Worker básico
 - [x] Layout principal con sidebar
 
-### Milestone 2: Offline Core (PENDIENTE)
-- [ ] Sync engine completo
-- [ ] Queue processor con reintentos
+### Milestone 2: Offline Core (EN PROGRESO)
+- [x] Sync engine completo
+- [x] Queue processor con reintentos
 - [ ] Background sync con Workbox
-- [ ] Detección de online/offline mejorada
-- [ ] Dead letter queue management
+- [x] Detección de online/offline mejorada
+- [x] Dead letter queue management
 - [ ] Conflict resolution
 
-### Milestone 3: Survey Engine (PENDIENTE)
-- [ ] Question renderer para todos los tipos
-- [ ] Validaciones (Zod)
-- [ ] Preguntas condicionales (JSON Logic)
-- [ ] Multi-step surveys
-- [ ] Drafts y resume
+### Milestone 3: Survey Engine (COMPLETADO)
+- [x] Question renderer para todos los tipos
+- [x] Validaciones básicas (react-hook-form)
+- [x] Preguntas condicionales (JSON Logic)
+- [x] Multi-step surveys
+- [x] Drafts y resume
 - [ ] Preview de encuesta
 
-### Milestone 4: Media & Location (PENDIENTE)
-- [ ] Captura de fotos (MediaDevices API)
-- [ ] Upload a R2 (presigned URLs)
-- [ ] Geolocation API
+### Milestone 4: Media & Location (COMPLETADO)
+- [x] Captura de fotos (MediaDevices API)
+- [x] Upload a R2 (presigned URLs)
+- [x] Geolocation API
 - [ ] MapLibre para visualización
-- [ ] Firma digital (canvas)
+- [x] Firma digital (signature_pad)
 - [ ] Compresión de imágenes
 
 ### Milestone 5: Polish & Testing (PENDIENTE)

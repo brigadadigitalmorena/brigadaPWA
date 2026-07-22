@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { ClipboardList, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,67 +48,87 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <span className="text-3xl">📋</span>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/15 via-background to-background p-4 safe-area-top safe-area-bottom">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-3">
+          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <ClipboardList className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Brigada Digital</CardTitle>
-          <CardDescription>
-            Inicia sesión para acceder a tus encuestas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Correo electrónico</Label>
-              <Input
-                id="username"
-                type="email"
-                placeholder="tu@correo.com"
-                autoComplete="email"
-                disabled={isLoading}
-                {...register('username')}
-              />
-              {errors.username && (
-                <p className="text-sm text-destructive">{errors.username.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                disabled={isLoading}
-                {...register('password')}
-              />
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password.message}</p>
-              )}
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  Iniciando sesión...
-                </>
-              ) : (
-                'Iniciar sesión'
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>¿Olvidaste tu contraseña?</p>
-            <p>Contacta al administrador del sistema</p>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Brigada Digital</h1>
+            <p className="text-base text-muted-foreground mt-2">
+              Inicia sesión para acceder a tus encuestas
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <Card className="rounded-2xl shadow-lg border-primary/10">
+          <CardHeader className="sr-only">
+            <CardTitle>Iniciar sesión</CardTitle>
+            <CardDescription>Formulario de acceso</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-base">
+                  Correo electrónico
+                </Label>
+                <Input
+                  id="username"
+                  type="email"
+                  inputSize="mobile"
+                  placeholder="tu@correo.com"
+                  autoComplete="email"
+                  disabled={isLoading}
+                  {...register('username')}
+                />
+                {errors.username && (
+                  <p className="text-sm text-destructive">{errors.username.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-base">
+                  Contraseña
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  inputSize="mobile"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  disabled={isLoading}
+                  {...register('password')}
+                />
+                {errors.password && (
+                  <p className="text-sm text-destructive">{errors.password.message}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                size="mobile"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Iniciando sesión...
+                  </>
+                ) : (
+                  'Iniciar sesión'
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center text-sm text-muted-foreground space-y-1">
+              <p>¿Olvidaste tu contraseña?</p>
+              <p>Contacta al administrador del sistema</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

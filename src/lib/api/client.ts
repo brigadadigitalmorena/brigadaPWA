@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { LoginResponse, RefreshTokenResponse } from '@/lib/types';
+import { RefreshTokenResponse } from '@/lib/types';
 
 // API configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
