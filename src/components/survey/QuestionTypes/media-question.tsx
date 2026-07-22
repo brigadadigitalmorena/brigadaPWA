@@ -6,6 +6,7 @@ import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
 import { saveFileBlob, deleteFileBlob } from '@/lib/services/file-blob.service';
 import { compressPhoto } from '@/lib/services/image-compression.service';
+import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
 import { QuestionRendererProps } from './question-renderer';
 
 export function MediaQuestion({
@@ -18,7 +19,25 @@ export function MediaQuestion({
 
   const questionKey = question.question_key || question.id.toString();
   const questionFiles = files[questionKey] || [];
-  const isPhoto = question.question_type === 'photo';
+  const normalizedType = normalizeQuestionType(question.question_type);
+  const isPhoto = ['photo', 'selfie', 'photo_no_gallery', 'photo_canvas'].includes(
+    normalizedType
+  );
+  const isVideo = normalizedType === 'video';
+  const isVoice = normalizedType === 'voice';
+  const captureFacing =
+    normalizedType === 'selfie'
+      ? 'user'
+      : isPhoto
+        ? 'environment'
+        : undefined;
+  const accept = isPhoto
+    ? 'image/*'
+    : isVideo
+      ? 'video/*'
+      : isVoice
+        ? 'audio/*'
+        : '*/*';
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -73,8 +92,8 @@ export function MediaQuestion({
       <input
         ref={inputRef}
         type="file"
-        accept={isPhoto ? 'image/*' : '*/*'}
-        capture={isPhoto ? 'environment' : undefined}
+        accept={accept}
+        capture={captureFacing}
         onChange={handleFileChange}
         className="hidden"
         id={`media-${question.id}`}
@@ -90,7 +109,13 @@ export function MediaQuestion({
         >
           {isPhoto ? <Camera className="h-6 w-6" /> : <FileUp className="h-6 w-6" />}
           <span className="text-xs">
-            {isPhoto ? 'Tomar foto / Galería' : 'Seleccionar archivo'}
+            {isPhoto
+              ? 'Tomar foto / Galería'
+              : isVideo
+                ? 'Grabar o seleccionar video'
+                : isVoice
+                  ? 'Grabar o seleccionar audio'
+                  : 'Seleccionar archivo'}
           </span>
         </Button>
       </div>

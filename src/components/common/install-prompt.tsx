@@ -73,7 +73,7 @@ export function InstallPrompt() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md rounded-2xl">
+      <DialogContent showCloseButton={false} className="sm:max-w-md rounded-2xl">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

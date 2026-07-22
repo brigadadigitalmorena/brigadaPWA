@@ -11,6 +11,7 @@ import { db, Response } from '@/lib/db/database';
 import { getCurrentUser } from '@/lib/api/auth.service';
 import { generateResponseId } from '@/lib/utils/uuid';
 import { isRelevant } from '@/lib/utils/json-logic';
+import { isFillableQuestion } from '@/lib/survey/field-types';
 
 export interface LocalFilePreview {
   id: string;
@@ -22,11 +23,19 @@ export interface LocalFilePreview {
   ineOcrData?: string;
 }
 
+export interface FillableQuestionEntry {
+  question: Question;
+  sectionIndex: number;
+  sectionKey: string;
+  sectionTitle: string;
+  sectionDescription?: string;
+}
+
 interface SurveyFillState {
   surveyId: string | null;
   version: SurveyVersion | null;
   responseId: string | null;
-  currentSectionIndex: number;
+  currentQuestionIndex: number;
   answers: Record<string, unknown>;
   files: Record<string, LocalFilePreview[]>;
   location: LocationData | null;
@@ -41,10 +50,13 @@ interface SurveyFillState {
   setFiles: (questionKey: string, files: LocalFilePreview[]) => void;
   removeFile: (questionKey: string, fileId: string) => void;
   setLocation: (location: LocationData | null) => void;
-  nextSection: () => void;
-  prevSection: () => void;
-  goToSection: (index: number) => void;
+  nextQuestion: () => void;
+  prevQuestion: () => void;
+  goToQuestion: (index: number) => void;
+  goToSection: (sectionIndex: number) => void;
   reset: () => void;
+  getFillableQuestions: () => FillableQuestionEntry[];
+  getCurrentQuestionEntry: () => FillableQuestionEntry | null;
   getVisibleQuestions: (section: SurveySection) => Question[];
   getProgress: () => number;
 }
@@ -57,17 +69,20 @@ const initialState: Omit<
   | 'setFiles'
   | 'removeFile'
   | 'setLocation'
-  | 'nextSection'
-  | 'prevSection'
+  | 'nextQuestion'
+  | 'prevQuestion'
+  | 'goToQuestion'
   | 'goToSection'
   | 'reset'
+  | 'getFillableQuestions'
+  | 'getCurrentQuestionEntry'
   | 'getVisibleQuestions'
   | 'getProgress'
 > = {
   surveyId: null,
   version: null,
   responseId: null,
-  currentSectionIndex: 0,
+  currentQuestionIndex: 0,
   answers: {},
   files: {},
   location: null,
@@ -81,7 +96,40 @@ function getAppVersion(): string {
   return process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0';
 }
 
-function buildDraftResponse(state: SurveyFillState, user: { id: number; nombre: string; apellido: string; role_key: string }): Response {
+function buildFillableQuestions(
+  version: SurveyVersion | null,
+  answers: Record<string, unknown>
+): FillableQuestionEntry[] {
+  if (!version?.sections) return [];
+
+  const entries: FillableQuestionEntry[] = [];
+
+  version.sections.forEach((section, sectionIndex) => {
+    const visibleQuestions =
+      section.questions?.filter(
+        (question) =>
+          isFillableQuestion(question) &&
+          isRelevant(question.relevance_expression, answers)
+      ) ?? [];
+
+    visibleQuestions.forEach((question) => {
+      entries.push({
+        question,
+        sectionIndex,
+        sectionKey: section.section_key,
+        sectionTitle: section.title,
+        sectionDescription: section.description,
+      });
+    });
+  });
+
+  return entries;
+}
+
+function buildDraftResponse(
+  state: SurveyFillState,
+  user: { id: number; nombre: string; apellido: string; role_key: string }
+): Response {
   const now = new Date().toISOString();
   const startedAt = state.startedAt || now;
 
@@ -125,8 +173,7 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
         .where('survey_id')
         .equals(surveyId)
         .and(
-          (r) =>
-            r.survey_version === surveyVersion && r.status === 'draft'
+          (r) => r.survey_version === surveyVersion && r.status === 'draft'
         )
         .toArray();
 
@@ -141,7 +188,7 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
         surveyId,
         version,
         responseId,
-        currentSectionIndex: 0,
+        currentQuestionIndex: 0,
         answers,
         files: {},
         location:
@@ -221,26 +268,51 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
     set({ location });
   },
 
-  nextSection: () => {
-    const { version, currentSectionIndex } = get();
-    const totalSections = version?.sections?.length || 0;
-    if (currentSectionIndex < totalSections - 1) {
-      set({ currentSectionIndex: currentSectionIndex + 1 });
+  getFillableQuestions: () => {
+    const { version, answers } = get();
+    return buildFillableQuestions(version, answers);
+  },
+
+  getCurrentQuestionEntry: () => {
+    const { currentQuestionIndex } = get();
+    const fillable = get().getFillableQuestions();
+    if (fillable.length === 0) return null;
+    const boundedIndex = Math.max(
+      0,
+      Math.min(currentQuestionIndex, fillable.length - 1)
+    );
+    return fillable[boundedIndex] ?? null;
+  },
+
+  nextQuestion: () => {
+    const fillable = get().getFillableQuestions();
+    const { currentQuestionIndex } = get();
+    if (currentQuestionIndex < fillable.length - 1) {
+      set({ currentQuestionIndex: currentQuestionIndex + 1 });
     }
   },
 
-  prevSection: () => {
+  prevQuestion: () => {
     set((state) => ({
-      currentSectionIndex: Math.max(0, state.currentSectionIndex - 1),
+      currentQuestionIndex: Math.max(0, state.currentQuestionIndex - 1),
     }));
   },
 
-  goToSection: (index) => {
-    const { version } = get();
-    const totalSections = version?.sections?.length || 0;
+  goToQuestion: (index) => {
+    const fillable = get().getFillableQuestions();
     set({
-      currentSectionIndex: Math.max(0, Math.min(index, totalSections - 1)),
+      currentQuestionIndex: Math.max(0, Math.min(index, fillable.length - 1)),
     });
+  },
+
+  goToSection: (sectionIndex) => {
+    const fillable = get().getFillableQuestions();
+    const targetIndex = fillable.findIndex(
+      (entry) => entry.sectionIndex === sectionIndex
+    );
+    if (targetIndex >= 0) {
+      set({ currentQuestionIndex: targetIndex });
+    }
   },
 
   reset: () => {
@@ -250,16 +322,21 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
   getVisibleQuestions: (section) => {
     const { answers } = get();
     return (
-      section.questions?.filter((q) =>
-        isRelevant(q.relevance_expression, answers)
+      section.questions?.filter(
+        (q) =>
+          isFillableQuestion(q) && isRelevant(q.relevance_expression, answers)
       ) || []
     );
   },
 
   getProgress: () => {
-    const { version, currentSectionIndex } = get();
-    const total = version?.sections?.length || 0;
-    if (total === 0) return 0;
-    return ((currentSectionIndex + 1) / total) * 100;
+    const fillable = get().getFillableQuestions();
+    const { currentQuestionIndex } = get();
+    if (fillable.length === 0) return 0;
+    const boundedIndex = Math.max(
+      0,
+      Math.min(currentQuestionIndex, fillable.length - 1)
+    );
+    return ((boundedIndex + 1) / fillable.length) * 100;
   },
 }));

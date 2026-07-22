@@ -100,29 +100,66 @@ export interface Question {
   constraint_expression?: string;
   calculated_expression?: string;
   default_value_expression?: string;
-  section_id?: number;
+  section_id?: number | string;
+  group_type?: string;
+  appearance?: string;
+  dataset_ref?: string;
   ui?: QuestionUI;
 }
 
 export type QuestionType =
   | 'text'
   | 'textarea'
+  | 'email'
+  | 'phone'
+  | 'regex'
+  | 'curp'
+  | 'codigo_postal'
+  | 'codigo_postal_autofill'
+  | 'seccion'
+  | 'estado'
+  | 'string_masked'
   | 'number'
+  | 'decimal'
+  | 'edad'
+  | 'slider'
+  | 'scale'
+  | 'rating'
+  | 'single_choice'
+  | 'multiple_choice'
+  | 'multi_choice'
+  | 'multi_select'
+  | 'checkbox'
+  | 'radio'
+  | 'select'
+  | 'yes_no'
+  | 'single_choice_image'
+  | 'multiple_choice_image'
   | 'date'
   | 'datetime'
   | 'time'
-  | 'single_choice'
-  | 'multi_choice'
-  | 'yes_no'
+  | 'fecha_nacimiento'
   | 'photo'
+  | 'selfie'
+  | 'photo_no_gallery'
+  | 'photo_canvas'
+  | 'file'
+  | 'voice'
+  | 'video'
   | 'signature'
   | 'location'
-  | 'file'
+  | 'ine_ocr'
   | 'ine_front'
   | 'ine_back'
-  | 'slider'
-  | 'rating'
-  | 'data_list';
+  | 'barcode'
+  | 'barcode_hidden'
+  | 'read_only'
+  | 'data_list'
+  | 'gis_line'
+  | 'gis_polygon'
+  | 'gis_tracking_manual'
+  | 'gis_tracking_auto'
+  | '';
 
 export interface ValidationRules {
   min?: number;
@@ -142,6 +179,7 @@ export interface AnswerOption {
   option_text: string;
   order: number;
   is_exclusive?: boolean;
+  image_url?: string;
 }
 
 export interface QuestionUI {

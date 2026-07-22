@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
 import { QuestionRendererProps } from './question-renderer';
 
 export function DateTimeQuestion({
@@ -9,19 +10,20 @@ export function DateTimeQuestion({
   disabled,
   error,
 }: QuestionRendererProps) {
+  const normalizedType = normalizeQuestionType(question.question_type);
+
   const typeMap: Record<string, string> = {
     date: 'date',
+    fecha_nacimiento: 'date',
     datetime: 'datetime-local',
     time: 'time',
   };
 
-  const inputType = typeMap[question.question_type] || 'date';
+  const inputType = typeMap[normalizedType] || 'date';
 
-  // HTML datetime-local expects YYYY-MM-DDTHH:MM
   const formatValue = (val: unknown): string => {
     if (typeof val !== 'string') return '';
-    if (question.question_type === 'datetime') {
-      // Trim seconds if present
+    if (normalizedType === 'datetime') {
       return val.slice(0, 16);
     }
     return val;
@@ -40,11 +42,11 @@ export function DateTimeQuestion({
 
       <Input
         type={inputType}
+        inputSize="mobile"
         value={formatValue(value)}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         aria-invalid={!!error}
-        className="h-12 text-base md:text-sm"
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}

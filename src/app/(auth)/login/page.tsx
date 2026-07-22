@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ClipboardList, Loader2 } from 'lucide-react';
-import { isAxiosError } from 'axios';
 import { useAuth } from '@/contexts/auth.context';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { PasswordInput } from '@/components/auth/password-input';
@@ -15,7 +14,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { InlineBanner } from '@/components/ui/inline-banner';
 import { toast } from 'sonner';
+import {
+  getLoginErrorMessage,
+  isEmailNotVerifiedError,
+} from '@/lib/utils/api-errors';
 
 const loginSchema = z.object({
   username: z.string().email('Correo electrónico inválido'),
@@ -24,28 +28,15 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-function getLoginErrorMessage(error: unknown): string {
-  if (isAxiosError(error)) {
-    const code = error.response?.data?.code;
-    if (error.response?.status === 403 && code === 'email_not_verified') {
-      return 'Debes verificar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.';
-    }
-    if (error.response?.status === 401) {
-      return 'Credenciales incorrectas. Por favor, intenta de nuevo.';
-    }
-    const detail = error.response?.data?.detail;
-    if (typeof detail === 'string' && detail.length > 0) {
-      return detail;
-    }
-  }
-
-  return 'Credenciales incorrectas. Por favor, intenta de nuevo.';
-}
-
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [banner, setBanner] = useState<{
+    variant: 'error' | 'warning' | 'info';
+    message: string;
+  } | null>(null);
 
   const {
     register,
@@ -60,15 +51,34 @@ export default function LoginPage() {
     },
   });
 
+  useEffect(() => {
+    if (searchParams.get('pending_email_verification') === '1') {
+      const emailHint = searchParams.get('email_hint');
+      setBanner({
+        variant: 'info',
+        message: emailHint
+          ? `Cuenta creada correctamente. Revisa tu correo (${emailHint}), abre el enlace de verificación y luego vuelve a iniciar sesión.`
+          : 'Cuenta creada correctamente. Revisa tu correo, abre el enlace de verificación y luego vuelve a iniciar sesión.',
+      });
+    }
+  }, [searchParams]);
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
+    setBanner(null);
+
     try {
       await login(data.username, data.password);
       toast.success('Inicio de sesión exitoso');
       router.push('/surveys');
     } catch (error) {
       console.error('Login error:', error);
-      toast.error(getLoginErrorMessage(error));
+      const message = getLoginErrorMessage(error);
+      setBanner({
+        variant: isEmailNotVerifiedError(error) ? 'warning' : 'error',
+        message,
+      });
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +103,15 @@ export default function LoginPage() {
           <CardTitle>Iniciar sesión</CardTitle>
           <CardDescription>Formulario de acceso</CardDescription>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="space-y-5 pt-6">
+          {banner && (
+            <InlineBanner
+              variant={banner.variant}
+              message={banner.message}
+              onClose={() => setBanner(null)}
+            />
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-base">
@@ -148,7 +166,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 space-y-3 text-center text-sm">
+          <div className="space-y-3 text-center text-sm">
             <p>
               <Link
                 href="/activate"

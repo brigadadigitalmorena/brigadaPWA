@@ -2,6 +2,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AnswerOption } from '@/lib/types';
+import { getRendererKind } from '@/lib/survey/question-type-registry';
 import { QuestionRendererProps } from './question-renderer';
 
 export function ChoiceQuestion({
@@ -11,8 +12,9 @@ export function ChoiceQuestion({
   disabled,
   error,
 }: QuestionRendererProps) {
-  const isMulti = question.question_type === 'multi_choice';
-  const isYesNo = question.question_type === 'yes_no';
+  const rendererKind = getRendererKind(question.question_type);
+  const isMulti = rendererKind === 'choice_multi';
+  const isYesNo = rendererKind === 'choice' && question.question_type === 'yes_no';
 
   const options: AnswerOption[] = isYesNo
     ? [
@@ -38,12 +40,10 @@ export function ChoiceQuestion({
     let nextValues: string[];
 
     if (isExclusive) {
-      // Exclusive option clears all others
       nextValues = checked ? [optionId] : [];
     } else {
       const current = selectedValues.filter((v) => {
         const selectedOption = options.find((o) => String(o.id) === v);
-        // If selecting a non-exclusive option, clear any exclusive option
         return checked || !selectedOption?.is_exclusive;
       });
 

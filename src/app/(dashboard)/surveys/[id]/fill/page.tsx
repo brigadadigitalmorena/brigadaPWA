@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import {
   finalizeResponse,
   buildDeviceInfo,
 } from '@/lib/services/response-submission.service';
+import { isAutoAdvanceType } from '@/lib/survey/field-types';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,11 +30,12 @@ export default function SurveyFillPage() {
   const titleFromUrl = searchParams.get('title');
   const [surveyTitle, setSurveyTitle] = useState<string>(titleFromUrl ?? 'Encuesta');
   const formRef = useRef<HTMLFormElement>(null);
+  const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     version,
     responseId,
-    currentSectionIndex,
+    currentQuestionIndex,
     answers,
     files,
     location,
@@ -44,10 +46,11 @@ export default function SurveyFillPage() {
     init,
     saveDraft,
     setAnswer,
-    nextSection,
-    prevSection,
+    nextQuestion,
+    prevQuestion,
     goToSection,
-    getVisibleQuestions,
+    getFillableQuestions,
+    getCurrentQuestionEntry,
     getProgress,
     reset,
   } = useSurveyFillStore();
@@ -56,19 +59,30 @@ export default function SurveyFillPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
 
-  const currentSection = version?.sections?.[currentSectionIndex];
-  const visibleQuestions = currentSection
-    ? getVisibleQuestions(currentSection)
-    : [];
+  const fillableQuestions = getFillableQuestions();
+  const currentEntry = getCurrentQuestionEntry();
+  const currentQuestion = currentEntry?.question ?? null;
+  const totalQuestions = fillableQuestions.length;
   const progress = getProgress();
-  const isLastSection =
-    currentSectionIndex >= (version?.sections?.length || 0) - 1;
+  const isFirstQuestion = currentQuestionIndex === 0;
+  const isLastQuestion =
+    totalQuestions === 0 || currentQuestionIndex >= totalQuestions - 1;
+  const currentSectionIndex = currentEntry?.sectionIndex ?? 0;
+
+  const showSectionHeader = useMemo(() => {
+    if (!currentEntry) return false;
+    if (currentQuestionIndex === 0) return true;
+    const previousEntry = fillableQuestions[currentQuestionIndex - 1];
+    return previousEntry?.sectionKey !== currentEntry.sectionKey;
+  }, [currentEntry, currentQuestionIndex, fillableQuestions]);
 
   const {
     control,
     handleSubmit,
     reset: resetForm,
-    formState: { errors, isDirty, isValid },
+    trigger,
+    getValues,
+    formState: { errors, isDirty },
   } = useForm({
     defaultValues: answers,
     mode: 'onChange',
@@ -76,6 +90,9 @@ export default function SurveyFillPage() {
 
   useEffect(() => {
     return () => {
+      if (autoAdvanceTimeoutRef.current) {
+        clearTimeout(autoAdvanceTimeoutRef.current);
+      }
       reset();
     };
   }, [reset]);
@@ -137,16 +154,7 @@ export default function SurveyFillPage() {
     }
   };
 
-  const onSubmit = async (data: Record<string, unknown>) => {
-    Object.entries(data).forEach(([key, value]) => {
-      setAnswer(key, value);
-    });
-
-    if (!isLastSection) {
-      nextSection();
-      return;
-    }
-
+  const finalizeSurvey = async () => {
     if (!version || !responseId || !startedAt) {
       toast.error('Faltan datos para finalizar la encuesta');
       return;
@@ -185,13 +193,44 @@ export default function SurveyFillPage() {
     }
   };
 
-  const handleNext = () => {
-    if (!isValid && visibleQuestions.length > 0) {
-      toast.error('Completa los campos obligatorios antes de continuar');
+  const advanceOrFinalize = async () => {
+    if (!isLastQuestion) {
+      nextQuestion();
+      return;
+    }
+
+    await finalizeSurvey();
+  };
+
+  const handleNext = async () => {
+    if (!currentQuestion) return;
+
+    const questionKey =
+      currentQuestion.question_key || currentQuestion.id.toString();
+    const valid = await trigger(questionKey);
+
+    if (!valid) {
+      toast.error('Completa el campo obligatorio antes de continuar');
       scrollToFirstError();
       return;
     }
-    handleSubmit(onSubmit)();
+
+    const value = getValues(questionKey);
+    setAnswer(questionKey, value);
+    await advanceOrFinalize();
+  };
+
+  const handleAutoAdvance = (questionKey: string, value: unknown) => {
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+    }
+
+    autoAdvanceTimeoutRef.current = setTimeout(async () => {
+      const valid = await trigger(questionKey);
+      if (!valid) return;
+      setAnswer(questionKey, value);
+      await advanceOrFinalize();
+    }, 350);
   };
 
   const handleSaveDraft = async () => {
@@ -200,8 +239,8 @@ export default function SurveyFillPage() {
   };
 
   const handleExit = async () => {
-    if (currentSectionIndex !== 0) {
-      prevSection();
+    if (!isFirstQuestion) {
+      prevQuestion();
       return;
     }
 
@@ -233,7 +272,12 @@ export default function SurveyFillPage() {
             <CardDescription className="text-base">{error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push('/surveys')} variant="outline" size="mobile" className="w-full">
+            <Button
+              onClick={() => router.push('/surveys')}
+              variant="outline"
+              size="mobile"
+              className="w-full"
+            >
               Volver a encuestas
             </Button>
           </CardContent>
@@ -242,7 +286,7 @@ export default function SurveyFillPage() {
     );
   }
 
-  if (!version || !currentSection) {
+  if (!version) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-lg rounded-2xl text-center">
@@ -252,6 +296,26 @@ export default function SurveyFillPage() {
               No se encontró la versión activa de esta encuesta.
             </CardDescription>
           </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (totalQuestions === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-lg rounded-2xl text-center">
+          <CardHeader>
+            <CardTitle className="text-xl">Sin preguntas</CardTitle>
+            <CardDescription className="text-base">
+              Esta encuesta no tiene preguntas disponibles para responder.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push('/surveys')} variant="outline" size="mobile" className="w-full">
+              Volver a encuestas
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
@@ -269,7 +333,7 @@ export default function SurveyFillPage() {
               {Math.round(progress)}%
             </span>
             <span className="text-sm text-muted-foreground">
-              {currentSectionIndex + 1} / {version.sections?.length}
+              {currentQuestionIndex + 1} / {totalQuestions}
             </span>
           </div>
         </div>
@@ -284,7 +348,7 @@ export default function SurveyFillPage() {
         <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
           {version.sections?.map((section, index) => (
             <button
-              key={index}
+              key={section.section_key || index}
               type="button"
               onClick={() => goToSection(index)}
               className={cn(
@@ -304,65 +368,75 @@ export default function SurveyFillPage() {
         </div>
       </div>
 
-      <div className="px-4 pt-4 pb-2">
-        <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
-          <h2 className="text-xl font-semibold text-foreground">{currentSection.title}</h2>
-          {currentSection.description && (
-            <p className="text-base text-muted-foreground mt-1 leading-relaxed">
-              {currentSection.description}
-            </p>
-          )}
+      {showSectionHeader && currentEntry && (
+        <div className="px-4 pt-4 pb-2">
+          <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+            <h2 className="text-xl font-semibold text-foreground">
+              {currentEntry.sectionTitle}
+            </h2>
+            {currentEntry.sectionDescription && (
+              <p className="text-base text-muted-foreground mt-1 leading-relaxed">
+                {currentEntry.sectionDescription}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <form
         ref={formRef}
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-6"
+        onSubmit={handleSubmit(() => handleNext())}
+        className="flex-1 overflow-y-auto px-4 py-4"
       >
-        {visibleQuestions.length === 0 ? (
-          <p className="text-base text-muted-foreground text-center py-8">
-            No hay preguntas en esta sección.
-          </p>
-        ) : (
-          visibleQuestions.map((question, index) => {
-            const questionKey = question.question_key || question.id.toString();
-            return (
-              <div
-                key={question.id}
-                className="bg-card rounded-xl border border-border p-5 shadow-sm"
-              >
-                <div className="flex items-start gap-3 mb-4">
-                  <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
-                    {index + 1}
-                  </span>
-                  <span className="text-xs font-medium text-primary uppercase tracking-wide pt-1.5">
-                    Pregunta {index + 1} de {visibleQuestions.length}
-                  </span>
-                </div>
-                <Controller
-                  name={questionKey}
-                  control={control}
-                  rules={{
-                    required: question.is_required
-                      ? 'Este campo es obligatorio'
-                      : false,
-                  }}
-                  render={({ field }) => (
-                    <QuestionRenderer
-                      question={question}
-                      value={field.value}
-                      onChange={(value) => {
-                        field.onChange(value);
-                        setAnswer(questionKey, value);
-                      }}
-                      error={errors[questionKey]?.message as string}
-                    />
-                  )}
-                />
-              </div>
-            );
-          })
+        {currentQuestion && (
+          <div className="bg-card rounded-xl border border-border p-5 shadow-sm min-h-[50vh] flex flex-col justify-center">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
+                {currentQuestionIndex + 1}
+              </span>
+              <span className="text-xs font-medium text-primary uppercase tracking-wide pt-1.5">
+                Pregunta {currentQuestionIndex + 1} de {totalQuestions}
+              </span>
+            </div>
+
+            <Controller
+              name={
+                currentQuestion.question_key || currentQuestion.id.toString()
+              }
+              control={control}
+              rules={{
+                required: currentQuestion.is_required
+                  ? 'Este campo es obligatorio'
+                  : false,
+              }}
+              render={({ field }) => {
+                const questionKey =
+                  currentQuestion.question_key ||
+                  currentQuestion.id.toString();
+
+                return (
+                  <QuestionRenderer
+                    question={currentQuestion}
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      setAnswer(questionKey, value);
+
+                      if (
+                        isAutoAdvanceType(currentQuestion.question_type) &&
+                        value !== null &&
+                        value !== undefined &&
+                        value !== ''
+                      ) {
+                        handleAutoAdvance(questionKey, value);
+                      }
+                    }}
+                    error={errors[questionKey]?.message as string}
+                  />
+                );
+              }}
+            />
+          </div>
         )}
 
         <div className="h-4" />
@@ -379,7 +453,7 @@ export default function SurveyFillPage() {
             className="gap-2 h-14 px-4 text-base"
           >
             <ChevronLeft className="h-5 w-5" />
-            {currentSectionIndex === 0 ? 'Salir' : 'Anterior'}
+            {isFirstQuestion ? 'Salir' : 'Anterior'}
           </Button>
 
           <Button
@@ -403,7 +477,7 @@ export default function SurveyFillPage() {
           >
             {isSubmitting
               ? 'Guardando...'
-              : isLastSection
+              : isLastQuestion
                 ? 'Finalizar'
                 : 'Siguiente'}
             <ChevronRight className="h-5 w-5" />

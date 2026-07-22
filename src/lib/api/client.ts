@@ -205,9 +205,9 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Handle 403 Forbidden
+    // Handle 403 Forbidden — let callers show inline errors (e.g. email_not_verified on login)
     if (error.response?.status === 403) {
-      console.error('Forbidden:', error.response.data);
+      return Promise.reject(error);
     }
 
     // Handle network errors

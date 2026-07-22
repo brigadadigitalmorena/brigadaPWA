@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { BadgeCheck, KeyRound, Loader2, RefreshCw } from 'lucide-react';
+import { BadgeCheck, KeyRound, Loader2, Mail, RefreshCw } from 'lucide-react';
 
 import { AuthShell } from '@/components/auth/auth-shell';
 import { OtpInput } from '@/components/auth/otp-input';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { InlineBanner } from '@/components/ui/inline-banner';
 import {
   completeActivation,
   resendActivationCode,
@@ -130,6 +131,9 @@ export default function ActivatePage() {
         setEmailHint(result.email_hint);
         setIsCompleted(true);
         toast.success('Cuenta creada. Revisa tu correo para verificarla.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        toast.error(result.message || 'No se pudo completar la activación');
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '';
@@ -162,19 +166,43 @@ export default function ActivatePage() {
           <CardContent className="space-y-5 pt-6">
             {isCompleted ? (
               <div className="space-y-5">
-                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                <InlineBanner
+                  variant="info"
+                  message={
+                    emailHint
+                      ? `Te enviamos un correo a ${emailHint}. Ábrelo y haz clic en el enlace de verificación antes de iniciar sesión.`
+                      : 'Te enviamos un correo de verificación. Ábrelo y confirma tu cuenta antes de iniciar sesión.'
+                  }
+                />
+
+                <div className="flex flex-col items-center gap-3 py-2 text-center">
                   <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
                     <BadgeCheck className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                   </span>
-                  <div>
+                  <div className="space-y-2">
                     <h2 className="text-lg font-semibold">¡Cuenta registrada!</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Revisa tu correo{emailHint ? ` (${emailHint})` : ''} y haz clic en el
-                      enlace de verificación para activar tu cuenta.
+                    <p className="text-sm text-muted-foreground">
+                      Tu contraseña quedó guardada. El último paso es verificar tu correo
+                      electrónico para poder entrar a la app.
                     </p>
+                    <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                      <Mail className="h-4 w-4 shrink-0 text-primary" />
+                      <span>Revisa bandeja de entrada y carpeta de spam.</span>
+                    </div>
                   </div>
                 </div>
-                <Button size="mobile" className="w-full" render={<Link href="/login" />}>
+
+                <Button
+                  size="mobile"
+                  className="w-full"
+                  render={
+                    <Link
+                      href={`/login?pending_email_verification=1${
+                        emailHint ? `&email_hint=${encodeURIComponent(emailHint)}` : ''
+                      }`}
+                    />
+                  }
+                >
                   Ir a iniciar sesión
                 </Button>
               </div>

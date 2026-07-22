@@ -9,6 +9,11 @@ import { saveFileBlob, deleteFileBlob } from '@/lib/services/file-blob.service';
 import { compressInePhoto } from '@/lib/services/image-compression.service';
 import { QuestionRendererProps } from './question-renderer';
 
+function getIneSide(questionType: string | undefined): 'front' | 'back' {
+  const rawType = (questionType || '').trim().toLowerCase();
+  return rawType === 'ine_back' ? 'back' : 'front';
+}
+
 export function IneQuestion({
   question,
   error,
@@ -21,8 +26,8 @@ export function IneQuestion({
 
   const questionKey = question.question_key || question.id.toString();
   const ineFiles = files[questionKey] || [];
-  const sideLabel = question.question_type === 'ine_front' ? 'frente' : 'reverso';
-  const side = question.question_type === 'ine_front' ? 'front' : 'back';
+  const side = getIneSide(question.question_type);
+  const sideLabel = side === 'front' ? 'frente' : 'reverso';
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
