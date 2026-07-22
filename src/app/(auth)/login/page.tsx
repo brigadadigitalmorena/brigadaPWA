@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ClipboardList, Loader2 } from 'lucide-react';
+import { ClipboardList, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -91,15 +92,36 @@ export default function LoginPage() {
                 <Label htmlFor="password" className="text-base">
                   Contraseña
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  inputSize="mobile"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  disabled={isLoading}
-                  {...register('password')}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    inputSize="mobile"
+                    className="pr-12"
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    disabled={isLoading}
+                    {...register('password')}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={
+                      showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                    }
+                    aria-pressed={showPassword}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
                 {errors.password && (
                   <p className="text-sm text-destructive">{errors.password.message}</p>
                 )}
