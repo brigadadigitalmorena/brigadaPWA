@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/auth.context';
 import { SyncProvider } from '@/contexts/sync.context';
+import { ThemeProvider } from '@/contexts/theme-context';
 import { Toaster } from '@/components/ui/sonner';
 import { ServiceWorkerRegistrar } from '@/components/common/service-worker-registrar';
 
@@ -34,17 +35,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <SyncProvider>
-            {children}
-            <Toaster />
-            <ServiceWorkerRegistrar />
-          </SyncProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <SyncProvider>
+              {children}
+              <Toaster />
+              <ServiceWorkerRegistrar />
+            </SyncProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

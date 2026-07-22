@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
+import { useTheme } from '@/contexts/theme-context';
 import { User as UserType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -20,6 +21,7 @@ interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const { logout } = useAuth();
+  const { theme, toggleTheme, mounted } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
 
@@ -70,6 +72,21 @@ export function UserMenu({ user }: UserMenuProps) {
               </div>
             </div>
           </DialogHeader>
+
+          <Button
+            variant="outline"
+            size="mobile"
+            className="w-full justify-start gap-3"
+            onClick={toggleTheme}
+            disabled={!mounted}
+          >
+            {theme === 'light' ? (
+              <Moon className="h-5 w-5" />
+            ) : (
+              <Sun className="h-5 w-5" />
+            )}
+            {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+          </Button>
 
           <Button
             variant="outline"

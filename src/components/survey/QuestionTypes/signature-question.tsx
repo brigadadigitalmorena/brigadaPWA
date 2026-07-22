@@ -134,7 +134,7 @@ export function SignatureQuestion({
         <p className="text-sm text-muted-foreground">{question.ui.helper_text}</p>
       )}
 
-      <div className="rounded-xl border border-input bg-white overflow-hidden touch-none">
+      <div className="rounded-xl border border-input bg-card overflow-hidden touch-none">
         <canvas
           ref={canvasRef}
           className="w-full h-40 block cursor-crosshair"

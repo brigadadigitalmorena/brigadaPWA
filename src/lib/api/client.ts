@@ -1,8 +1,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { RefreshTokenResponse } from '@/lib/types';
+import { getApiBaseUrl } from './api-base-url';
 
-// API configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_TIMEOUT = 30000;
 
 // Storage keys
@@ -22,7 +21,7 @@ let refreshSubscribers: ((token: string) => void)[] = [];
  * Create axios instance with base configuration
  */
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   timeout: API_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
@@ -111,7 +110,7 @@ async function performTokenRefresh(): Promise<string | null> {
 
   try {
     const response = await axios.post<RefreshTokenResponse>(
-      `${API_BASE_URL}/mobile/token/refresh`,
+      `${getApiBaseUrl()}/mobile/token/refresh`,
       { refresh_token: refreshToken },
       { timeout: 15000 }
     );
