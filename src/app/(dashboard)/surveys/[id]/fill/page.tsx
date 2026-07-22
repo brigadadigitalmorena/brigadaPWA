@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -23,6 +23,14 @@ import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
 
 export default function SurveyFillPage() {
+  return (
+    <Suspense fallback={<LoadingState message="Cargando encuesta..." />}>
+      <SurveyFillPageContent />
+    </Suspense>
+  );
+}
+
+function SurveyFillPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
