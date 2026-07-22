@@ -6,6 +6,12 @@ import {
   LocationData,
   ResponseMetadata,
 } from '@/lib/types';
+import {
+  cacheAssignment,
+  cacheAssignments,
+  normalizeSurveyVersion,
+  readCachedAssignment,
+} from '@/lib/utils/survey-version';
 
 export interface QuestionAnswerCreate {
   question_id: number;
@@ -78,26 +84,67 @@ export interface DocumentConfirmRequest {
  */
 export async function getMyAssignments(): Promise<Assignment[]> {
   const response = await apiClient.get<Assignment[]>('/mobile/surveys');
+  cacheAssignments(response.data);
   return response.data;
+}
+
+/**
+ * Find one assignment for a survey from the mobile assignments endpoint.
+ */
+export async function getAssignmentForSurvey(
+  surveyId: number
+): Promise<Assignment | null> {
+  const assignments = await getMyAssignments();
+  return assignments.find((assignment) => assignment.survey_id === surveyId) ?? null;
 }
 
 /**
  * Resolve survey title from mobile assignments (no admin permission required).
  */
 export async function getSurveyTitle(surveyId: number): Promise<string> {
-  const assignments = await getMyAssignments();
-  const match = assignments.find((a) => a.survey_id === surveyId);
-  return match?.survey_title ?? `Encuesta #${surveyId}`;
+  const cached = readCachedAssignment(surveyId);
+  if (cached?.survey_title) return cached.survey_title;
+
+  const assignment = await getAssignmentForSurvey(surveyId);
+  return assignment?.survey_title ?? `Encuesta #${surveyId}`;
 }
 
 /**
- * Get latest published survey version
+ * Load survey version for the fill flow.
+ * Uses assignment data from /mobile/surveys instead of the legacy /latest endpoint.
+ */
+export async function loadSurveyForFill(
+  surveyId: number,
+  titleFromUrl?: string | null
+): Promise<{ title: string; version: SurveyVersion }> {
+  const cached = readCachedAssignment(surveyId);
+  if (cached?.latest_version) {
+    return {
+      title: titleFromUrl ?? cached.survey_title,
+      version: normalizeSurveyVersion(cached.latest_version),
+    };
+  }
+
+  const assignment = await getAssignmentForSurvey(surveyId);
+  if (!assignment?.latest_version) {
+    throw new Error('No published version available for this survey');
+  }
+
+  cacheAssignment(surveyId, assignment);
+
+  return {
+    title: titleFromUrl ?? assignment.survey_title,
+    version: normalizeSurveyVersion(assignment.latest_version),
+  };
+}
+
+/**
+ * Get latest published survey version (legacy endpoint).
+ * Prefer loadSurveyForFill() which reuses /mobile/surveys assignments.
  */
 export async function getLatestSurveyVersion(surveyId: number): Promise<SurveyVersion> {
-  const response = await apiClient.get<SurveyVersion>(
-    `/mobile/surveys/${surveyId}/latest`
-  );
-  return response.data;
+  const { version } = await loadSurveyForFill(surveyId);
+  return version;
 }
 
 /**

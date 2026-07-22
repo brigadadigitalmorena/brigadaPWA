@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getMyAssignments } from '@/lib/api/survey.service';
+import type { Assignment } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,17 +13,7 @@ import { SkeletonSurveyCard } from '@/components/ui/skeleton';
 import { ClipboardList, Play, Calendar, Users, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface AssignedSurvey {
-  id: number;
-  survey_id: number;
-  survey_title: string;
-  survey_description?: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  group_name?: string;
-  version_id?: number;
-}
+interface AssignedSurvey extends Assignment {}
 
 export default function SurveysPage() {
   const [surveys, setSurveys] = useState<AssignedSurvey[]>([]);
@@ -100,7 +91,9 @@ export default function SurveysPage() {
     );
   }
 
-  const pendingCount = surveys.filter((s) => s.status !== 'completed').length;
+  const pendingCount = surveys.filter(
+    (survey) => survey.assignment_status !== 'completed'
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -126,11 +119,11 @@ export default function SurveysPage() {
 
       <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
         {surveys.map((survey) => {
-          const isCompleted = survey.status === 'completed';
+          const isCompleted = survey.assignment_status === 'completed';
 
           return (
             <Card
-              key={survey.id}
+              key={survey.assignment_id}
               className={cn(
                 'overflow-hidden transition-shadow hover:shadow-md',
                 isCompleted && 'opacity-80'
@@ -157,7 +150,8 @@ export default function SurveysPage() {
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 flex-shrink-0" />
                     <span>
-                      Asignada: {new Date(survey.created_at).toLocaleDateString()}
+                      Asignada:{' '}
+                      {new Date(survey.assigned_at).toLocaleDateString()}
                     </span>
                   </div>
                   {survey.group_name && (

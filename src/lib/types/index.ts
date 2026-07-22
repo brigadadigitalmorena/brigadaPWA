@@ -61,13 +61,17 @@ export interface SurveyMetadata {
 
 export interface SurveyVersion {
   id: number;
-  survey_id: number;
+  survey_id?: number;
   version_number: number;
   is_published: boolean;
+  is_archived?: boolean;
   published_at?: string;
   change_summary?: string;
   engine_version: number;
+  schema_hash?: string;
+  schema_version?: number;
   sections?: SurveySection[];
+  questions?: Question[];
   data_lists?: Record<string, unknown>;
 }
 
@@ -148,19 +152,28 @@ export interface QuestionUI {
   [key: string]: unknown;
 }
 
-// Assignment types
+// Assignment types (matches backend AssignedSurveyResponse)
 export interface Assignment {
-  id: number;
+  assignment_id: number;
   survey_id: number;
   survey_title: string;
-  assigned_to_id: number;
-  assigned_to_name: string;
-  assigned_by_id: number;
-  assigned_by_name: string;
-  status: string;
-  due_date?: string;
-  created_at: string;
-  updated_at: string;
+  survey_description?: string;
+  survey_type?: string;
+  assignment_status: string;
+  inactive_reason?: string;
+  management_status?: string;
+  assigned_location?: string;
+  group_id?: number;
+  group_name?: string;
+  group_path?: string;
+  group_depth?: number;
+  area_names?: string[];
+  notes?: string;
+  latest_version: SurveyVersion;
+  engine_version?: number;
+  assigned_at: string;
+  min_responses_per_day?: number;
+  max_responses_per_day?: number;
 }
 
 // Sync types

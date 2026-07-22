@@ -9,7 +9,7 @@ import { isAxiosError } from 'axios';
 
 import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
 import { useSync } from '@/contexts/sync.context';
-import { getLatestSurveyVersion, getSurveyTitle } from '@/lib/api/survey.service';
+import { loadSurveyForFill } from '@/lib/api/survey.service';
 import {
   finalizeResponse,
   buildDeviceInfo,
@@ -85,12 +85,10 @@ export default function SurveyFillPage() {
 
     const load = async () => {
       try {
-        const [title, version] = await Promise.all([
+        const { title, version } = await loadSurveyForFill(
+          Number(surveyId),
           titleFromUrl
-            ? Promise.resolve(titleFromUrl)
-            : getSurveyTitle(Number(surveyId)),
-          getLatestSurveyVersion(Number(surveyId)),
-        ]);
+        );
 
         if (mounted) {
           setSurveyTitle(title);
