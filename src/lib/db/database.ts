@@ -1,6 +1,5 @@
 import Dexie, { Table } from 'dexie';
 
-// Survey types
 export interface Survey {
   id?: number;
   survey_id: string;
@@ -18,11 +17,11 @@ export interface Survey {
   sync_status: 'pending' | 'synced' | 'error';
   last_synced_at?: string;
   remote_updated_at?: string;
+  assignment_json?: string;
   created_at: string;
   updated_at: string;
 }
 
-// Response types
 export interface Response {
   id?: number;
   response_id: string;
@@ -59,7 +58,6 @@ export interface Response {
   updated_at: string;
 }
 
-// Response Answer types
 export interface ResponseAnswer {
   id?: number;
   response_id: string;
@@ -71,7 +69,6 @@ export interface ResponseAnswer {
   created_at: string;
 }
 
-// Local File types
 export interface LocalFile {
   id?: number;
   file_id: string;
@@ -96,7 +93,18 @@ export interface LocalFile {
   created_at: string;
 }
 
-// Sync Queue types
+export type SyncQueueStatus =
+  | 'pending'
+  | 'leased'
+  | 'syncing'
+  | 'retry_wait'
+  | 'completed'
+  | 'failed'
+  | 'failed_permanent'
+  | 'dead_letter'
+  | 'discarded'
+  | 'cancelled';
+
 export interface SyncQueue {
   id?: number;
   queue_id: string;
@@ -104,7 +112,7 @@ export interface SyncQueue {
   entity_type: 'survey' | 'response' | 'user' | 'file';
   entity_id: string;
   payload_json: string;
-  status: 'pending' | 'syncing' | 'completed' | 'failed' | 'dead_letter';
+  status: SyncQueueStatus;
   priority: number;
   retry_count: number;
   max_retries: number;
@@ -119,7 +127,6 @@ export interface SyncQueue {
   completed_at?: string;
 }
 
-// KV Cache types
 export interface KVCache {
   cache_key: string;
   cache_value: string;
@@ -128,7 +135,6 @@ export interface KVCache {
   updated_at: string;
 }
 
-// File Blob types (stores actual file content for offline survival)
 export interface FileBlob {
   id?: number;
   file_id: string;
@@ -137,7 +143,6 @@ export interface FileBlob {
   created_at: string;
 }
 
-// Database class
 class BrigadaDatabase extends Dexie {
   surveys!: Table<Survey>;
   responses!: Table<Response>;
@@ -168,48 +173,151 @@ class BrigadaDatabase extends Dexie {
       kv_cache: 'cache_key, expires_at',
       file_blobs: '++id, file_id, response_id, created_at',
     });
+
+    // v3: durable assignment cache fields (assignment_json) — same indexes
+    this.version(3).stores({
+      surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
+      responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
+      response_answers: '++id, response_id, question_key, created_at',
+      local_files: '++id, file_id, response_id, file_type, sync_status, created_at',
+      sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
+      kv_cache: 'cache_key, expires_at',
+      file_blobs: '++id, file_id, response_id, created_at',
+    });
   }
 }
 
-// Create singleton instance
 export const db = new BrigadaDatabase();
+export const DB_VERSION = 3;
 
-// Database version
-export const DB_VERSION = 2;
+const PROCESS_LOCK_KEY = 'sync_process_lock';
+const LEASE_OWNER = `pwa-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : 'local'}`;
+const LEASE_MS = 120_000;
 
-// Initialize database
+export function getLeaseOwner(): string {
+  return LEASE_OWNER;
+}
+
+export function getLeaseDurationMs(): number {
+  return LEASE_MS;
+}
+
 export async function initializeDatabase(): Promise<void> {
-  try {
-    await db.open();
-    console.log('Database initialized successfully');
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw error;
-  }
+  await db.open();
 }
 
-// Close database
 export async function closeDatabase(): Promise<void> {
+  await db.close();
+}
+
+export async function clearDatabase(): Promise<void> {
+  await db.surveys.clear();
+  await db.responses.clear();
+  await db.response_answers.clear();
+  await db.local_files.clear();
+  await db.sync_queue.clear();
+  await db.kv_cache.clear();
+  await db.file_blobs.clear();
+}
+
+export async function kvGet(key: string): Promise<string | null> {
+  const row = await db.kv_cache.get(key);
+  if (!row) return null;
+  if (row.expires_at && row.expires_at < new Date().toISOString()) {
+    await db.kv_cache.delete(key);
+    return null;
+  }
+  return row.cache_value;
+}
+
+export async function kvSet(
+  key: string,
+  value: string,
+  expiresAt?: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.kv_cache.put({
+    cache_key: key,
+    cache_value: value,
+    expires_at: expiresAt,
+    created_at: now,
+    updated_at: now,
+  });
+}
+
+export async function kvRemove(key: string): Promise<void> {
+  await db.kv_cache.delete(key);
+}
+
+export async function acquireProcessLock(): Promise<boolean> {
+  const now = Date.now();
+  const existing = await kvGet(PROCESS_LOCK_KEY);
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing) as { owner: string; until: number };
+      if (parsed.until > now && parsed.owner !== LEASE_OWNER) {
+        return false;
+      }
+    } catch {
+      /* take over corrupt lock */
+    }
+  }
+  await kvSet(
+    PROCESS_LOCK_KEY,
+    JSON.stringify({ owner: LEASE_OWNER, until: now + LEASE_MS })
+  );
+  return true;
+}
+
+export async function releaseProcessLock(): Promise<void> {
+  const existing = await kvGet(PROCESS_LOCK_KEY);
+  if (!existing) return;
   try {
-    await db.close();
-    console.log('Database closed successfully');
-  } catch (error) {
-    console.error('Failed to close database:', error);
+    const parsed = JSON.parse(existing) as { owner: string };
+    if (parsed.owner === LEASE_OWNER) {
+      await kvRemove(PROCESS_LOCK_KEY);
+    }
+  } catch {
+    await kvRemove(PROCESS_LOCK_KEY);
   }
 }
 
-// Clear all data (for logout)
-export async function clearDatabase(): Promise<void> {
-  try {
-    await db.surveys.clear();
-    await db.responses.clear();
-    await db.response_answers.clear();
-    await db.local_files.clear();
-    await db.sync_queue.clear();
-    await db.kv_cache.clear();
-    console.log('Database cleared successfully');
-  } catch (error) {
-    console.error('Failed to clear database:', error);
-    throw error;
+export async function forceReleaseStaleLocks(): Promise<void> {
+  const now = Date.now();
+  const existing = await kvGet(PROCESS_LOCK_KEY);
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing) as { until: number };
+      if (parsed.until <= now) {
+        await kvRemove(PROCESS_LOCK_KEY);
+      }
+    } catch {
+      await kvRemove(PROCESS_LOCK_KEY);
+    }
+  }
+
+  const leased = await db.sync_queue.where('status').equals('leased').toArray();
+  for (const item of leased) {
+    if (item.id === undefined) continue;
+    if (!item.lease_until || item.lease_until <= new Date(now).toISOString()) {
+      await db.sync_queue.update(item.id, {
+        status: 'pending',
+        lease_owner: undefined,
+        lease_until: undefined,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  // Migrate legacy "failed" rows that have a future/past retry into retry_wait
+  const failed = await db.sync_queue.where('status').equals('failed').toArray();
+  for (const item of failed) {
+    if (item.id === undefined) continue;
+    if (item.retry_count < item.max_retries) {
+      await db.sync_queue.update(item.id, {
+        status: 'retry_wait',
+        updated_at: new Date().toISOString(),
+      });
+    }
   }
 }

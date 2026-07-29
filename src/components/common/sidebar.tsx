@@ -9,6 +9,9 @@ import {
   ClipboardList,
   RefreshCw,
   LogOut,
+  FileEdit,
+  Zap,
+  MapPinned,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,7 +30,25 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       isActive: (path: string) => path.startsWith('/surveys'),
     },
     {
-      label: 'Sincronización',
+      label: 'Borradores',
+      href: '/drafts',
+      icon: FileEdit,
+      isActive: (path: string) => path.startsWith('/drafts'),
+    },
+    {
+      label: 'Extras',
+      href: '/extras',
+      icon: Zap,
+      isActive: (path: string) => path.startsWith('/extras'),
+    },
+    {
+      label: 'Tracking',
+      href: '/tracking',
+      icon: MapPinned,
+      isActive: (path: string) => path.startsWith('/tracking'),
+    },
+    {
+      label: 'Envíos',
       href: '/sync',
       icon: RefreshCw,
       isActive: (path: string) => path.startsWith('/sync'),

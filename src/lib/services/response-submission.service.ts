@@ -140,7 +140,7 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
         status: 'pending',
         priority: 10,
         retry_count: 0,
-        max_retries: 5,
+        max_retries: 12,
         next_retry_at: now,
         last_error: undefined,
         last_error_code: undefined,

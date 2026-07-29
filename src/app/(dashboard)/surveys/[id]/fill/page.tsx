@@ -15,6 +15,7 @@ import {
   buildDeviceInfo,
 } from '@/lib/services/response-submission.service';
 import { isAutoAdvanceType } from '@/lib/survey/field-types';
+import { useSurveyFormEngine } from '@/lib/forms/use-survey-form-engine';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -66,6 +67,9 @@ function SurveyFillPageContent() {
   const { isOnline, syncNow } = useSync();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
+
+  // Form Engine v2 — keeps visibility/constraints aligned with mobile
+  const formEngine = useSurveyFormEngine(version, answers);
 
   const fillableQuestions = getFillableQuestions();
   const currentEntry = getCurrentQuestionEntry();
@@ -225,6 +229,7 @@ function SurveyFillPageContent() {
 
     const value = getValues(questionKey);
     setAnswer(questionKey, value);
+    formEngine?.setAnswer(questionKey, value);
     await advanceOrFinalize();
   };
 
@@ -237,6 +242,7 @@ function SurveyFillPageContent() {
       const valid = await trigger(questionKey);
       if (!valid) return;
       setAnswer(questionKey, value);
+      formEngine?.setAnswer(questionKey, value);
       await advanceOrFinalize();
     }, 350);
   };
@@ -429,6 +435,7 @@ function SurveyFillPageContent() {
                     onChange={(value) => {
                       field.onChange(value);
                       setAnswer(questionKey, value);
+                      formEngine?.setAnswer(questionKey, value);
 
                       if (
                         isAutoAdvanceType(currentQuestion.question_type) &&

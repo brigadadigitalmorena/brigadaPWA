@@ -9,6 +9,7 @@ import { SyncIndicator } from '@/components/sync/sync-indicator';
 import { UserMenu } from '@/components/common/user-menu';
 import { InstallPrompt } from '@/components/common/install-prompt';
 import { LoadingState } from '@/components/common/loading-state';
+import { FieldStatusBanners } from '@/components/banners/field-status-banners';
 import { ClipboardList } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -70,6 +71,9 @@ export default function DashboardLayout({
         <main
           className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] md:pb-6"
         >
+          <div className="mb-4">
+            <FieldStatusBanners />
+          </div>
           {children}
         </main>
 

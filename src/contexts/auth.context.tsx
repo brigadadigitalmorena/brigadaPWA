@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { AuthState } from '@/lib/types';
 import { getCurrentUser, isAuthenticated, login as loginApi, logout as logoutApi } from '@/lib/api/auth.service';
 import { loadTokensFromStorage } from '@/lib/api/client';
+import { clearDatabase } from '@/lib/db/database';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
@@ -57,6 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: true,
         isLoading: false,
       });
+
+      void import('@/lib/services/datasets.service').then((m) =>
+        m.warmDatasetsIfOnline()
+      );
     } catch (error) {
       setState((prev) => ({ ...prev, isLoading: false }));
       throw error;
@@ -67,6 +72,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await logoutApi();
     } finally {
+      try {
+        await clearDatabase();
+      } catch (err) {
+        console.warn('Failed to clear IndexedDB on logout', err);
+      }
       setState({
         user: null,
         accessToken: null,

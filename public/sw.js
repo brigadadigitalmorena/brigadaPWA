@@ -2478,6 +2478,12 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
   };
 
+  // node_modules/workbox-core/_private/dontWaitFor.js
+  function dontWaitFor(promise) {
+    void promise.then(() => {
+    });
+  }
+
   // node_modules/idb/build/wrap-idb-value.js
   var instanceOfAny = (object, constructors) => constructors.some((c) => object instanceof c);
   var idbProxyableTypes;
@@ -2696,726 +2702,6 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     has: (target, prop) => !!getMethod(target, prop) || oldTraps.has(target, prop)
   }));
 
-  // node_modules/workbox-background-sync/_version.js
-  try {
-    self["workbox:background-sync:7.4.0"] && _();
-  } catch (e) {
-  }
-
-  // node_modules/workbox-background-sync/lib/QueueDb.js
-  var DB_VERSION = 3;
-  var DB_NAME = "workbox-background-sync";
-  var REQUEST_OBJECT_STORE_NAME = "requests";
-  var QUEUE_NAME_INDEX = "queueName";
-  var QueueDb = class {
-    constructor() {
-      this._db = null;
-    }
-    /**
-     * Add QueueStoreEntry to underlying db.
-     *
-     * @param {UnidentifiedQueueStoreEntry} entry
-     */
-    async addEntry(entry) {
-      const db = await this.getDb();
-      const tx = db.transaction(REQUEST_OBJECT_STORE_NAME, "readwrite", {
-        durability: "relaxed"
-      });
-      await tx.store.add(entry);
-      await tx.done;
-    }
-    /**
-     * Returns the first entry id in the ObjectStore.
-     *
-     * @return {number | undefined}
-     */
-    async getFirstEntryId() {
-      const db = await this.getDb();
-      const cursor = await db.transaction(REQUEST_OBJECT_STORE_NAME).store.openCursor();
-      return cursor === null || cursor === void 0 ? void 0 : cursor.value.id;
-    }
-    /**
-     * Get all the entries filtered by index
-     *
-     * @param queueName
-     * @return {Promise<QueueStoreEntry[]>}
-     */
-    async getAllEntriesByQueueName(queueName) {
-      const db = await this.getDb();
-      const results = await db.getAllFromIndex(REQUEST_OBJECT_STORE_NAME, QUEUE_NAME_INDEX, IDBKeyRange.only(queueName));
-      return results ? results : new Array();
-    }
-    /**
-     * Returns the number of entries filtered by index
-     *
-     * @param queueName
-     * @return {Promise<number>}
-     */
-    async getEntryCountByQueueName(queueName) {
-      const db = await this.getDb();
-      return db.countFromIndex(REQUEST_OBJECT_STORE_NAME, QUEUE_NAME_INDEX, IDBKeyRange.only(queueName));
-    }
-    /**
-     * Deletes a single entry by id.
-     *
-     * @param {number} id the id of the entry to be deleted
-     */
-    async deleteEntry(id) {
-      const db = await this.getDb();
-      await db.delete(REQUEST_OBJECT_STORE_NAME, id);
-    }
-    /**
-     *
-     * @param queueName
-     * @returns {Promise<QueueStoreEntry | undefined>}
-     */
-    async getFirstEntryByQueueName(queueName) {
-      return await this.getEndEntryFromIndex(IDBKeyRange.only(queueName), "next");
-    }
-    /**
-     *
-     * @param queueName
-     * @returns {Promise<QueueStoreEntry | undefined>}
-     */
-    async getLastEntryByQueueName(queueName) {
-      return await this.getEndEntryFromIndex(IDBKeyRange.only(queueName), "prev");
-    }
-    /**
-     * Returns either the first or the last entries, depending on direction.
-     * Filtered by index.
-     *
-     * @param {IDBCursorDirection} direction
-     * @param {IDBKeyRange} query
-     * @return {Promise<QueueStoreEntry | undefined>}
-     * @private
-     */
-    async getEndEntryFromIndex(query, direction) {
-      const db = await this.getDb();
-      const cursor = await db.transaction(REQUEST_OBJECT_STORE_NAME).store.index(QUEUE_NAME_INDEX).openCursor(query, direction);
-      return cursor === null || cursor === void 0 ? void 0 : cursor.value;
-    }
-    /**
-     * Returns an open connection to the database.
-     *
-     * @private
-     */
-    async getDb() {
-      if (!this._db) {
-        this._db = await openDB(DB_NAME, DB_VERSION, {
-          upgrade: this._upgradeDb
-        });
-      }
-      return this._db;
-    }
-    /**
-     * Upgrades QueueDB
-     *
-     * @param {IDBPDatabase<QueueDBSchema>} db
-     * @param {number} oldVersion
-     * @private
-     */
-    _upgradeDb(db, oldVersion) {
-      if (oldVersion > 0 && oldVersion < DB_VERSION) {
-        if (db.objectStoreNames.contains(REQUEST_OBJECT_STORE_NAME)) {
-          db.deleteObjectStore(REQUEST_OBJECT_STORE_NAME);
-        }
-      }
-      const objStore = db.createObjectStore(REQUEST_OBJECT_STORE_NAME, {
-        autoIncrement: true,
-        keyPath: "id"
-      });
-      objStore.createIndex(QUEUE_NAME_INDEX, QUEUE_NAME_INDEX, { unique: false });
-    }
-  };
-
-  // node_modules/workbox-background-sync/lib/QueueStore.js
-  var QueueStore = class {
-    /**
-     * Associates this instance with a Queue instance, so entries added can be
-     * identified by their queue name.
-     *
-     * @param {string} queueName
-     */
-    constructor(queueName) {
-      this._queueName = queueName;
-      this._queueDb = new QueueDb();
-    }
-    /**
-     * Append an entry last in the queue.
-     *
-     * @param {Object} entry
-     * @param {Object} entry.requestData
-     * @param {number} [entry.timestamp]
-     * @param {Object} [entry.metadata]
-     */
-    async pushEntry(entry) {
-      if (true) {
-        finalAssertExports.isType(entry, "object", {
-          moduleName: "workbox-background-sync",
-          className: "QueueStore",
-          funcName: "pushEntry",
-          paramName: "entry"
-        });
-        finalAssertExports.isType(entry.requestData, "object", {
-          moduleName: "workbox-background-sync",
-          className: "QueueStore",
-          funcName: "pushEntry",
-          paramName: "entry.requestData"
-        });
-      }
-      delete entry.id;
-      entry.queueName = this._queueName;
-      await this._queueDb.addEntry(entry);
-    }
-    /**
-     * Prepend an entry first in the queue.
-     *
-     * @param {Object} entry
-     * @param {Object} entry.requestData
-     * @param {number} [entry.timestamp]
-     * @param {Object} [entry.metadata]
-     */
-    async unshiftEntry(entry) {
-      if (true) {
-        finalAssertExports.isType(entry, "object", {
-          moduleName: "workbox-background-sync",
-          className: "QueueStore",
-          funcName: "unshiftEntry",
-          paramName: "entry"
-        });
-        finalAssertExports.isType(entry.requestData, "object", {
-          moduleName: "workbox-background-sync",
-          className: "QueueStore",
-          funcName: "unshiftEntry",
-          paramName: "entry.requestData"
-        });
-      }
-      const firstId = await this._queueDb.getFirstEntryId();
-      if (firstId) {
-        entry.id = firstId - 1;
-      } else {
-        delete entry.id;
-      }
-      entry.queueName = this._queueName;
-      await this._queueDb.addEntry(entry);
-    }
-    /**
-     * Removes and returns the last entry in the queue matching the `queueName`.
-     *
-     * @return {Promise<QueueStoreEntry|undefined>}
-     */
-    async popEntry() {
-      return this._removeEntry(await this._queueDb.getLastEntryByQueueName(this._queueName));
-    }
-    /**
-     * Removes and returns the first entry in the queue matching the `queueName`.
-     *
-     * @return {Promise<QueueStoreEntry|undefined>}
-     */
-    async shiftEntry() {
-      return this._removeEntry(await this._queueDb.getFirstEntryByQueueName(this._queueName));
-    }
-    /**
-     * Returns all entries in the store matching the `queueName`.
-     *
-     * @param {Object} options See {@link workbox-background-sync.Queue~getAll}
-     * @return {Promise<Array<Object>>}
-     */
-    async getAll() {
-      return await this._queueDb.getAllEntriesByQueueName(this._queueName);
-    }
-    /**
-     * Returns the number of entries in the store matching the `queueName`.
-     *
-     * @param {Object} options See {@link workbox-background-sync.Queue~size}
-     * @return {Promise<number>}
-     */
-    async size() {
-      return await this._queueDb.getEntryCountByQueueName(this._queueName);
-    }
-    /**
-     * Deletes the entry for the given ID.
-     *
-     * WARNING: this method does not ensure the deleted entry belongs to this
-     * queue (i.e. matches the `queueName`). But this limitation is acceptable
-     * as this class is not publicly exposed. An additional check would make
-     * this method slower than it needs to be.
-     *
-     * @param {number} id
-     */
-    async deleteEntry(id) {
-      await this._queueDb.deleteEntry(id);
-    }
-    /**
-     * Removes and returns the first or last entry in the queue (based on the
-     * `direction` argument) matching the `queueName`.
-     *
-     * @return {Promise<QueueStoreEntry|undefined>}
-     * @private
-     */
-    async _removeEntry(entry) {
-      if (entry) {
-        await this.deleteEntry(entry.id);
-      }
-      return entry;
-    }
-  };
-
-  // node_modules/workbox-background-sync/lib/StorableRequest.js
-  var serializableProperties = [
-    "method",
-    "referrer",
-    "referrerPolicy",
-    "mode",
-    "credentials",
-    "cache",
-    "redirect",
-    "integrity",
-    "keepalive"
-  ];
-  var StorableRequest = class _StorableRequest {
-    /**
-     * Converts a Request object to a plain object that can be structured
-     * cloned or JSON-stringified.
-     *
-     * @param {Request} request
-     * @return {Promise<StorableRequest>}
-     */
-    static async fromRequest(request) {
-      const requestData = {
-        url: request.url,
-        headers: {}
-      };
-      if (request.method !== "GET") {
-        requestData.body = await request.clone().arrayBuffer();
-      }
-      for (const [key, value] of request.headers.entries()) {
-        requestData.headers[key] = value;
-      }
-      for (const prop of serializableProperties) {
-        if (request[prop] !== void 0) {
-          requestData[prop] = request[prop];
-        }
-      }
-      return new _StorableRequest(requestData);
-    }
-    /**
-     * Accepts an object of request data that can be used to construct a
-     * `Request` but can also be stored in IndexedDB.
-     *
-     * @param {Object} requestData An object of request data that includes the
-     *     `url` plus any relevant properties of
-     *     [requestInit]{@link https://fetch.spec.whatwg.org/#requestinit}.
-     */
-    constructor(requestData) {
-      if (true) {
-        finalAssertExports.isType(requestData, "object", {
-          moduleName: "workbox-background-sync",
-          className: "StorableRequest",
-          funcName: "constructor",
-          paramName: "requestData"
-        });
-        finalAssertExports.isType(requestData.url, "string", {
-          moduleName: "workbox-background-sync",
-          className: "StorableRequest",
-          funcName: "constructor",
-          paramName: "requestData.url"
-        });
-      }
-      if (requestData["mode"] === "navigate") {
-        requestData["mode"] = "same-origin";
-      }
-      this._requestData = requestData;
-    }
-    /**
-     * Returns a deep clone of the instances `_requestData` object.
-     *
-     * @return {Object}
-     */
-    toObject() {
-      const requestData = Object.assign({}, this._requestData);
-      requestData.headers = Object.assign({}, this._requestData.headers);
-      if (requestData.body) {
-        requestData.body = requestData.body.slice(0);
-      }
-      return requestData;
-    }
-    /**
-     * Converts this instance to a Request.
-     *
-     * @return {Request}
-     */
-    toRequest() {
-      return new Request(this._requestData.url, this._requestData);
-    }
-    /**
-     * Creates and returns a deep clone of the instance.
-     *
-     * @return {StorableRequest}
-     */
-    clone() {
-      return new _StorableRequest(this.toObject());
-    }
-  };
-
-  // node_modules/workbox-background-sync/Queue.js
-  var TAG_PREFIX = "workbox-background-sync";
-  var MAX_RETENTION_TIME = 60 * 24 * 7;
-  var queueNames = /* @__PURE__ */ new Set();
-  var convertEntry = (queueStoreEntry) => {
-    const queueEntry = {
-      request: new StorableRequest(queueStoreEntry.requestData).toRequest(),
-      timestamp: queueStoreEntry.timestamp
-    };
-    if (queueStoreEntry.metadata) {
-      queueEntry.metadata = queueStoreEntry.metadata;
-    }
-    return queueEntry;
-  };
-  var Queue = class {
-    /**
-     * Creates an instance of Queue with the given options
-     *
-     * @param {string} name The unique name for this queue. This name must be
-     *     unique as it's used to register sync events and store requests
-     *     in IndexedDB specific to this instance. An error will be thrown if
-     *     a duplicate name is detected.
-     * @param {Object} [options]
-     * @param {Function} [options.onSync] A function that gets invoked whenever
-     *     the 'sync' event fires. The function is invoked with an object
-     *     containing the `queue` property (referencing this instance), and you
-     *     can use the callback to customize the replay behavior of the queue.
-     *     When not set the `replayRequests()` method is called.
-     *     Note: if the replay fails after a sync event, make sure you throw an
-     *     error, so the browser knows to retry the sync event later.
-     * @param {number} [options.maxRetentionTime=7 days] The amount of time (in
-     *     minutes) a request may be retried. After this amount of time has
-     *     passed, the request will be deleted from the queue.
-     * @param {boolean} [options.forceSyncFallback=false] If `true`, instead
-     *     of attempting to use background sync events, always attempt to replay
-     *     queued request at service worker startup. Most folks will not need
-     *     this, unless you explicitly target a runtime like Electron that
-     *     exposes the interfaces for background sync, but does not have a working
-     *     implementation.
-     */
-    constructor(name, { forceSyncFallback, onSync, maxRetentionTime } = {}) {
-      this._syncInProgress = false;
-      this._requestsAddedDuringSync = false;
-      if (queueNames.has(name)) {
-        throw new WorkboxError("duplicate-queue-name", { name });
-      } else {
-        queueNames.add(name);
-      }
-      this._name = name;
-      this._onSync = onSync || this.replayRequests;
-      this._maxRetentionTime = maxRetentionTime || MAX_RETENTION_TIME;
-      this._forceSyncFallback = Boolean(forceSyncFallback);
-      this._queueStore = new QueueStore(this._name);
-      this._addSyncListener();
-    }
-    /**
-     * @return {string}
-     */
-    get name() {
-      return this._name;
-    }
-    /**
-     * Stores the passed request in IndexedDB (with its timestamp and any
-     * metadata) at the end of the queue.
-     *
-     * @param {QueueEntry} entry
-     * @param {Request} entry.request The request to store in the queue.
-     * @param {Object} [entry.metadata] Any metadata you want associated with the
-     *     stored request. When requests are replayed you'll have access to this
-     *     metadata object in case you need to modify the request beforehand.
-     * @param {number} [entry.timestamp] The timestamp (Epoch time in
-     *     milliseconds) when the request was first added to the queue. This is
-     *     used along with `maxRetentionTime` to remove outdated requests. In
-     *     general you don't need to set this value, as it's automatically set
-     *     for you (defaulting to `Date.now()`), but you can update it if you
-     *     don't want particular requests to expire.
-     */
-    async pushRequest(entry) {
-      if (true) {
-        finalAssertExports.isType(entry, "object", {
-          moduleName: "workbox-background-sync",
-          className: "Queue",
-          funcName: "pushRequest",
-          paramName: "entry"
-        });
-        finalAssertExports.isInstance(entry.request, Request, {
-          moduleName: "workbox-background-sync",
-          className: "Queue",
-          funcName: "pushRequest",
-          paramName: "entry.request"
-        });
-      }
-      await this._addRequest(entry, "push");
-    }
-    /**
-     * Stores the passed request in IndexedDB (with its timestamp and any
-     * metadata) at the beginning of the queue.
-     *
-     * @param {QueueEntry} entry
-     * @param {Request} entry.request The request to store in the queue.
-     * @param {Object} [entry.metadata] Any metadata you want associated with the
-     *     stored request. When requests are replayed you'll have access to this
-     *     metadata object in case you need to modify the request beforehand.
-     * @param {number} [entry.timestamp] The timestamp (Epoch time in
-     *     milliseconds) when the request was first added to the queue. This is
-     *     used along with `maxRetentionTime` to remove outdated requests. In
-     *     general you don't need to set this value, as it's automatically set
-     *     for you (defaulting to `Date.now()`), but you can update it if you
-     *     don't want particular requests to expire.
-     */
-    async unshiftRequest(entry) {
-      if (true) {
-        finalAssertExports.isType(entry, "object", {
-          moduleName: "workbox-background-sync",
-          className: "Queue",
-          funcName: "unshiftRequest",
-          paramName: "entry"
-        });
-        finalAssertExports.isInstance(entry.request, Request, {
-          moduleName: "workbox-background-sync",
-          className: "Queue",
-          funcName: "unshiftRequest",
-          paramName: "entry.request"
-        });
-      }
-      await this._addRequest(entry, "unshift");
-    }
-    /**
-     * Removes and returns the last request in the queue (along with its
-     * timestamp and any metadata). The returned object takes the form:
-     * `{request, timestamp, metadata}`.
-     *
-     * @return {Promise<QueueEntry | undefined>}
-     */
-    async popRequest() {
-      return this._removeRequest("pop");
-    }
-    /**
-     * Removes and returns the first request in the queue (along with its
-     * timestamp and any metadata). The returned object takes the form:
-     * `{request, timestamp, metadata}`.
-     *
-     * @return {Promise<QueueEntry | undefined>}
-     */
-    async shiftRequest() {
-      return this._removeRequest("shift");
-    }
-    /**
-     * Returns all the entries that have not expired (per `maxRetentionTime`).
-     * Any expired entries are removed from the queue.
-     *
-     * @return {Promise<Array<QueueEntry>>}
-     */
-    async getAll() {
-      const allEntries = await this._queueStore.getAll();
-      const now = Date.now();
-      const unexpiredEntries = [];
-      for (const entry of allEntries) {
-        const maxRetentionTimeInMs = this._maxRetentionTime * 60 * 1e3;
-        if (now - entry.timestamp > maxRetentionTimeInMs) {
-          await this._queueStore.deleteEntry(entry.id);
-        } else {
-          unexpiredEntries.push(convertEntry(entry));
-        }
-      }
-      return unexpiredEntries;
-    }
-    /**
-     * Returns the number of entries present in the queue.
-     * Note that expired entries (per `maxRetentionTime`) are also included in this count.
-     *
-     * @return {Promise<number>}
-     */
-    async size() {
-      return await this._queueStore.size();
-    }
-    /**
-     * Adds the entry to the QueueStore and registers for a sync event.
-     *
-     * @param {Object} entry
-     * @param {Request} entry.request
-     * @param {Object} [entry.metadata]
-     * @param {number} [entry.timestamp=Date.now()]
-     * @param {string} operation ('push' or 'unshift')
-     * @private
-     */
-    async _addRequest({ request, metadata, timestamp = Date.now() }, operation) {
-      const storableRequest = await StorableRequest.fromRequest(request.clone());
-      const entry = {
-        requestData: storableRequest.toObject(),
-        timestamp
-      };
-      if (metadata) {
-        entry.metadata = metadata;
-      }
-      switch (operation) {
-        case "push":
-          await this._queueStore.pushEntry(entry);
-          break;
-        case "unshift":
-          await this._queueStore.unshiftEntry(entry);
-          break;
-      }
-      if (true) {
-        logger.log(`Request for '${getFriendlyURL(request.url)}' has been added to background sync queue '${this._name}'.`);
-      }
-      if (this._syncInProgress) {
-        this._requestsAddedDuringSync = true;
-      } else {
-        await this.registerSync();
-      }
-    }
-    /**
-     * Removes and returns the first or last (depending on `operation`) entry
-     * from the QueueStore that's not older than the `maxRetentionTime`.
-     *
-     * @param {string} operation ('pop' or 'shift')
-     * @return {Object|undefined}
-     * @private
-     */
-    async _removeRequest(operation) {
-      const now = Date.now();
-      let entry;
-      switch (operation) {
-        case "pop":
-          entry = await this._queueStore.popEntry();
-          break;
-        case "shift":
-          entry = await this._queueStore.shiftEntry();
-          break;
-      }
-      if (entry) {
-        const maxRetentionTimeInMs = this._maxRetentionTime * 60 * 1e3;
-        if (now - entry.timestamp > maxRetentionTimeInMs) {
-          return this._removeRequest(operation);
-        }
-        return convertEntry(entry);
-      } else {
-        return void 0;
-      }
-    }
-    /**
-     * Loops through each request in the queue and attempts to re-fetch it.
-     * If any request fails to re-fetch, it's put back in the same position in
-     * the queue (which registers a retry for the next sync event).
-     */
-    async replayRequests() {
-      let entry;
-      while (entry = await this.shiftRequest()) {
-        try {
-          await fetch(entry.request.clone());
-          if (true) {
-            logger.log(`Request for '${getFriendlyURL(entry.request.url)}' has been replayed in queue '${this._name}'`);
-          }
-        } catch (error) {
-          await this.unshiftRequest(entry);
-          if (true) {
-            logger.log(`Request for '${getFriendlyURL(entry.request.url)}' failed to replay, putting it back in queue '${this._name}'`);
-          }
-          throw new WorkboxError("queue-replay-failed", { name: this._name });
-        }
-      }
-      if (true) {
-        logger.log(`All requests in queue '${this.name}' have successfully replayed; the queue is now empty!`);
-      }
-    }
-    /**
-     * Registers a sync event with a tag unique to this instance.
-     */
-    async registerSync() {
-      if ("sync" in self.registration && !this._forceSyncFallback) {
-        try {
-          await self.registration.sync.register(`${TAG_PREFIX}:${this._name}`);
-        } catch (err) {
-          if (true) {
-            logger.warn(`Unable to register sync event for '${this._name}'.`, err);
-          }
-        }
-      }
-    }
-    /**
-     * In sync-supporting browsers, this adds a listener for the sync event.
-     * In non-sync-supporting browsers, or if _forceSyncFallback is true, this
-     * will retry the queue on service worker startup.
-     *
-     * @private
-     */
-    _addSyncListener() {
-      if ("sync" in self.registration && !this._forceSyncFallback) {
-        self.addEventListener("sync", (event) => {
-          if (event.tag === `${TAG_PREFIX}:${this._name}`) {
-            if (true) {
-              logger.log(`Background sync for tag '${event.tag}' has been received`);
-            }
-            const syncComplete = async () => {
-              this._syncInProgress = true;
-              let syncError;
-              try {
-                await this._onSync({ queue: this });
-              } catch (error) {
-                if (error instanceof Error) {
-                  syncError = error;
-                  throw syncError;
-                }
-              } finally {
-                if (this._requestsAddedDuringSync && !(syncError && !event.lastChance)) {
-                  await this.registerSync();
-                }
-                this._syncInProgress = false;
-                this._requestsAddedDuringSync = false;
-              }
-            };
-            event.waitUntil(syncComplete());
-          }
-        });
-      } else {
-        if (true) {
-          logger.log(`Background sync replaying without background sync event`);
-        }
-        void this._onSync({ queue: this });
-      }
-    }
-    /**
-     * Returns the set of queue names. This is primarily used to reset the list
-     * of queue names in tests.
-     *
-     * @return {Set<string>}
-     *
-     * @private
-     */
-    static get _queueNames() {
-      return queueNames;
-    }
-  };
-
-  // node_modules/workbox-background-sync/BackgroundSyncPlugin.js
-  var BackgroundSyncPlugin = class {
-    /**
-     * @param {string} name See the {@link workbox-background-sync.Queue}
-     *     documentation for parameter details.
-     * @param {Object} [options] See the
-     *     {@link workbox-background-sync.Queue} documentation for
-     *     parameter details.
-     */
-    constructor(name, options) {
-      this.fetchDidFail = async ({ request }) => {
-        await this._queue.pushRequest({ request });
-      };
-      this._queue = new Queue(name, options);
-    }
-  };
-
-  // node_modules/workbox-core/_private/dontWaitFor.js
-  function dontWaitFor(promise) {
-    void promise.then(() => {
-    });
-  }
-
   // node_modules/workbox-expiration/_version.js
   try {
     self["workbox:expiration:7.4.0"] && _();
@@ -3423,7 +2709,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   }
 
   // node_modules/workbox-expiration/models/CacheTimestampsModel.js
-  var DB_NAME2 = "workbox-expiration";
+  var DB_NAME = "workbox-expiration";
   var CACHE_OBJECT_STORE = "cache-entries";
   var normalizeURL = (unNormalizedUrl) => {
     const url = new URL(unNormalizedUrl, location.href);
@@ -3555,7 +2841,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
      */
     async getDb() {
       if (!this._db) {
-        this._db = await openDB(DB_NAME2, 1, {
+        this._db = await openDB(DB_NAME, 1, {
           upgrade: this._upgradeDbAndDeleteOldDbs.bind(this)
         });
       }
@@ -3888,7 +3174,13 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   };
 
   // workers/sw.js
-  precacheAndRoute(self.__WB_MANIFEST);
+  var shellUrls = ["/", "/offline.html", "/manifest.json", "/surveys", "/sync"];
+  var injected = self.__WB_MANIFEST || [];
+  var precacheEntries = [
+    ...injected,
+    ...shellUrls.map((url) => ({ url, revision: null }))
+  ];
+  precacheAndRoute(precacheEntries);
   registerRoute(
     ({ request }) => request.mode === "navigate",
     new NetworkFirst({
@@ -3897,7 +3189,6 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
         new ExpirationPlugin({
           maxEntries: 50,
           maxAgeSeconds: 30 * 24 * 60 * 60
-          // 30 days
         })
       ]
     })
@@ -3910,7 +3201,6 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
         new ExpirationPlugin({
           maxEntries: 60,
           maxAgeSeconds: 20 * 24 * 60 * 60
-          // 20 days
         })
       ]
     })
@@ -3923,13 +3213,12 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
         new ExpirationPlugin({
           maxEntries: 60,
           maxAgeSeconds: 30 * 24 * 60 * 60
-          // 30 days
         })
       ]
     })
   );
   registerRoute(
-    ({ url }) => url.pathname.startsWith("/api/"),
+    ({ url, request }) => url.pathname.startsWith("/api/") && request.method === "GET",
     new NetworkFirst({
       cacheName: "api-cache",
       networkTimeoutSeconds: 3,
@@ -3937,22 +3226,9 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
         new ExpirationPlugin({
           maxEntries: 50,
           maxAgeSeconds: 5 * 60
-          // 5 minutes
         })
       ]
     })
-  );
-  var bgSyncPlugin = new BackgroundSyncPlugin("sync-queue", {
-    maxRetentionTime: 24 * 60
-    // Retry for up to 24 hours
-  });
-  registerRoute(
-    ({ url, request }) => url.pathname.startsWith("/mobile/responses") && request.method === "POST",
-    new NetworkFirst({
-      cacheName: "responses-cache",
-      plugins: [bgSyncPlugin]
-    }),
-    "POST"
   );
   registerRoute(
     ({ url }) => url.origin === "https://fonts.googleapis.com" || url.origin === "https://fonts.gstatic.com",
@@ -3962,7 +3238,6 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
         new ExpirationPlugin({
           maxEntries: 30,
           maxAgeSeconds: 365 * 24 * 60 * 60
-          // 1 year
         })
       ]
     })
@@ -3970,8 +3245,17 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   self.addEventListener("fetch", (event) => {
     if (event.request.mode === "navigate") {
       event.respondWith(
-        fetch(event.request).catch(() => {
-          return caches.match("/offline.html");
+        fetch(event.request).catch(() => caches.match("/offline.html"))
+      );
+    }
+  });
+  self.addEventListener("sync", (event) => {
+    if (event.tag === "brigada-dexie-sync") {
+      event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: "BRIGADA_SYNC_WAKE" });
+          });
         })
       );
     }
@@ -3982,5 +3266,5 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   self.addEventListener("activate", (event) => {
     event.waitUntil(self.clients.claim());
   });
-  console.log("Service Worker registered");
+  console.log("Service Worker registered (Dexie-backed sync wake)");
 })();

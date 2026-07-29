@@ -28,7 +28,9 @@ export default function SurveysPage() {
       setSurveys(data);
     } catch (err) {
       console.error('Failed to load surveys:', err);
-      setError('Error al cargar las encuestas asignadas');
+      setError(
+        'Error al cargar las encuestas. Si ya las viste antes, revisa que haya caché offline o reintenta con conexión.'
+      );
     } finally {
       setIsLoading(false);
     }

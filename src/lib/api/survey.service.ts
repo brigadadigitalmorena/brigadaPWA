@@ -8,10 +8,15 @@ import {
 } from '@/lib/types';
 import {
   cacheAssignment,
-  cacheAssignments,
   normalizeSurveyVersion,
   readCachedAssignment,
 } from '@/lib/utils/survey-version';
+import {
+  persistAssignments,
+  readDurableAssignments,
+  readCachedSurveyVersion,
+} from '@/lib/services/assignment-cache.service';
+import { isAcceptedBatchStatus } from '@/lib/sync';
 
 export interface QuestionAnswerCreate {
   question_id: number;
@@ -43,6 +48,12 @@ export interface SurveyResponseCreate {
 export interface BatchResponseCreate {
   responses: SurveyResponseCreate[];
   events?: unknown[];
+}
+
+export interface BatchResponseResult {
+  client_id?: string;
+  status?: string;
+  message?: string;
 }
 
 export interface DocumentUploadRequest {
@@ -79,18 +90,23 @@ export interface DocumentConfirmRequest {
 }
 
 /**
- * Get my assigned surveys (mobile endpoint)
- * Uses /mobile/surveys which works for any authenticated user
+ * Get my assigned surveys (network-first with durable Dexie fallback).
  */
 export async function getMyAssignments(): Promise<Assignment[]> {
-  const response = await apiClient.get<Assignment[]>('/mobile/surveys');
-  cacheAssignments(response.data);
-  return response.data;
+  try {
+    const response = await apiClient.get<Assignment[]>('/mobile/surveys');
+    await persistAssignments(response.data);
+    return response.data;
+  } catch (err) {
+    const cached = await readDurableAssignments();
+    if (cached.length > 0) {
+      console.warn('Using durable assignment cache (offline)', err);
+      return cached;
+    }
+    throw err;
+  }
 }
 
-/**
- * Find one assignment for a survey from the mobile assignments endpoint.
- */
 export async function getAssignmentForSurvey(
   surveyId: number
 ): Promise<Assignment | null> {
@@ -98,30 +114,37 @@ export async function getAssignmentForSurvey(
   return assignments.find((assignment) => assignment.survey_id === surveyId) ?? null;
 }
 
-/**
- * Resolve survey title from mobile assignments (no admin permission required).
- */
 export async function getSurveyTitle(surveyId: number): Promise<string> {
-  const cached = readCachedAssignment(surveyId);
-  if (cached?.survey_title) return cached.survey_title;
+  const session = readCachedAssignment(surveyId);
+  if (session?.survey_title) return session.survey_title;
+
+  const durable = await readCachedSurveyVersion(surveyId);
+  if (durable?.title) return durable.title;
 
   const assignment = await getAssignmentForSurvey(surveyId);
   return assignment?.survey_title ?? `Encuesta #${surveyId}`;
 }
 
 /**
- * Load survey version for the fill flow.
- * Uses assignment data from /mobile/surveys instead of the legacy /latest endpoint.
+ * Load survey version for fill — session → Dexie → network.
  */
 export async function loadSurveyForFill(
   surveyId: number,
   titleFromUrl?: string | null
 ): Promise<{ title: string; version: SurveyVersion }> {
-  const cached = readCachedAssignment(surveyId);
-  if (cached?.latest_version) {
+  const session = readCachedAssignment(surveyId);
+  if (session?.latest_version) {
     return {
-      title: titleFromUrl ?? cached.survey_title,
-      version: normalizeSurveyVersion(cached.latest_version),
+      title: titleFromUrl ?? session.survey_title,
+      version: normalizeSurveyVersion(session.latest_version),
+    };
+  }
+
+  const durable = await readCachedSurveyVersion(surveyId);
+  if (durable) {
+    return {
+      title: titleFromUrl ?? durable.title,
+      version: durable.version,
     };
   }
 
@@ -131,6 +154,7 @@ export async function loadSurveyForFill(
   }
 
   cacheAssignment(surveyId, assignment);
+  await persistAssignments([assignment]);
 
   return {
     title: titleFromUrl ?? assignment.survey_title,
@@ -138,37 +162,36 @@ export async function loadSurveyForFill(
   };
 }
 
-/**
- * Get latest published survey version (legacy endpoint).
- * Prefer loadSurveyForFill() which reuses /mobile/surveys assignments.
- */
 export async function getLatestSurveyVersion(surveyId: number): Promise<SurveyVersion> {
   const { version } = await loadSurveyForFill(surveyId);
   return version;
 }
 
-/**
- * Submit a batch of responses.
- */
 export async function submitBatchResponses(
   batch: BatchResponseCreate
-): Promise<unknown> {
-  const response = await apiClient.post<unknown>('/mobile/responses/batch', batch);
+): Promise<{ results?: BatchResponseResult[]; status?: string }> {
+  const response = await apiClient.post<{
+    results?: BatchResponseResult[];
+    status?: string;
+  }>('/mobile/responses/batch', batch);
   return response.data;
 }
 
-/**
- * Submit a single response using the batch endpoint.
- */
 export async function submitResponse(
   responseData: SurveyResponseCreate
-): Promise<unknown> {
-  return submitBatchResponses({ responses: [responseData] });
+): Promise<{ results?: BatchResponseResult[]; status?: string }> {
+  const result = await submitBatchResponses({ responses: [responseData] });
+
+  if (!result.results && isAcceptedBatchStatus(result.status ?? 'success')) {
+    return {
+      results: [{ client_id: responseData.client_id, status: result.status ?? 'success' }],
+      status: result.status ?? 'success',
+    };
+  }
+
+  return result;
 }
 
-/**
- * Get presigned URL for file upload
- */
 export async function getPresignedUploadUrl(
   request: DocumentUploadRequest
 ): Promise<DocumentUploadResponse> {
@@ -179,9 +202,6 @@ export async function getPresignedUploadUrl(
   return response.data;
 }
 
-/**
- * Confirm file upload
- */
 export async function confirmFileUpload(
   request: DocumentConfirmRequest
 ): Promise<unknown> {
@@ -189,17 +209,11 @@ export async function confirmFileUpload(
   return response.data;
 }
 
-/**
- * Get my submitted responses
- */
 export async function getMyResponses(): Promise<SurveyFormData[]> {
   const response = await apiClient.get<SurveyFormData[]>('/mobile/responses/me');
   return response.data;
 }
 
-/**
- * Build a SurveyResponseCreate payload from local response data.
- */
 export function buildSurveyResponseCreate(
   responseId: string,
   versionId: number,

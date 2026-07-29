@@ -219,6 +219,8 @@ export interface SyncStatus {
   isOnline: boolean;
   isSyncing: boolean;
   pendingCount: number;
+  deadLetterCount?: number;
+  retryWaitCount?: number;
   lastSyncedAt: string | null;
   error?: string;
 }

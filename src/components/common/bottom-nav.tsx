@@ -2,26 +2,56 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardList, RefreshCw } from 'lucide-react';
+import { ClipboardList, RefreshCw, FileEdit, Zap, MapPinned } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSync } from '@/contexts/sync.context';
+import { isModuleEnabled } from '@/lib/services/app-config.service';
 
-const navItems = [
+const allNavItems = [
   {
     label: 'Encuestas',
     href: '/surveys',
     icon: ClipboardList,
+    module: 'surveys' as const,
     isActive: (path: string) => path.startsWith('/surveys'),
   },
   {
-    label: 'Sincronización',
+    label: 'Borradores',
+    href: '/drafts',
+    icon: FileEdit,
+    module: 'drafts' as const,
+    isActive: (path: string) => path.startsWith('/drafts'),
+  },
+  {
+    label: 'Extras',
+    href: '/extras',
+    icon: Zap,
+    module: 'extras' as const,
+    isActive: (path: string) => path.startsWith('/extras'),
+  },
+  {
+    label: 'Tracking',
+    href: '/tracking',
+    icon: MapPinned,
+    module: 'tracking' as const,
+    isActive: (path: string) => path.startsWith('/tracking'),
+  },
+  {
+    label: 'Envíos',
     href: '/sync',
     icon: RefreshCw,
+    module: 'sync' as const,
     isActive: (path: string) => path.startsWith('/sync'),
   },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { isOnline } = useSync();
+
+  const navItems = allNavItems.filter((item) =>
+    isModuleEnabled(item.module, isOnline)
+  );
 
   return (
     <nav
@@ -29,7 +59,7 @@ export function BottomNav() {
       style={{ height: 'var(--bottom-nav-height)' }}
       aria-label="Navegación principal"
     >
-      <div className="flex h-full items-stretch">
+      <div className="flex h-full items-stretch overflow-x-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = item.isActive(pathname);
@@ -39,7 +69,7 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 transition-colors touch-target',
+                'flex min-w-[4.5rem] flex-1 flex-col items-center justify-center gap-1 transition-colors touch-target',
                 active
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
@@ -47,15 +77,15 @@ export function BottomNav() {
             >
               <div
                 className={cn(
-                  'flex items-center justify-center rounded-xl px-5 py-1 transition-colors',
+                  'flex items-center justify-center rounded-xl px-3 py-1 transition-colors',
                   active && 'bg-primary/10'
                 )}
               >
-                <Icon size={24} strokeWidth={active ? 2.5 : 2} />
+                <Icon size={22} strokeWidth={active ? 2.5 : 2} />
               </div>
               <span
                 className={cn(
-                  'text-xs',
+                  'text-[10px]',
                   active ? 'font-semibold' : 'font-medium'
                 )}
               >

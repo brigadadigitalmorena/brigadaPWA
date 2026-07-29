@@ -22,10 +22,12 @@ export default function SyncPage() {
     isOnline,
     isSyncing,
     pendingCount,
+    deadLetterCount,
     lastSyncedAt,
     error,
     syncNow,
     retryFailed,
+    clearDeadLetter,
   } = useSync();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -33,14 +35,21 @@ export default function SyncPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Sincronización"
-        description="Estado de sincronización de datos"
+        title="Envíos"
+        description="Cola de sincronización y estado de envíos"
       />
 
       {!isOnline && (
         <InlineBanner
           variant="warning"
           message="Sin conexión a internet. Puedes seguir trabajando; los datos se sincronizarán cuando recuperes la conexión."
+        />
+      )}
+
+      {(deadLetterCount ?? 0) > 0 && (
+        <InlineBanner
+          variant="error"
+          message={`${deadLetterCount} envío(s) en dead-letter. Reintenta o descarta tras revisar el error.`}
         />
       )}
 
@@ -93,7 +102,7 @@ export default function SyncPage() {
               </div>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-2">
             <Button
               onClick={syncNow}
               disabled={!isOnline || isSyncing || pendingCount === 0}
@@ -112,6 +121,16 @@ export default function SyncPage() {
                 </>
               )}
             </Button>
+            {(deadLetterCount ?? 0) > 0 && (
+              <div className="flex gap-2">
+                <Button onClick={retryFailed} variant="outline" size="sm" className="flex-1">
+                  Reintentar fallidos
+                </Button>
+                <Button onClick={clearDeadLetter} variant="ghost" size="sm" className="flex-1">
+                  Descartar DLQ
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -170,16 +189,16 @@ export default function SyncPage() {
         {infoOpen && (
           <CardContent className="space-y-4 text-sm text-muted-foreground pt-0">
             <p>
-              <strong className="text-foreground">Modo Offline:</strong> Puedes trabajar sin conexión. Los datos se guardan localmente y se sincronizan automáticamente cuando recuperes la conexión.
+              <strong className="text-foreground">Modo Offline:</strong> Los datos se guardan en IndexedDB (Dexie) y se encolan. Al volver la red se reintentan con backoff.
             </p>
             <p>
-              <strong className="text-foreground">Sincronización automática:</strong> Cuando estás en línea, los datos pendientes se sincronizan automáticamente en segundo plano.
+              <strong className="text-foreground">Reintentos:</strong> Los fallos van a <code>retry_wait</code> con jitter; tras agotar intentos pasan a dead-letter (no se borran al descartar).
             </p>
             <p>
-              <strong className="text-foreground">Reintentos:</strong> Si una sincronización falla, se reintentará automáticamente con intervalos crecientes.
+              <strong className="text-foreground">Duplicados:</strong> Si el servidor responde <code>duplicate</code> para el mismo <code>client_id</code>, se trata como éxito.
             </p>
             <p>
-              <strong className="text-foreground">Cola de sincronización:</strong> Los elementos pendientes se procesan en orden de prioridad.
+              <strong className="text-foreground">Background Sync:</strong> El Service Worker despierta la cola Dexie (una sola fuente de verdad).
             </p>
           </CardContent>
         )}
