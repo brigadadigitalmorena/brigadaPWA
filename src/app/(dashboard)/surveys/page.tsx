@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { getMyAssignments } from '@/lib/api/survey.service';
 import type { Assignment } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,10 +14,19 @@ import { EmptyState } from '@/components/common/empty-state';
 import { SkeletonSurveyCard } from '@/components/ui/skeleton';
 import { ClipboardList, Play, Calendar, Users, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  warmSurveyFillUrls,
+  isUrlCachedOffline,
+} from '@/lib/services/offline-warm.service';
 
 interface AssignedSurvey extends Assignment {}
 
+function fillHref(survey: AssignedSurvey): string {
+  return `/surveys/${survey.survey_id}/fill?title=${encodeURIComponent(survey.survey_title)}`;
+}
+
 export default function SurveysPage() {
+  const router = useRouter();
   const [surveys, setSurveys] = useState<AssignedSurvey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +37,7 @@ export default function SurveysPage() {
       setError(null);
       const data = await getMyAssignments();
       setSurveys(data);
+      warmSurveyFillUrls(data);
     } catch (err) {
       console.error('Failed to load surveys:', err);
       setError(
@@ -43,6 +55,36 @@ export default function SurveysPage() {
     return () => clearTimeout(timeout);
   }, [loadSurveys]);
 
+  const handleOpenSurvey = async (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    survey: AssignedSurvey
+  ) => {
+    if (survey.assignment_status === 'completed') {
+      event.preventDefault();
+      return;
+    }
+
+    const href = fillHref(survey);
+
+    // Online: normal navigation + ensure cache warm
+    if (navigator.onLine) {
+      warmSurveyFillUrls([survey]);
+      return;
+    }
+
+    // Offline: only open if the document (or ignore-search variant) was cached
+    // while online; otherwise prevent Chrome ERR_FAILED on a cold deep link.
+    event.preventDefault();
+    const cached = await isUrlCachedOffline(href);
+    if (!cached) {
+      toast.error(
+        'Esta encuesta aún no está disponible offline. Conéctate, ábrela una vez, y quedará lista sin red.'
+      );
+      return;
+    }
+
+    router.push(href);
+  };
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -166,7 +208,8 @@ export default function SurveysPage() {
               </CardHeader>
               <CardContent>
                 <Link
-                  href={`/surveys/${survey.survey_id}/fill?title=${encodeURIComponent(survey.survey_title)}`}
+                  href={fillHref(survey)}
+                  onClick={(event) => handleOpenSurvey(event, survey)}
                   className={cn(
                     'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-all',
                     'hover:bg-primary/80 active:translate-y-px',

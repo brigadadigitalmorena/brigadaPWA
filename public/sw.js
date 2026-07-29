@@ -2154,6 +2154,93 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     addRoute(options);
   }
 
+  // node_modules/workbox-routing/NavigationRoute.js
+  var NavigationRoute = class extends Route {
+    /**
+     * If both `denylist` and `allowlist` are provided, the `denylist` will
+     * take precedence and the request will not match this route.
+     *
+     * The regular expressions in `allowlist` and `denylist`
+     * are matched against the concatenated
+     * [`pathname`]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLHyperlinkElementUtils/pathname}
+     * and [`search`]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLHyperlinkElementUtils/search}
+     * portions of the requested URL.
+     *
+     * *Note*: These RegExps may be evaluated against every destination URL during
+     * a navigation. Avoid using
+     * [complex RegExps](https://github.com/GoogleChrome/workbox/issues/3077),
+     * or else your users may see delays when navigating your site.
+     *
+     * @param {workbox-routing~handlerCallback} handler A callback
+     * function that returns a Promise resulting in a Response.
+     * @param {Object} options
+     * @param {Array<RegExp>} [options.denylist] If any of these patterns match,
+     * the route will not handle the request (even if a allowlist RegExp matches).
+     * @param {Array<RegExp>} [options.allowlist=[/./]] If any of these patterns
+     * match the URL's pathname and search parameter, the route will handle the
+     * request (assuming the denylist doesn't match).
+     */
+    constructor(handler, { allowlist = [/./], denylist = [] } = {}) {
+      if (true) {
+        finalAssertExports.isArrayOfClass(allowlist, RegExp, {
+          moduleName: "workbox-routing",
+          className: "NavigationRoute",
+          funcName: "constructor",
+          paramName: "options.allowlist"
+        });
+        finalAssertExports.isArrayOfClass(denylist, RegExp, {
+          moduleName: "workbox-routing",
+          className: "NavigationRoute",
+          funcName: "constructor",
+          paramName: "options.denylist"
+        });
+      }
+      super((options) => this._match(options), handler);
+      this._allowlist = allowlist;
+      this._denylist = denylist;
+    }
+    /**
+     * Routes match handler.
+     *
+     * @param {Object} options
+     * @param {URL} options.url
+     * @param {Request} options.request
+     * @return {boolean}
+     *
+     * @private
+     */
+    _match({ url, request }) {
+      if (request && request.mode !== "navigate") {
+        return false;
+      }
+      const pathnameAndSearch = url.pathname + url.search;
+      for (const regExp of this._denylist) {
+        if (regExp.test(pathnameAndSearch)) {
+          if (true) {
+            logger.log(`The navigation route ${pathnameAndSearch} is not being used, since the URL matches this denylist pattern: ${regExp.toString()}`);
+          }
+          return false;
+        }
+      }
+      if (this._allowlist.some((regExp) => regExp.test(pathnameAndSearch))) {
+        if (true) {
+          logger.debug(`The navigation route ${pathnameAndSearch} is being used.`);
+        }
+        return true;
+      }
+      if (true) {
+        logger.log(`The navigation route ${pathnameAndSearch} is not being used, since the URL being navigated to doesn't match the allowlist.`);
+      }
+      return false;
+    }
+  };
+
+  // node_modules/workbox-routing/setDefaultHandler.js
+  function setDefaultHandler(handler) {
+    const defaultRouter2 = getOrCreateDefaultRouter();
+    defaultRouter2.setDefaultHandler(handler);
+  }
+
   // node_modules/workbox-strategies/utils/messages.js
   var messages2 = {
     strategyStart: (strategyName, request) => `Using ${strategyName} to respond to '${getFriendlyURL(request.url)}'`,
@@ -3174,32 +3261,57 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   };
 
   // workers/sw.js
-  var shellUrls = ["/", "/offline.html", "/manifest.json", "/surveys", "/sync"];
+  var PAGES_CACHE = "pages-cache";
+  var STATIC_CACHE = "static-resources-cache";
+  var IMAGES_CACHE = "images-cache";
+  var API_CACHE = "api-cache";
+  var shellUrls = [
+    "/",
+    "/offline.html",
+    "/manifest.json",
+    "/surveys",
+    "/sync",
+    "/drafts",
+    "/extras"
+  ];
   var injected = self.__WB_MANIFEST || [];
   var precacheEntries = [
     ...injected,
     ...shellUrls.map((url) => ({ url, revision: null }))
   ];
   precacheAndRoute(precacheEntries);
-  registerRoute(
-    ({ request }) => request.mode === "navigate",
-    new NetworkFirst({
-      cacheName: "pages-cache",
-      plugins: [
-        new ExpirationPlugin({
-          maxEntries: 50,
-          maxAgeSeconds: 30 * 24 * 60 * 60
-        })
-      ]
-    })
-  );
+  async function navigationHandler({ request }) {
+    const cache = await caches.open(PAGES_CACHE);
+    try {
+      const networkResponse = await fetch(request);
+      if (networkResponse && networkResponse.ok) {
+        cache.put(request, networkResponse.clone()).catch(() => {
+        });
+        return networkResponse;
+      }
+    } catch {
+    }
+    const url = new URL(request.url);
+    const withoutQuery = `${url.origin}${url.pathname}`;
+    const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || // App shell fallbacks (keep the SPA alive instead of Chrome ERR_FAILED)
+    await cache.match("/surveys") || await caches.match("/surveys") || await cache.match("/") || await caches.match("/") || await caches.match("/offline.html");
+    if (cached) return cached;
+    return new Response(
+      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Abre Brigada en l\xEDnea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
+      {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" }
+      }
+    );
+  }
+  registerRoute(new NavigationRoute(navigationHandler));
   registerRoute(
     ({ request }) => request.destination === "style" || request.destination === "script" || request.destination === "worker",
     new StaleWhileRevalidate({
-      cacheName: "static-resources-cache",
+      cacheName: STATIC_CACHE,
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 60,
+          maxEntries: 80,
           maxAgeSeconds: 20 * 24 * 60 * 60
         })
       ]
@@ -3208,7 +3320,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   registerRoute(
     ({ request }) => request.destination === "image",
     new CacheFirst({
-      cacheName: "images-cache",
+      cacheName: IMAGES_CACHE,
       plugins: [
         new ExpirationPlugin({
           maxEntries: 60,
@@ -3218,9 +3330,22 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     })
   );
   registerRoute(
+    ({ url, request }) => request.method === "GET" && (url.pathname.startsWith("/_next/") || request.headers.get("RSC") === "1" || request.headers.get("Next-Router-Prefetch") === "1" || url.searchParams.has("_rsc")),
+    new NetworkFirst({
+      cacheName: "next-rsc-cache",
+      networkTimeoutSeconds: 3,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 100,
+          maxAgeSeconds: 24 * 60 * 60
+        })
+      ]
+    })
+  );
+  registerRoute(
     ({ url, request }) => url.pathname.startsWith("/api/") && request.method === "GET",
     new NetworkFirst({
-      cacheName: "api-cache",
+      cacheName: API_CACHE,
       networkTimeoutSeconds: 3,
       plugins: [
         new ExpirationPlugin({
@@ -3242,13 +3367,12 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       ]
     })
   );
-  self.addEventListener("fetch", (event) => {
-    if (event.request.mode === "navigate") {
-      event.respondWith(
-        fetch(event.request).catch(() => caches.match("/offline.html"))
-      );
-    }
-  });
+  setDefaultHandler(
+    new NetworkFirst({
+      cacheName: "default-cache",
+      networkTimeoutSeconds: 3
+    })
+  );
   self.addEventListener("sync", (event) => {
     if (event.tag === "brigada-dexie-sync") {
       event.waitUntil(
@@ -3260,11 +3384,32 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       );
     }
   });
+  self.addEventListener("message", (event) => {
+    var _a;
+    if (((_a = event.data) == null ? void 0 : _a.type) === "WARM_URLS" && Array.isArray(event.data.urls)) {
+      event.waitUntil(
+        (async () => {
+          const cache = await caches.open(PAGES_CACHE);
+          await Promise.all(
+            event.data.urls.map(async (url) => {
+              try {
+                const response = await fetch(url, { credentials: "same-origin" });
+                if (response.ok) {
+                  await cache.put(url, response.clone());
+                }
+              } catch {
+              }
+            })
+          );
+        })()
+      );
+    }
+  });
   self.addEventListener("install", () => {
     self.skipWaiting();
   });
   self.addEventListener("activate", (event) => {
     event.waitUntil(self.clients.claim());
   });
-  console.log("Service Worker registered (Dexie-backed sync wake)");
+  console.log("Service Worker registered (offline navigation safe)");
 })();

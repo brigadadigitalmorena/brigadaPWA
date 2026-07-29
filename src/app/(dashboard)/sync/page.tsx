@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useSync } from '@/contexts/sync.context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,6 @@ import {
   WifiOff,
   CheckCircle2,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,8 +26,6 @@ export default function SyncPage() {
     retryFailed,
     clearDeadLetter,
   } = useSync();
-
-  const [infoOpen, setInfoOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -49,7 +44,7 @@ export default function SyncPage() {
       {(deadLetterCount ?? 0) > 0 && (
         <InlineBanner
           variant="error"
-          message={`${deadLetterCount} envío(s) en dead-letter. Reintenta o descarta tras revisar el error.`}
+          message={`${deadLetterCount} envío(s) con error. Reintenta o descarta tras revisar el problema.`}
         />
       )}
 
@@ -127,7 +122,7 @@ export default function SyncPage() {
                   Reintentar fallidos
                 </Button>
                 <Button onClick={clearDeadLetter} variant="ghost" size="sm" className="flex-1">
-                  Descartar DLQ
+                  Descartar
                 </Button>
               </div>
             )}
@@ -172,37 +167,6 @@ export default function SyncPage() {
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <button
-          type="button"
-          onClick={() => setInfoOpen(!infoOpen)}
-          className="w-full flex items-center justify-between p-6 text-left touch-target"
-        >
-          <CardTitle className="text-base">¿Cómo funciona la sincronización?</CardTitle>
-          {infoOpen ? (
-            <ChevronUp className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-          )}
-        </button>
-        {infoOpen && (
-          <CardContent className="space-y-4 text-sm text-muted-foreground pt-0">
-            <p>
-              <strong className="text-foreground">Modo Offline:</strong> Los datos se guardan en IndexedDB (Dexie) y se encolan. Al volver la red se reintentan con backoff.
-            </p>
-            <p>
-              <strong className="text-foreground">Reintentos:</strong> Los fallos van a <code>retry_wait</code> con jitter; tras agotar intentos pasan a dead-letter (no se borran al descartar).
-            </p>
-            <p>
-              <strong className="text-foreground">Duplicados:</strong> Si el servidor responde <code>duplicate</code> para el mismo <code>client_id</code>, se trata como éxito.
-            </p>
-            <p>
-              <strong className="text-foreground">Background Sync:</strong> El Service Worker despierta la cola Dexie (una sola fuente de verdad).
-            </p>
-          </CardContent>
-        )}
-      </Card>
     </div>
   );
 }
