@@ -3280,21 +3280,45 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     ...shellUrls.map((url) => ({ url, revision: null }))
   ];
   precacheAndRoute(precacheEntries);
+  async function findCachedFillShell(cache) {
+    const shell = await cache.match("/surveys/__fill_shell__");
+    if (shell) return shell;
+    const keys = await cache.keys();
+    for (const req of keys) {
+      try {
+        const path = new URL(req.url).pathname;
+        if (/\/surveys\/\d+\/fill\/?$/.test(path)) {
+          const hit = await cache.match(req);
+          if (hit) return hit;
+        }
+      } catch {
+      }
+    }
+    return void 0;
+  }
   async function navigationHandler({ request }) {
     const cache = await caches.open(PAGES_CACHE);
+    const url = new URL(request.url);
+    const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
     try {
       const networkResponse = await fetch(request);
       if (networkResponse && networkResponse.ok) {
         cache.put(request, networkResponse.clone()).catch(() => {
         });
+        if (isFillRoute) {
+          cache.put("/surveys/__fill_shell__", networkResponse.clone()).catch(() => {
+          });
+        }
         return networkResponse;
       }
     } catch {
     }
-    const url = new URL(request.url);
     const withoutQuery = `${url.origin}${url.pathname}`;
-    const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || // App shell fallbacks (keep the SPA alive instead of Chrome ERR_FAILED)
-    await cache.match("/surveys") || await caches.match("/surveys") || await cache.match("/") || await caches.match("/") || await caches.match("/offline.html");
+    if (isFillRoute) {
+      const fillShell = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || await findCachedFillShell(cache);
+      if (fillShell) return fillShell;
+    }
+    const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || await cache.match("/surveys") || await caches.match("/surveys") || await cache.match("/") || await caches.match("/") || await caches.match("/offline.html");
     if (cached) return cached;
     return new Response(
       '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Abre Brigada en l\xEDnea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
@@ -3390,12 +3414,17 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       event.waitUntil(
         (async () => {
           const cache = await caches.open(PAGES_CACHE);
+          let savedShell = false;
           await Promise.all(
             event.data.urls.map(async (url) => {
               try {
                 const response = await fetch(url, { credentials: "same-origin" });
                 if (response.ok) {
                   await cache.put(url, response.clone());
+                  if (!savedShell && /\/surveys\/\d+\/fill/.test(String(url))) {
+                    await cache.put("/surveys/__fill_shell__", response.clone());
+                    savedShell = true;
+                  }
                 }
               } catch {
               }

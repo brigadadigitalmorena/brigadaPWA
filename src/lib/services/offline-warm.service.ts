@@ -1,3 +1,7 @@
+import { readCachedSurveyVersion } from '@/lib/services/assignment-cache.service';
+import { readDurableAssignments } from '@/lib/services/assignment-cache.service';
+import { readCachedAssignment } from '@/lib/utils/survey-version';
+
 /**
  * Warm the service-worker page cache for survey fill routes while online,
  * so offline navigation does not hit Chrome ERR_FAILED.
@@ -18,7 +22,6 @@ export function warmSurveyFillUrls(
 
   if (urls.length === 0) return;
 
-  // Next client prefetch (in-memory + HTTP cache)
   urls.forEach((url) => {
     const link = document.createElement('link');
     link.rel = 'prefetch';
@@ -27,7 +30,6 @@ export function warmSurveyFillUrls(
     document.head.appendChild(link);
   });
 
-  // SW Cache Storage warm (survives offline)
   navigator.serviceWorker.ready
     .then((reg) => {
       reg.active?.postMessage({ type: 'WARM_URLS', urls });
@@ -35,6 +37,22 @@ export function warmSurveyFillUrls(
     .catch(() => {
       /* SW not ready */
     });
+}
+
+/**
+ * Offline open is gated by survey *schema* in Dexie/session, not by having
+ * visited that exact fill URL. Drafts on one survey must not block others.
+ */
+export async function canOpenSurveyOffline(surveyId: number): Promise<boolean> {
+  if (readCachedAssignment(surveyId)?.latest_version) return true;
+
+  const durable = await readCachedSurveyVersion(surveyId);
+  if (durable?.version) return true;
+
+  const assignments = await readDurableAssignments();
+  return assignments.some(
+    (a) => a.survey_id === surveyId && Boolean(a.latest_version)
+  );
 }
 
 export async function isUrlCachedOffline(url: string): Promise<boolean> {

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { getMyAssignments } from '@/lib/api/survey.service';
 import type { Assignment } from '@/lib/types';
@@ -16,7 +15,7 @@ import { ClipboardList, Play, Calendar, Users, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   warmSurveyFillUrls,
-  isUrlCachedOffline,
+  canOpenSurveyOffline,
 } from '@/lib/services/offline-warm.service';
 
 interface AssignedSurvey extends Assignment {}
@@ -26,7 +25,6 @@ function fillHref(survey: AssignedSurvey): string {
 }
 
 export default function SurveysPage() {
-  const router = useRouter();
   const [surveys, setSurveys] = useState<AssignedSurvey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,24 +64,26 @@ export default function SurveysPage() {
 
     const href = fillHref(survey);
 
-    // Online: normal navigation + ensure cache warm
+    // Online: normal Next navigation + warm fill shell for offline later
     if (navigator.onLine) {
       warmSurveyFillUrls([survey]);
       return;
     }
 
-    // Offline: only open if the document (or ignore-search variant) was cached
-    // while online; otherwise prevent Chrome ERR_FAILED on a cold deep link.
+    // Offline: allow any survey that has schema cached in Dexie (list visit),
+    // not only the one whose fill URL was opened before (draft).
     event.preventDefault();
-    const cached = await isUrlCachedOffline(href);
-    if (!cached) {
+    const canOpen = await canOpenSurveyOffline(survey.survey_id);
+    if (!canOpen) {
       toast.error(
-        'Esta encuesta aún no está disponible offline. Conéctate, ábrela una vez, y quedará lista sin red.'
+        'Esta encuesta no está disponible offline. Conéctate y actualiza la lista de encuestas.'
       );
       return;
     }
 
-    router.push(href);
+    // Full navigation so the SW can serve the shared fill shell.
+    // Soft nav (router.push) would request RSC and fail offline.
+    window.location.assign(href);
   };
   if (isLoading) {
     return (

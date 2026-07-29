@@ -29,28 +29,60 @@ precacheAndRoute(precacheEntries);
  * Always return a real Response for navigations.
  * Chrome shows ERR_FAILED when respondWith resolves to undefined / rejects.
  */
+async function findCachedFillShell(cache) {
+  const shell = await cache.match('/surveys/__fill_shell__');
+  if (shell) return shell;
+
+  const keys = await cache.keys();
+  for (const req of keys) {
+    try {
+      const path = new URL(req.url).pathname;
+      if (/\/surveys\/\d+\/fill\/?$/.test(path)) {
+        const hit = await cache.match(req);
+        if (hit) return hit;
+      }
+    } catch {
+      /* ignore bad keys */
+    }
+  }
+  return undefined;
+}
+
 async function navigationHandler({ request }) {
   const cache = await caches.open(PAGES_CACHE);
+  const url = new URL(request.url);
+  const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
 
   try {
     const networkResponse = await fetch(request);
     if (networkResponse && networkResponse.ok) {
-      // Cache fill + dashboard HTML so offline reopen works after one online visit.
       cache.put(request, networkResponse.clone()).catch(() => {});
+      // Shared shell for ANY survey id offline (HTML is the same App Router page).
+      if (isFillRoute) {
+        cache.put('/surveys/__fill_shell__', networkResponse.clone()).catch(() => {});
+      }
       return networkResponse;
     }
   } catch {
     /* offline or network error — fall through to cache */
   }
 
-  const url = new URL(request.url);
   const withoutQuery = `${url.origin}${url.pathname}`;
+
+  if (isFillRoute) {
+    const fillShell =
+      (await cache.match(request)) ||
+      (await cache.match(withoutQuery)) ||
+      (await caches.match(request.url, { ignoreSearch: true })) ||
+      (await findCachedFillShell(cache));
+
+    if (fillShell) return fillShell;
+  }
 
   const cached =
     (await cache.match(request)) ||
     (await cache.match(withoutQuery)) ||
     (await caches.match(request.url, { ignoreSearch: true })) ||
-    // App shell fallbacks (keep the SPA alive instead of Chrome ERR_FAILED)
     (await cache.match('/surveys')) ||
     (await caches.match('/surveys')) ||
     (await cache.match('/')) ||
@@ -176,12 +208,17 @@ self.addEventListener('message', (event) => {
     event.waitUntil(
       (async () => {
         const cache = await caches.open(PAGES_CACHE);
+        let savedShell = false;
         await Promise.all(
           event.data.urls.map(async (url) => {
             try {
               const response = await fetch(url, { credentials: 'same-origin' });
               if (response.ok) {
                 await cache.put(url, response.clone());
+                if (!savedShell && /\/surveys\/\d+\/fill/.test(String(url))) {
+                  await cache.put('/surveys/__fill_shell__', response.clone());
+                  savedShell = true;
+                }
               }
             } catch {
               /* ignore warm failures */
