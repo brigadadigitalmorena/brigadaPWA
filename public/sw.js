@@ -3261,10 +3261,10 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   };
 
   // workers/sw.js
-  var PAGES_CACHE = "pages-cache";
-  var STATIC_CACHE = "static-resources-cache";
-  var IMAGES_CACHE = "images-cache";
-  var API_CACHE = "api-cache";
+  var PAGES_CACHE = "pages-cache-v3";
+  var STATIC_CACHE = "static-resources-cache-v3";
+  var IMAGES_CACHE = "images-cache-v3";
+  var API_CACHE = "api-cache-v3";
   var shellUrls = [
     "/",
     "/offline.html",
@@ -3445,7 +3445,24 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     self.skipWaiting();
   });
   self.addEventListener("activate", (event) => {
-    event.waitUntil(self.clients.claim());
+    event.waitUntil(
+      (async () => {
+        const keep = /* @__PURE__ */ new Set([
+          PAGES_CACHE,
+          STATIC_CACHE,
+          IMAGES_CACHE,
+          API_CACHE,
+          "next-rsc-cache",
+          "google-fonts-cache",
+          "default-cache"
+        ]);
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.filter((key) => !keep.has(key) && !key.includes("precache")).map((key) => caches.delete(key))
+        );
+        await self.clients.claim();
+      })()
+    );
   });
   console.log("Service Worker registered (offline navigation safe)");
 })();

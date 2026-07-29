@@ -3,6 +3,7 @@ import { SurveyVersion, LocationData } from '@/lib/types';
 import { getCurrentUser } from '@/lib/api/auth.service';
 import { LocalFilePreview } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
+import { SYNC_PRIORITY } from '@/lib/sync';
 
 export interface FinalizeResponseInput {
   responseId: string;
@@ -138,7 +139,8 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
           ine_ocr_data: preview.ineOcrData,
         }),
         status: 'pending',
-        priority: 10,
+        // Files after responses (mobile parity).
+        priority: SYNC_PRIORITY.FILE,
         retry_count: 0,
         max_retries: 12,
         next_retry_at: now,
@@ -172,7 +174,8 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
         device_info: input.deviceInfo,
       }),
       status: 'pending',
-      priority: 20,
+      // Responses before file uploads (mobile parity).
+      priority: SYNC_PRIORITY.RESPONSE,
       retry_count: 0,
       max_retries: 8,
       next_retry_at: now,

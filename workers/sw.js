@@ -3,10 +3,10 @@ import { registerRoute, NavigationRoute, setDefaultHandler } from 'workbox-routi
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-const PAGES_CACHE = 'pages-cache';
-const STATIC_CACHE = 'static-resources-cache';
-const IMAGES_CACHE = 'images-cache';
-const API_CACHE = 'api-cache';
+const PAGES_CACHE = 'pages-cache-v3';
+const STATIC_CACHE = 'static-resources-cache-v3';
+const IMAGES_CACHE = 'images-cache-v3';
+const API_CACHE = 'api-cache-v3';
 
 // Injected at build time; also seed critical shell URLs for first-visit offline.
 const shellUrls = [
@@ -250,7 +250,26 @@ self.addEventListener('install', () => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keep = new Set([
+        PAGES_CACHE,
+        STATIC_CACHE,
+        IMAGES_CACHE,
+        API_CACHE,
+        'next-rsc-cache',
+        'google-fonts-cache',
+        'default-cache',
+      ]);
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => !keep.has(key) && !key.includes('precache'))
+          .map((key) => caches.delete(key))
+      );
+      await self.clients.claim();
+    })()
+  );
 });
 
 console.log('Service Worker registered (offline navigation safe)');

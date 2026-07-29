@@ -50,11 +50,11 @@ export function SignatureQuestion({
             file,
             previewUrl,
             fileType: 'signature',
-            questionId: questionKey,
+            questionId: question.id.toString(),
           },
         ]);
       });
-  }, [questionKey, responseId, setFiles]);
+  }, [question.id, questionKey, responseId, setFiles]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

@@ -214,26 +214,84 @@ export async function getMyResponses(): Promise<SurveyFormData[]> {
   return response.data;
 }
 
+function resolveAnswerValue(
+  answers: Record<string, unknown>,
+  question: { id: number; question_key?: string }
+): unknown {
+  const key = question.question_key?.trim();
+  if (key && answers[key] !== undefined) {
+    return answers[key];
+  }
+  const idKey = String(question.id);
+  if (answers[idKey] !== undefined) {
+    return answers[idKey];
+  }
+  return undefined;
+}
+
+export interface FileAnswerRef {
+  question_id: number;
+  file_id: string;
+  file_type: string;
+}
+
+/**
+ * Build the mobile batch payload. Resolves answers by question_key or id,
+ * and attaches pending_upload media refs so media-only questions still produce
+ * a non-empty answers[] (backend requires min_length=1).
+ */
 export function buildSurveyResponseCreate(
   responseId: string,
   versionId: number,
   answers: Record<string, unknown>,
   questions: { id: number; question_key?: string }[],
   location: LocationData | null,
-  metadata: ResponseMetadata
+  metadata: ResponseMetadata,
+  fileAnswers: FileAnswerRef[] = []
 ): SurveyResponseCreate {
   const now = new Date().toISOString();
+  const byQuestion = new Map<number, QuestionAnswerCreate>();
 
-  const answerEntries: QuestionAnswerCreate[] = questions
-    .filter((q) => q.question_key !== undefined && answers[q.question_key] !== undefined)
-    .map((q) => ({
-      question_id: q.id,
-      answer_value: answers[q.question_key as string],
+  for (const question of questions) {
+    const value = resolveAnswerValue(answers, question);
+    if (value === undefined) continue;
+    byQuestion.set(question.id, {
+      question_id: question.id,
+      answer_value: value,
       answered_at: now,
       answer_meta: {},
       media_url: null,
       evaluated_label: null,
-    }));
+    });
+  }
+
+  for (const file of fileAnswers) {
+    if (!Number.isFinite(file.question_id) || file.question_id <= 0) continue;
+    const mediaUrl = `pending_upload:${file.file_id}`;
+    const existing = byQuestion.get(file.question_id);
+    if (existing) {
+      existing.media_url = mediaUrl;
+      if (existing.answer_value == null) {
+        existing.answer_value = { file_id: file.file_id, type: file.file_type };
+      }
+      continue;
+    }
+    byQuestion.set(file.question_id, {
+      question_id: file.question_id,
+      answer_value: { file_id: file.file_id, type: file.file_type },
+      answered_at: now,
+      answer_meta: {},
+      media_url: mediaUrl,
+      evaluated_label: null,
+    });
+  }
+
+  const answerEntries = Array.from(byQuestion.values());
+  if (answerEntries.length === 0) {
+    throw new Error(
+      'La respuesta no tiene respuestas para enviar. Completa al menos una pregunta.'
+    );
+  }
 
   return {
     client_id: responseId,

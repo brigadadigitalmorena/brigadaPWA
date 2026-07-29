@@ -55,7 +55,7 @@ export function MediaQuestion({
           file,
           previewUrl: URL.createObjectURL(file),
           fileType: question.question_type,
-          questionId: questionKey,
+          questionId: question.id.toString(),
         };
       })
     );

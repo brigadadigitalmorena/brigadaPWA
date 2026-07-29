@@ -74,7 +74,7 @@ export function IneQuestion({
           file: compressedFile,
           previewUrl: URL.createObjectURL(compressedFile),
           fileType: question.question_type,
-          questionId: questionKey,
+          questionId: question.id.toString(),
           // Store OCR metadata so the sync engine can send it to the backend.
           ineOcrData: JSON.stringify({
             ocr_confidence: ocrResult.confidence,

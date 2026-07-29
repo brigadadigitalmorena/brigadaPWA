@@ -16,6 +16,7 @@ import {
   confirmFileUpload,
   buildSurveyResponseCreate,
   DocumentUploadRequest,
+  FileAnswerRef,
 } from '@/lib/api/survey.service';
 import {
   isAcceptedBatchStatus,
@@ -23,7 +24,9 @@ import {
   classifySubmitError,
   recordSubmitOutcome,
   normalizeConfirmDocumentPayload,
+  SYNC_PRIORITY,
 } from '@/lib/sync';
+import { getApiErrorMessage } from '@/lib/utils/api-errors';
 
 interface SyncResult {
   success: boolean;
@@ -37,6 +40,54 @@ export interface SyncEngineOptions {
 }
 
 const inFlightUploads = new Set<string>();
+
+function operationRank(operationType: string): number {
+  switch (operationType) {
+    case 'CREATE_RESPONSE':
+      return 0;
+    case 'UPLOAD_FILE':
+      return 1;
+    case 'CONFIRM_DOCUMENT':
+      return 2;
+    default:
+      return 9;
+  }
+}
+
+/** Map local file_type / question_type → backend DocumentMetadata.document_type */
+function mapFileTypeToDocType(fileType: string | undefined): string {
+  const t = (fileType || '').trim().toLowerCase();
+  const mapping: Record<string, string> = {
+    photo: 'photo',
+    selfie: 'photo',
+    photo_no_gallery: 'photo',
+    photo_canvas: 'photo',
+    signature: 'signature',
+    ine: 'ine_front',
+    ine_front: 'ine_front',
+    ine_back: 'ine_back',
+    audio: 'audio',
+    voice: 'audio',
+    video: 'video',
+    file: 'form',
+    document: 'form',
+  };
+  return mapping[t] ?? 'photo';
+}
+
+function resolveNumericQuestionId(
+  raw: string | number | undefined,
+  questions: { id: number; question_key?: string }[]
+): number | null {
+  if (raw == null || raw === '') return null;
+  const asNum = Number(raw);
+  if (Number.isFinite(asNum) && asNum > 0) return asNum;
+  const key = String(raw);
+  const match = questions.find(
+    (q) => q.question_key === key || String(q.id) === key
+  );
+  return match?.id ?? null;
+}
 
 /**
  * Process due items in the sync queue (pending + retry_wait).
@@ -60,7 +111,12 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
       )
       .toArray();
 
-    candidates.sort((a, b) => a.priority - b.priority || a.created_at.localeCompare(b.created_at));
+    candidates.sort(
+      (a, b) =>
+        operationRank(a.operation_type) - operationRank(b.operation_type) ||
+        a.priority - b.priority ||
+        a.created_at.localeCompare(b.created_at)
+    );
 
     for (const item of candidates) {
       if (item.id === undefined) continue;
@@ -88,7 +144,10 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
         recordSubmitOutcome(outcome);
         result = {
           success: false,
-          error: err instanceof Error ? err.message : 'Error desconocido',
+          error: getApiErrorMessage(
+            err,
+            err instanceof Error ? err.message : 'Error desconocido'
+          ),
           errorCode: outcome === 'network_failure' ? 'NETWORK_FAILURE' : 'SYNC_ERROR',
         };
       }
@@ -133,21 +192,57 @@ async function processResponseItem(
 
   options?.onProgress?.(`Enviando respuesta ${String(response_id).slice(0, 8)}...`);
 
-  const responseCreate = buildSurveyResponseCreate(
-    response_id,
-    version_id,
-    answers,
-    questions || [],
-    location,
-    {
-      device_platform: device_info?.platform ?? 'web',
-      device_os_version: device_info?.osVersion ?? 'unknown',
-      device_app_version: device_info?.appVersion ?? '0.1.0',
-      started_at,
-      completed_at,
-      duration_seconds: 0,
-    }
-  );
+  const questionList: { id: number; question_key?: string }[] = Array.isArray(
+    questions
+  )
+    ? questions
+    : [];
+
+  const localFiles = await db.local_files
+    .where('response_id')
+    .equals(response_id)
+    .toArray();
+
+  const fileAnswers: FileAnswerRef[] = [];
+  for (const file of localFiles) {
+    const qid = resolveNumericQuestionId(file.question_id, questionList);
+    if (qid == null) continue;
+    fileAnswers.push({
+      question_id: qid,
+      file_id: file.file_id,
+      file_type: mapFileTypeToDocType(file.file_type),
+    });
+  }
+
+  let responseCreate;
+  try {
+    responseCreate = buildSurveyResponseCreate(
+      response_id,
+      version_id,
+      answers || {},
+      questionList,
+      location,
+      {
+        device_platform: device_info?.platform ?? 'web',
+        device_os_version: device_info?.osVersion ?? 'unknown',
+        device_app_version: device_info?.appVersion ?? '0.1.0',
+        started_at,
+        completed_at,
+        duration_seconds: 0,
+      },
+      fileAnswers
+    );
+  } catch (buildErr) {
+    return {
+      success: false,
+      error:
+        buildErr instanceof Error
+          ? buildErr.message
+          : 'No se pudo armar el envío',
+      errorCode: 'INVALID_PAYLOAD',
+      permanent: true,
+    };
+  }
 
   try {
     const batchResult = (await submitResponse(responseCreate)) as {
@@ -227,6 +322,20 @@ async function processResponseItem(
         permanent: true,
       };
     }
+    if (
+      typeof axiosErr.response?.status === 'number' &&
+      axiosErr.response.status >= 500
+    ) {
+      recordSubmitOutcome('network_failure');
+      return {
+        success: false,
+        error: getApiErrorMessage(
+          err,
+          `Error del servidor (${axiosErr.response.status})`
+        ),
+        errorCode: 'SERVER_ERROR',
+      };
+    }
     const outcome = classifySubmitError(err);
     recordSubmitOutcome(outcome);
     throw err;
@@ -292,9 +401,32 @@ async function processFileItem(
     let remoteUrl = localFile.remote_url;
 
     if (!hasValidPresign) {
+      let numericQuestionId = resolveNumericQuestionId(question_id, []);
+      if (numericQuestionId == null) {
+        numericQuestionId = resolveNumericQuestionId(localFile.question_id, []);
+      }
+      if (numericQuestionId == null) {
+        const responseQueueItem = await db.sync_queue
+          .where('entity_id')
+          .equals(response_id)
+          .filter((q) => q.operation_type === 'CREATE_RESPONSE')
+          .first();
+        if (responseQueueItem) {
+          try {
+            const responsePayload = JSON.parse(responseQueueItem.payload_json);
+            numericQuestionId = resolveNumericQuestionId(
+              question_id ?? localFile.question_id,
+              responsePayload.questions || []
+            );
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
       const metadata: DocumentUploadRequest['metadata'] = {
-        document_type: file_type,
-        question_id: Number(question_id),
+        document_type: mapFileTypeToDocType(file_type || localFile.file_type),
+        ...(numericQuestionId != null ? { question_id: numericQuestionId } : {}),
       };
 
       if (ine_ocr_data) {
@@ -483,7 +615,7 @@ async function recoverOrphanUploads(options?: SyncEngineOptions): Promise<void> 
         ine_ocr_data: file.ine_ocr_data,
       }),
       status: 'pending',
-      priority: 10,
+      priority: SYNC_PRIORITY.FILE,
       retry_count: 0,
       max_retries: 12,
       next_retry_at: now,

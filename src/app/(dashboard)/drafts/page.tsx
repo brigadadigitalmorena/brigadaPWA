@@ -1,15 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { db } from '@/lib/db/database';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileEdit } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileEdit, Trash2 } from 'lucide-react';
 import { readCachedAssignment } from '@/lib/utils/survey-version';
+import { deleteDraft } from '@/lib/services/draft.service';
+import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export default function DraftsPage() {
+  const { confirm, confirmDialog } = useConfirmDialog();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const drafts = useLiveQuery(async () => {
     const rows = await db.responses
       .where('status')
@@ -40,6 +47,24 @@ export default function DraftsPage() {
     return withTitles;
   }, []);
 
+  const handleDelete = async (responseId: string, title: string) => {
+    const ok = await confirm({
+      title: '¿Borrar borrador?',
+      description: `Se eliminará “${title}” de este dispositivo. Esta acción no se puede deshacer.`,
+      confirmText: 'Borrar',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    setDeletingId(responseId);
+    try {
+      await deleteDraft(responseId);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -66,17 +91,34 @@ export default function DraftsPage() {
                 <p className="text-sm text-muted-foreground">
                   Actualizado {new Date(draft.updated_at).toLocaleString()}
                 </p>
-                <Link
-                  href={`/surveys/${draft.survey_id}/fill?title=${encodeURIComponent(draft.survey_title)}`}
-                  className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
-                >
-                  Continuar
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                    disabled={deletingId === draft.response_id}
+                    onClick={() =>
+                      handleDelete(draft.response_id, draft.survey_title)
+                    }
+                    aria-label={`Borrar borrador ${draft.survey_title}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Link
+                    href={`/surveys/${draft.survey_id}/fill?title=${encodeURIComponent(draft.survey_title)}`}
+                    className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
+                  >
+                    Continuar
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }
