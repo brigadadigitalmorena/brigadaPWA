@@ -102,10 +102,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       const now = new Date().toISOString();
       await db.sync_queue
         .where('status')
-        .anyOf(['failed', 'retry_wait', 'dead_letter'])
+        .anyOf(['failed', 'retry_wait', 'dead_letter', 'failed_permanent'])
         .modify({
           status: 'pending',
+          retry_count: 0,
           next_retry_at: now,
+          last_error: undefined,
+          last_error_code: undefined,
+          lease_owner: undefined,
+          lease_until: undefined,
           updated_at: now,
         });
       await syncNow();

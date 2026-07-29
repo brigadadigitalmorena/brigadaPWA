@@ -3314,12 +3314,19 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     } catch {
     }
     const withoutQuery = `${url.origin}${url.pathname}`;
+    const isAppRoute = url.pathname === "/sync" || url.pathname === "/drafts" || url.pathname === "/extras" || url.pathname === "/tracking" || url.pathname === "/surveys" || url.pathname === "/";
     if (isFillRoute) {
       const fillShell = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || await findCachedFillShell(cache);
       if (fillShell) return fillShell;
     }
-    const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || await cache.match("/surveys") || await caches.match("/surveys") || await cache.match("/") || await caches.match("/") || await caches.match("/offline.html");
+    const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true });
     if (cached) return cached;
+    if (isAppRoute) {
+      const offline = await caches.match("/offline.html");
+      if (offline) return offline;
+    }
+    const shellFallback = await cache.match("/") || await caches.match("/") || await caches.match("/offline.html");
+    if (shellFallback) return shellFallback;
     return new Response(
       '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Abre Brigada en l\xEDnea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
       {

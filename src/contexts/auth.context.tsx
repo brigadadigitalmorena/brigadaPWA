@@ -33,7 +33,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState({
           user,
           accessToken: localStorage.getItem('brigada_access_token'),
-          refreshToken: sessionStorage.getItem('brigada_refresh_token'),
+          refreshToken:
+            sessionStorage.getItem('brigada_refresh_token') ||
+            localStorage.getItem('brigada_refresh_token'),
           isAuthenticated: true,
           isLoading: false,
         });

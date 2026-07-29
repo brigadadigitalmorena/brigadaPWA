@@ -1,12 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, FileEdit, CloudOff } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import { Button } from '@/components/ui/button';
+
+function goTo(path: string) {
+  // Hard navigation so SW / offline soft-nav does not strand the user.
+  window.location.assign(path);
+}
 
 /**
  * Field-critical banners: dead-letter, drafts, offline — mobile parity.
@@ -38,7 +42,7 @@ export function FieldStatusBanners() {
                 {deadLetterCount} envío{deadLetterCount !== 1 ? 's' : ''} con error
               </p>
               <p className="text-muted-foreground">
-                Revisa la cola de sincronización o reintenta el envío.
+                Revisa el detalle en Envíos o reintenta.
               </p>
             </div>
           </div>
@@ -49,12 +53,9 @@ export function FieldStatusBanners() {
             <Button size="sm" variant="ghost" onClick={clearDeadLetter}>
               Descartar
             </Button>
-            <Link
-              href="/sync"
-              className="inline-flex h-7 items-center rounded-lg bg-secondary px-2.5 text-[0.8rem] font-medium"
-            >
+            <Button size="sm" variant="secondary" onClick={() => goTo('/sync')}>
               Ver
-            </Link>
+            </Button>
           </div>
         </div>
       )}
@@ -68,12 +69,9 @@ export function FieldStatusBanners() {
               {draftCount !== 1 ? 's' : ''}
             </p>
           </div>
-          <Link
-            href="/drafts"
-            className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
-          >
+          <Button size="sm" variant="outline" onClick={() => goTo('/drafts')}>
             Continuar
-          </Link>
+          </Button>
         </div>
       )}
 
@@ -86,12 +84,9 @@ export function FieldStatusBanners() {
               {pendingCount !== 1 ? 's' : ''} de sincronizar
             </p>
           </div>
-          <Link
-            href="/sync"
-            className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
-          >
+          <Button size="sm" variant="outline" onClick={() => goTo('/sync')}>
             Envíos
-          </Link>
+          </Button>
         </div>
       )}
     </div>

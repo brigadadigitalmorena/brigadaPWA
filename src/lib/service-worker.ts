@@ -9,6 +9,12 @@ export async function registerServiceWorker() {
 
       console.log('Service Worker registered successfully:', registration);
 
+      // Warm shell routes so "Ver" / Envíos work offline
+      registration.active?.postMessage({
+        type: 'WARM_URLS',
+        urls: ['/', '/surveys', '/sync', '/drafts', '/extras', '/offline.html'],
+      });
+
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
 

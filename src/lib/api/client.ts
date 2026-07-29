@@ -35,7 +35,9 @@ export function loadTokensFromStorage(): void {
   if (typeof window === 'undefined') return;
   
   accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  refreshToken = sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+  refreshToken =
+    sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN) ||
+    localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 }
 
 /**
@@ -49,7 +51,9 @@ export function saveTokensToStorage(access: string, refresh?: string): void {
   
   if (refresh) {
     refreshToken = refresh;
+    // Persist refresh across tab closes so offline→online sync can renew the session.
     sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh);
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh);
   }
 }
 
@@ -63,6 +67,7 @@ export function clearTokensFromStorage(): void {
   refreshToken = null;
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   sessionStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.USER);
 }
 

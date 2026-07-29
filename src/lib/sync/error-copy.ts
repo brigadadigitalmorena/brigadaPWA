@@ -152,6 +152,52 @@ const TABLE: Record<string, SyncErrorCopy> = {
     action: "Usa “Recuperar desde historial” en la pantalla de borradores.",
     needsManualFix: true,
   },
+  network_failure: {
+    title: "Error de red",
+    action: "Revisa tu conexión e intenta de nuevo.",
+    needsManualFix: false,
+  },
+  sync_error: {
+    title: "Error al sincronizar",
+    action: "Reintenta el envío. Si persiste, revisa el detalle del error.",
+    needsManualFix: false,
+  },
+  auth_required: {
+    title: "Sesión expirada",
+    action: "Inicia sesión de nuevo y luego sincroniza.",
+    needsManualFix: true,
+  },
+  blob_missing: {
+    title: "Archivo no encontrado",
+    body: "La foto o firma ya no está en este dispositivo.",
+    action: "Vuelve a capturar el archivo en la encuesta.",
+    needsManualFix: true,
+  },
+  local_file_missing: {
+    title: "Archivo local faltante",
+    action: "Vuelve a capturar el archivo y finaliza de nuevo.",
+    needsManualFix: true,
+  },
+  server_rejected: {
+    title: "Rechazado por el servidor",
+    action: "Revisa los datos de la encuesta o contacta soporte.",
+    needsManualFix: true,
+  },
+  batch_rejected: {
+    title: "Envío rechazado",
+    action: "Revisa el mensaje de error y corrige la encuesta.",
+    needsManualFix: true,
+  },
+  presign_missing: {
+    title: "No se pudo preparar la subida",
+    action: "Reintenta con buena conexión.",
+    needsManualFix: false,
+  },
+  r2_put_failed: {
+    title: "Error al subir archivo",
+    action: "Reintenta la sincronización.",
+    needsManualFix: false,
+  },
 };
 
 /**

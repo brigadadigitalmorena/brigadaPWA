@@ -140,9 +140,9 @@ async function processResponseItem(
     questions || [],
     location,
     {
-      device_platform: device_info.platform,
-      device_os_version: device_info.osVersion,
-      device_app_version: device_info.appVersion,
+      device_platform: device_info?.platform ?? 'web',
+      device_os_version: device_info?.osVersion ?? 'unknown',
+      device_app_version: device_info?.appVersion ?? '0.1.0',
       started_at,
       completed_at,
       duration_seconds: 0,
@@ -151,8 +151,16 @@ async function processResponseItem(
 
   try {
     const batchResult = (await submitResponse(responseCreate)) as {
-      results?: { client_id?: string; status?: string; message?: string }[];
+      results?: {
+        client_id?: string;
+        status?: string;
+        message?: string;
+        errors?: string[];
+        reject_category?: string;
+      }[];
       status?: string;
+      successful?: number;
+      failed?: number;
     };
 
     const detail =
@@ -162,15 +170,25 @@ async function processResponseItem(
     const status = detail?.status ?? batchResult?.status ?? 'success';
     if (!isAcceptedBatchStatus(status)) {
       recordSubmitOutcome('non_network_error');
+      const detailMsg =
+        detail?.message ||
+        (Array.isArray(detail?.errors) && detail.errors.length > 0
+          ? detail.errors.join('; ')
+          : null) ||
+        `Rechazado: ${status}`;
+      const permanent =
+        status === 'failed' &&
+        (detail?.reject_category === 'permanent' ||
+          detail?.reject_category === 'business_reject' ||
+          !detail?.reject_category);
       return {
         success: false,
-        error: detail?.message || `Rechazado: ${status}`,
+        error: detailMsg,
         errorCode: status === 'failed' ? 'SERVER_REJECTED' : 'BATCH_REJECTED',
-        permanent: status === 'failed',
+        permanent,
       };
     }
 
-    // duplicate / success / synced / partial → success
     recordSubmitOutcome('success');
 
     const response = await db.responses.where('response_id').equals(response_id).first();
@@ -185,6 +203,30 @@ async function processResponseItem(
 
     return { success: true };
   } catch (err) {
+    const axiosErr = err as { response?: { status?: number; data?: { detail?: unknown } } };
+    if (axiosErr.response?.status === 401) {
+      return {
+        success: false,
+        error: 'Sesión expirada. Inicia sesión e intenta de nuevo.',
+        errorCode: 'AUTH_REQUIRED',
+        permanent: false,
+      };
+    }
+    if (axiosErr.response?.status === 422 || axiosErr.response?.status === 400) {
+      const detail = axiosErr.response.data?.detail;
+      const message =
+        typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? JSON.stringify(detail).slice(0, 300)
+            : 'Datos inválidos en el envío';
+      return {
+        success: false,
+        error: message,
+        errorCode: 'SERVER_REJECTED',
+        permanent: true,
+      };
+    }
     const outcome = classifySubmitError(err);
     recordSubmitOutcome(outcome);
     throw err;
@@ -482,8 +524,24 @@ async function handleSyncResult(
     return;
   }
 
+  // Auth failures should not burn retries — pause until the user re-logins.
+  if (result.errorCode === 'AUTH_REQUIRED') {
+    await db.sync_queue.update(itemId, {
+      status: 'retry_wait',
+      next_retry_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      last_error: result.error,
+      last_error_code: result.errorCode,
+      lease_owner: undefined,
+      lease_until: undefined,
+      updated_at: now,
+    });
+    options?.onProgress?.(result.error || 'Sesión expirada');
+    return;
+  }
+
   const nextCount = item.retry_count + 1;
-  const exhausted = nextCount >= item.max_retries;
+  const maxRetries = item.max_retries > 0 ? item.max_retries : 5;
+  const exhausted = nextCount >= maxRetries;
   const permanent = Boolean(result.permanent) || result.errorCode === 'SERVER_REJECTED';
 
   let status: SyncQueue['status'];
