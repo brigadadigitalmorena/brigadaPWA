@@ -2,7 +2,10 @@
 
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { registerServiceWorker } from '@/lib/service-worker';
+import {
+  applyWaitingServiceWorker,
+  registerServiceWorker,
+} from '@/lib/service-worker';
 
 export function ServiceWorkerRegistrar() {
   useEffect(() => {
@@ -11,10 +14,8 @@ export function ServiceWorkerRegistrar() {
         description: 'Recarga la app para obtener las últimas mejoras.',
         action: {
           label: 'Recargar',
-          onClick: async () => {
-            const registration = await navigator.serviceWorker.getRegistration();
-            registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
-            window.location.reload();
+          onClick: () => {
+            void applyWaitingServiceWorker();
           },
         },
         duration: Infinity,
@@ -22,7 +23,7 @@ export function ServiceWorkerRegistrar() {
     };
 
     window.addEventListener('sw-update-available', handleUpdate);
-    registerServiceWorker();
+    void registerServiceWorker();
 
     return () => {
       window.removeEventListener('sw-update-available', handleUpdate);

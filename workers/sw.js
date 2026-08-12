@@ -3,10 +3,10 @@ import { registerRoute, NavigationRoute, setDefaultHandler } from 'workbox-routi
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-const PAGES_CACHE = 'pages-cache-v3';
-const STATIC_CACHE = 'static-resources-cache-v3';
-const IMAGES_CACHE = 'images-cache-v3';
-const API_CACHE = 'api-cache-v3';
+const PAGES_CACHE = 'pages-cache-v4';
+const STATIC_CACHE = 'static-resources-cache-v4';
+const IMAGES_CACHE = 'images-cache-v4';
+const API_CACHE = 'api-cache-v4';
 
 // Injected at build time; also seed critical shell URLs for first-visit offline.
 const shellUrls = [

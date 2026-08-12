@@ -3261,10 +3261,10 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   };
 
   // workers/sw.js
-  var PAGES_CACHE = "pages-cache-v3";
-  var STATIC_CACHE = "static-resources-cache-v3";
-  var IMAGES_CACHE = "images-cache-v3";
-  var API_CACHE = "api-cache-v3";
+  var PAGES_CACHE = "pages-cache-v4";
+  var STATIC_CACHE = "static-resources-cache-v4";
+  var IMAGES_CACHE = "images-cache-v4";
+  var API_CACHE = "api-cache-v4";
   var shellUrls = [
     "/",
     "/offline.html",
