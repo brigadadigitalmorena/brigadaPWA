@@ -2,6 +2,10 @@
  * Brigada Digital — design tokens (PWA)
  * Canonical source: ../../shared/brigada-tokens.css (repo root)
  * Keep in sync when updating brand tokens.
+ *
+ * Color schemes via [data-color-scheme="…"] on <html>.
+ * Default (:root / .dark) = pink. Dark mode keeps brand accent
+ * (does not use mobile's white-primary pattern).
  */
 
 :root {
@@ -10,7 +14,7 @@
   --bottom-nav-height: 64px;
   --header-height: 56px;
 
-  /* Brand — light mode */
+  /* Brand — light mode (pink) */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -77,4 +81,456 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.68 0.28 350);
+}
+
+/* ── Color schemes (brand token overrides) ─────────────────────────────── */
+/* pink = default :root / .dark above; explicit block for parity */
+
+[data-color-scheme="pink"] {
+  --primary: #ff1b8d;
+  --primary-foreground: #ffffff;
+  --secondary: #fff5f8;
+  --secondary-foreground: #cc1670;
+  --accent: #ffe8f0;
+  --accent-foreground: #cc1670;
+  --muted-foreground: #ff6bb8;
+  --border: #ffd6e8;
+  --input: #ffe8f0;
+  --ring: #ff1b8d;
+  --chart-1: #ff1b8d;
+  --chart-2: #ff4da6;
+  --chart-3: #ff6bb8;
+  --chart-4: #cc1670;
+  --chart-5: #99124f;
+  --sidebar-primary: #ff1b8d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff5f8;
+  --sidebar-accent-foreground: #cc1670;
+  --sidebar-border: #ffd6e8;
+  --sidebar-ring: #ff1b8d;
+}
+
+.dark[data-color-scheme="pink"],
+[data-color-scheme="pink"].dark {
+  --primary: #ff4da6;
+  --primary-foreground: #1a0a10;
+  --secondary: #2a1e25;
+  --secondary-foreground: #ffffff;
+  --accent: #2a1e25;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #ffaad4;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #ff4da6;
+  --chart-1: #ff4da6;
+  --chart-2: #ff85be;
+  --chart-3: #ff1b8d;
+  --chart-4: #cc1670;
+  --chart-5: #99124f;
+  --sidebar-primary: #ff4da6;
+  --sidebar-primary-foreground: #1a0a10;
+  --sidebar-accent: #2a1e25;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #ff4da6;
+}
+
+/* blue — Azul Profesional */
+[data-color-scheme="blue"] {
+  --primary: #0284c7;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f9ff;
+  --secondary-foreground: #075985;
+  --accent: #e0f2fe;
+  --accent-foreground: #075985;
+  --muted-foreground: #0369a1;
+  --border: #bae6fd;
+  --input: #e0f2fe;
+  --ring: #0284c7;
+  --chart-1: #0284c7;
+  --chart-2: #0ea5e9;
+  --chart-3: #38bdf8;
+  --chart-4: #075985;
+  --chart-5: #0c4a6e;
+  --sidebar-primary: #0284c7;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f9ff;
+  --sidebar-accent-foreground: #075985;
+  --sidebar-border: #bae6fd;
+  --sidebar-ring: #0284c7;
+}
+
+.dark[data-color-scheme="blue"],
+[data-color-scheme="blue"].dark {
+  --primary: #38bdf8;
+  --primary-foreground: #0c4a6e;
+  --secondary: #164e63;
+  --secondary-foreground: #ffffff;
+  --accent: #164e63;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #bae6fd;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #38bdf8;
+  --chart-1: #38bdf8;
+  --chart-2: #0ea5e9;
+  --chart-3: #0284c7;
+  --chart-4: #075985;
+  --chart-5: #0c4a6e;
+  --sidebar-primary: #38bdf8;
+  --sidebar-primary-foreground: #0c4a6e;
+  --sidebar-accent: #164e63;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #38bdf8;
+}
+
+/* purple — Púrpura Moderno */
+[data-color-scheme="purple"] {
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --secondary: #faf5ff;
+  --secondary-foreground: #5b21b6;
+  --accent: #f3e8ff;
+  --accent-foreground: #5b21b6;
+  --muted-foreground: #8b5cf6;
+  --border: #ddd6fe;
+  --input: #f3e8ff;
+  --ring: #7c3aed;
+  --chart-1: #7c3aed;
+  --chart-2: #8b5cf6;
+  --chart-3: #a78bfa;
+  --chart-4: #5b21b6;
+  --chart-5: #4c1d95;
+  --sidebar-primary: #7c3aed;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #faf5ff;
+  --sidebar-accent-foreground: #5b21b6;
+  --sidebar-border: #ddd6fe;
+  --sidebar-ring: #7c3aed;
+}
+
+.dark[data-color-scheme="purple"],
+[data-color-scheme="purple"].dark {
+  --primary: #a78bfa;
+  --primary-foreground: #2e1065;
+  --secondary: #3b0764;
+  --secondary-foreground: #ffffff;
+  --accent: #3b0764;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #ddd6fe;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #a78bfa;
+  --chart-1: #a78bfa;
+  --chart-2: #8b5cf6;
+  --chart-3: #7c3aed;
+  --chart-4: #5b21b6;
+  --chart-5: #4c1d95;
+  --sidebar-primary: #a78bfa;
+  --sidebar-primary-foreground: #2e1065;
+  --sidebar-accent: #3b0764;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #a78bfa;
+}
+
+/* green — Verde Natural */
+[data-color-scheme="green"] {
+  --primary: #16a34a;
+  --primary-foreground: #ffffff;
+  --secondary: #f0fdf4;
+  --secondary-foreground: #14532d;
+  --accent: #dcfce7;
+  --accent-foreground: #14532d;
+  --muted-foreground: #15803d;
+  --border: #bbf7d0;
+  --input: #dcfce7;
+  --ring: #16a34a;
+  --chart-1: #16a34a;
+  --chart-2: #22c55e;
+  --chart-3: #4ade80;
+  --chart-4: #15803d;
+  --chart-5: #14532d;
+  --sidebar-primary: #16a34a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0fdf4;
+  --sidebar-accent-foreground: #14532d;
+  --sidebar-border: #bbf7d0;
+  --sidebar-ring: #16a34a;
+}
+
+.dark[data-color-scheme="green"],
+[data-color-scheme="green"].dark {
+  --primary: #4ade80;
+  --primary-foreground: #052e16;
+  --secondary: #14532d;
+  --secondary-foreground: #ffffff;
+  --accent: #14532d;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #bbf7d0;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #4ade80;
+  --chart-1: #4ade80;
+  --chart-2: #22c55e;
+  --chart-3: #16a34a;
+  --chart-4: #15803d;
+  --chart-5: #14532d;
+  --sidebar-primary: #4ade80;
+  --sidebar-primary-foreground: #052e16;
+  --sidebar-accent: #14532d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #4ade80;
+}
+
+/* orange — Naranja Cálido */
+[data-color-scheme="orange"] {
+  --primary: #ea580c;
+  --primary-foreground: #ffffff;
+  --secondary: #fff7ed;
+  --secondary-foreground: #7c2d12;
+  --accent: #ffedd5;
+  --accent-foreground: #7c2d12;
+  --muted-foreground: #c2410c;
+  --border: #fed7aa;
+  --input: #ffedd5;
+  --ring: #ea580c;
+  --chart-1: #ea580c;
+  --chart-2: #f97316;
+  --chart-3: #fb923c;
+  --chart-4: #c2410c;
+  --chart-5: #7c2d12;
+  --sidebar-primary: #ea580c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff7ed;
+  --sidebar-accent-foreground: #7c2d12;
+  --sidebar-border: #fed7aa;
+  --sidebar-ring: #ea580c;
+}
+
+.dark[data-color-scheme="orange"],
+[data-color-scheme="orange"].dark {
+  --primary: #fb923c;
+  --primary-foreground: #431407;
+  --secondary: #7c2d12;
+  --secondary-foreground: #ffffff;
+  --accent: #7c2d12;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #fed7aa;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #fb923c;
+  --chart-1: #fb923c;
+  --chart-2: #f97316;
+  --chart-3: #ea580c;
+  --chart-4: #c2410c;
+  --chart-5: #7c2d12;
+  --sidebar-primary: #fb923c;
+  --sidebar-primary-foreground: #431407;
+  --sidebar-accent: #7c2d12;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #fb923c;
+}
+
+/* red — Rojo Intenso */
+[data-color-scheme="red"] {
+  --primary: #dc2626;
+  --primary-foreground: #ffffff;
+  --secondary: #fef2f2;
+  --secondary-foreground: #7f1d1d;
+  --accent: #fee2e2;
+  --accent-foreground: #7f1d1d;
+  --muted-foreground: #b91c1c;
+  --border: #fecaca;
+  --input: #fee2e2;
+  --ring: #dc2626;
+  --chart-1: #dc2626;
+  --chart-2: #ef4444;
+  --chart-3: #f87171;
+  --chart-4: #b91c1c;
+  --chart-5: #7f1d1d;
+  --sidebar-primary: #dc2626;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fef2f2;
+  --sidebar-accent-foreground: #7f1d1d;
+  --sidebar-border: #fecaca;
+  --sidebar-ring: #dc2626;
+}
+
+.dark[data-color-scheme="red"],
+[data-color-scheme="red"].dark {
+  --primary: #f87171;
+  --primary-foreground: #450a0a;
+  --secondary: #7f1d1d;
+  --secondary-foreground: #ffffff;
+  --accent: #7f1d1d;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #fecaca;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #f87171;
+  --chart-1: #f87171;
+  --chart-2: #ef4444;
+  --chart-3: #dc2626;
+  --chart-4: #b91c1c;
+  --chart-5: #7f1d1d;
+  --sidebar-primary: #f87171;
+  --sidebar-primary-foreground: #450a0a;
+  --sidebar-accent: #7f1d1d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #f87171;
+}
+
+/* darkElegant — Oscuro Elegante */
+[data-color-scheme="darkElegant"] {
+  --primary: #111827;
+  --primary-foreground: #ffffff;
+  --secondary: #f9fafb;
+  --secondary-foreground: #111827;
+  --accent: #e5e7eb;
+  --accent-foreground: #111827;
+  --muted-foreground: #6b7280;
+  --border: #d1d5db;
+  --input: #e5e7eb;
+  --ring: #111827;
+  --chart-1: #111827;
+  --chart-2: #374151;
+  --chart-3: #4b5563;
+  --chart-4: #6b7280;
+  --chart-5: #9ca3af;
+  --sidebar-primary: #111827;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f4f6;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #d1d5db;
+  --sidebar-ring: #111827;
+}
+
+.dark[data-color-scheme="darkElegant"],
+[data-color-scheme="darkElegant"].dark {
+  --primary: #f3f4f6;
+  --primary-foreground: #111827;
+  --secondary: #374151;
+  --secondary-foreground: #ffffff;
+  --accent: #374151;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #d1d5db;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #f3f4f6;
+  --chart-1: #f3f4f6;
+  --chart-2: #e5e7eb;
+  --chart-3: #9ca3af;
+  --chart-4: #6b7280;
+  --chart-5: #4b5563;
+  --sidebar-primary: #f3f4f6;
+  --sidebar-primary-foreground: #111827;
+  --sidebar-accent: #374151;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #f3f4f6;
+}
+
+/* indigo — Índigo Corporativo */
+[data-color-scheme="indigo"] {
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2ff;
+  --secondary-foreground: #3730a3;
+  --accent: #e0e7ff;
+  --accent-foreground: #3730a3;
+  --muted-foreground: #6366f1;
+  --border: #c7d2fe;
+  --input: #e0e7ff;
+  --ring: #4f46e5;
+  --chart-1: #4f46e5;
+  --chart-2: #6366f1;
+  --chart-3: #818cf8;
+  --chart-4: #3730a3;
+  --chart-5: #312e81;
+  --sidebar-primary: #4f46e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef2ff;
+  --sidebar-accent-foreground: #3730a3;
+  --sidebar-border: #c7d2fe;
+  --sidebar-ring: #4f46e5;
+}
+
+.dark[data-color-scheme="indigo"],
+[data-color-scheme="indigo"].dark {
+  --primary: #818cf8;
+  --primary-foreground: #1e1b4b;
+  --secondary: #312e81;
+  --secondary-foreground: #ffffff;
+  --accent: #312e81;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #c7d2fe;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #818cf8;
+  --chart-1: #818cf8;
+  --chart-2: #6366f1;
+  --chart-3: #4f46e5;
+  --chart-4: #3730a3;
+  --chart-5: #312e81;
+  --sidebar-primary: #818cf8;
+  --sidebar-primary-foreground: #1e1b4b;
+  --sidebar-accent: #312e81;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #818cf8;
+}
+
+/* teal — Aguamarina Premium */
+[data-color-scheme="teal"] {
+  --primary: #14b8a6;
+  --primary-foreground: #ffffff;
+  --secondary: #f0fdfa;
+  --secondary-foreground: #115e59;
+  --accent: #ccfbf1;
+  --accent-foreground: #115e59;
+  --muted-foreground: #0f766e;
+  --border: #99f6e4;
+  --input: #ccfbf1;
+  --ring: #14b8a6;
+  --chart-1: #14b8a6;
+  --chart-2: #2dd4bf;
+  --chart-3: #5eead4;
+  --chart-4: #0f766e;
+  --chart-5: #115e59;
+  --sidebar-primary: #14b8a6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0fdfa;
+  --sidebar-accent-foreground: #115e59;
+  --sidebar-border: #99f6e4;
+  --sidebar-ring: #14b8a6;
+}
+
+.dark[data-color-scheme="teal"],
+[data-color-scheme="teal"].dark {
+  --primary: #2dd4bf;
+  --primary-foreground: #042f2e;
+  --secondary: #134e4a;
+  --secondary-foreground: #ffffff;
+  --accent: #134e4a;
+  --accent-foreground: #ffffff;
+  --muted-foreground: #99f6e4;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #2dd4bf;
+  --chart-1: #2dd4bf;
+  --chart-2: #14b8a6;
+  --chart-3: #0d9488;
+  --chart-4: #0f766e;
+  --chart-5: #115e59;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #042f2e;
+  --sidebar-accent: #134e4a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: #2dd4bf;
 }

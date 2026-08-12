@@ -5,6 +5,7 @@ import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
 import { useTheme } from '@/contexts/theme-context';
 import { User as UserType } from '@/lib/types';
+import { ColorSchemeSelector } from '@/components/common/color-scheme-selector';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -87,6 +88,8 @@ export function UserMenu({ user }: UserMenuProps) {
             )}
             {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
           </Button>
+
+          <ColorSchemeSelector />
 
           <Button
             variant="outline"
