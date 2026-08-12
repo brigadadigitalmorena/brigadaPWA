@@ -3296,37 +3296,52 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
     return void 0;
   }
+  function isAuthRoute(pathname) {
+    return pathname === "/login" || pathname === "/activate" || pathname.startsWith("/activate/");
+  }
+  function authOfflineResponse() {
+    return new Response(
+      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Necesitas conexi\xF3n para iniciar sesi\xF3n o activar tu cuenta.</p><p><button onclick="location.reload()" style="font-size:1rem;padding:.75rem 1.25rem;border-radius:12px;border:0;background:#FF1B8D;color:#fff;cursor:pointer">Reintentar</button></p></body></html>',
+      {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" }
+      }
+    );
+  }
   async function navigationHandler({ request }) {
     const cache = await caches.open(PAGES_CACHE);
     const url = new URL(request.url);
     const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
+    const authRoute = isAuthRoute(url.pathname);
     try {
       const networkResponse = await fetch(request);
       if (networkResponse && networkResponse.ok) {
-        cache.put(request, networkResponse.clone()).catch(() => {
-        });
-        if (isFillRoute) {
-          cache.put("/surveys/__fill_shell__", networkResponse.clone()).catch(() => {
+        if (!authRoute) {
+          cache.put(request, networkResponse.clone()).catch(() => {
           });
+          if (isFillRoute) {
+            cache.put("/surveys/__fill_shell__", networkResponse.clone()).catch(() => {
+            });
+          }
         }
         return networkResponse;
       }
     } catch {
     }
+    if (authRoute) {
+      const exact = await cache.match(request) || await cache.match(`${url.origin}${url.pathname}`) || await caches.match(request.url, { ignoreSearch: true });
+      if (exact) return exact;
+      return authOfflineResponse();
+    }
     const withoutQuery = `${url.origin}${url.pathname}`;
-    const isAppRoute = url.pathname === "/sync" || url.pathname === "/drafts" || url.pathname === "/extras" || url.pathname === "/tracking" || url.pathname === "/surveys" || url.pathname === "/";
     if (isFillRoute) {
       const fillShell = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || await findCachedFillShell(cache);
       if (fillShell) return fillShell;
     }
     const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true });
     if (cached) return cached;
-    if (isAppRoute) {
-      const offline = await caches.match("/offline.html");
-      if (offline) return offline;
-    }
-    const shellFallback = await cache.match("/") || await caches.match("/") || await caches.match("/offline.html");
-    if (shellFallback) return shellFallback;
+    const offline = await caches.match("/offline.html");
+    if (offline) return offline;
     return new Response(
       '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Abre Brigada en l\xEDnea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
       {
@@ -3416,8 +3431,12 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
   });
   self.addEventListener("message", (event) => {
-    var _a;
-    if (((_a = event.data) == null ? void 0 : _a.type) === "WARM_URLS" && Array.isArray(event.data.urls)) {
+    var _a, _b;
+    if (((_a = event.data) == null ? void 0 : _a.type) === "SKIP_WAITING") {
+      self.skipWaiting();
+      return;
+    }
+    if (((_b = event.data) == null ? void 0 : _b.type) === "WARM_URLS" && Array.isArray(event.data.urls)) {
       event.waitUntil(
         (async () => {
           const cache = await caches.open(PAGES_CACHE);
@@ -3425,6 +3444,9 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
           await Promise.all(
             event.data.urls.map(async (url) => {
               try {
+                if (isAuthRoute(new URL(url, self.location.origin).pathname)) {
+                  return;
+                }
                 const response = await fetch(url, { credentials: "same-origin" });
                 if (response.ok) {
                   await cache.put(url, response.clone());
@@ -3442,7 +3464,9 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
   });
   self.addEventListener("install", () => {
-    self.skipWaiting();
+    if (!self.registration.active) {
+      self.skipWaiting();
+    }
   });
   self.addEventListener("activate", (event) => {
     event.waitUntil(

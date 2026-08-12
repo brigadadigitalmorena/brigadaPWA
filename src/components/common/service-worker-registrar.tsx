@@ -11,7 +11,11 @@ export function ServiceWorkerRegistrar() {
         description: 'Recarga la app para obtener las últimas mejoras.',
         action: {
           label: 'Recargar',
-          onClick: () => window.location.reload(),
+          onClick: async () => {
+            const registration = await navigator.serviceWorker.getRegistration();
+            registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+            window.location.reload();
+          },
         },
         duration: Infinity,
       });

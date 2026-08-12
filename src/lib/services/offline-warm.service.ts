@@ -22,14 +22,9 @@ export function warmSurveyFillUrls(
 
   if (urls.length === 0) return;
 
-  urls.forEach((url) => {
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = url;
-    link.as = 'document';
-    document.head.appendChild(link);
-  });
-
+  // Only warm via SW cache.put — do NOT inject <link rel="prefetch" as="document">.
+  // Document prefetch of App Router pages can thrash navigations / look like infinite reload
+  // when there are many assigned surveys (prod with data).
   navigator.serviceWorker.ready
     .then((reg) => {
       reg.active?.postMessage({ type: 'WARM_URLS', urls });

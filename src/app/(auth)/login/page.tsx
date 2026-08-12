@@ -32,7 +32,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [banner, setBanner] = useState<{
     variant: 'error' | 'warning' | 'info';
@@ -53,6 +53,12 @@ function LoginPageContent() {
   });
 
   useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.replace('/surveys');
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  useEffect(() => {
     if (searchParams.get('pending_email_verification') === '1') {
       const emailHint = searchParams.get('email_hint');
       setBanner({
@@ -71,7 +77,7 @@ function LoginPageContent() {
     try {
       await login(data.username, data.password);
       toast.success('Inicio de sesión exitoso');
-      router.push('/surveys');
+      router.replace('/surveys');
     } catch (error) {
       console.error('Login error:', error);
       const message = getLoginErrorMessage(error);
@@ -84,6 +90,14 @@ function LoginPageContent() {
       setIsLoading(false);
     }
   };
+
+  if (authLoading || isAuthenticated) {
+    return (
+      <AuthShell>
+        <LoadingState message="Cargando..." minHeight="min-h-[50vh]" />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell>

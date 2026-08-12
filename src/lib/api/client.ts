@@ -183,6 +183,32 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/** 401 on these must not clear session / hard-redirect (login errors, logout, refresh). */
+function isSessionRedirectExemptUrl(url?: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/mobile/login') ||
+    url.includes('/mobile/token/refresh') ||
+    url.includes('/auth/logout') ||
+    url.includes('/public/')
+  );
+}
+
+let isRedirectingToLogin = false;
+
+function redirectToLoginOnce(): void {
+  if (typeof window === 'undefined') return;
+  const path = window.location.pathname;
+  if (path === '/login' || path === '/activate' || path.startsWith('/activate/')) {
+    return;
+  }
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  // Soft full navigation without stacking history; avoids SW/auth loops on /login.
+  window.location.replace('/login');
+}
+
 /**
  * Response interceptor - Handle errors and token refresh
  */
@@ -194,7 +220,12 @@ apiClient.interceptors.response.use(
     };
 
     // Handle 401 Unauthorized
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      // Never refresh/redirect on auth endpoints (wrong password, logout, refresh itself).
+      if (isSessionRedirectExemptUrl(originalRequest.url)) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       const newToken = await attemptTokenRefresh();
@@ -203,11 +234,10 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       }
 
-      // Refresh failed - logout
+      // Refresh failed - clear session and go to login once
       clearTokensFromStorage();
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
+      redirectToLoginOnce();
+      return Promise.reject(error);
     }
 
     // Handle 403 Forbidden — let callers show inline errors (e.g. email_not_verified on login)

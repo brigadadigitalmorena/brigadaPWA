@@ -48,18 +48,39 @@ async function findCachedFillShell(cache) {
   return undefined;
 }
 
+function isAuthRoute(pathname) {
+  return (
+    pathname === '/login' ||
+    pathname === '/activate' ||
+    pathname.startsWith('/activate/')
+  );
+}
+
+function authOfflineResponse() {
+  return new Response(
+    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexión</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexión</h1><p>Necesitas conexión para iniciar sesión o activar tu cuenta.</p><p><button onclick="location.reload()" style="font-size:1rem;padding:.75rem 1.25rem;border-radius:12px;border:0;background:#FF1B8D;color:#fff;cursor:pointer">Reintentar</button></p></body></html>',
+    {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }
+  );
+}
+
 async function navigationHandler({ request }) {
   const cache = await caches.open(PAGES_CACHE);
   const url = new URL(request.url);
   const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
+  const authRoute = isAuthRoute(url.pathname);
 
   try {
     const networkResponse = await fetch(request);
     if (networkResponse && networkResponse.ok) {
-      cache.put(request, networkResponse.clone()).catch(() => {});
-      // Shared shell for ANY survey id offline (HTML is the same App Router page).
-      if (isFillRoute) {
-        cache.put('/surveys/__fill_shell__', networkResponse.clone()).catch(() => {});
+      // Never cache auth pages as shell — wrong HTML on /login causes redirect loops.
+      if (!authRoute) {
+        cache.put(request, networkResponse.clone()).catch(() => {});
+        if (isFillRoute) {
+          cache.put('/surveys/__fill_shell__', networkResponse.clone()).catch(() => {});
+        }
       }
       return networkResponse;
     }
@@ -67,14 +88,17 @@ async function navigationHandler({ request }) {
     /* offline or network error — fall through to cache */
   }
 
+  // Auth routes: network-only (+ optional exact /login cache). Never serve / or offline.html.
+  if (authRoute) {
+    const exact =
+      (await cache.match(request)) ||
+      (await cache.match(`${url.origin}${url.pathname}`)) ||
+      (await caches.match(request.url, { ignoreSearch: true }));
+    if (exact) return exact;
+    return authOfflineResponse();
+  }
+
   const withoutQuery = `${url.origin}${url.pathname}`;
-  const isAppRoute =
-    url.pathname === '/sync' ||
-    url.pathname === '/drafts' ||
-    url.pathname === '/extras' ||
-    url.pathname === '/tracking' ||
-    url.pathname === '/surveys' ||
-    url.pathname === '/';
 
   if (isFillRoute) {
     const fillShell =
@@ -93,18 +117,10 @@ async function navigationHandler({ request }) {
 
   if (cached) return cached;
 
-  // Never serve a different app page for /sync|/drafts (looks like "Ver" does nothing).
-  if (isAppRoute) {
-    const offline = await caches.match('/offline.html');
-    if (offline) return offline;
-  }
-
-  const shellFallback =
-    (await cache.match('/')) ||
-    (await caches.match('/')) ||
-    (await caches.match('/offline.html'));
-
-  if (shellFallback) return shellFallback;
+  // Never serve a different app page (especially "/") — wrong HTML at /surveys|/login
+  // remounts Home ("Cargando...") in a redirect loop when prod has warm caches.
+  const offline = await caches.match('/offline.html');
+  if (offline) return offline;
 
   return new Response(
     '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexión</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexión</h1><p>Abre Brigada en línea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
@@ -219,6 +235,11 @@ self.addEventListener('sync', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+
   if (event.data?.type === 'WARM_URLS' && Array.isArray(event.data.urls)) {
     event.waitUntil(
       (async () => {
@@ -227,6 +248,10 @@ self.addEventListener('message', (event) => {
         await Promise.all(
           event.data.urls.map(async (url) => {
             try {
+              // Do not warm/cache auth pages into the app shell.
+              if (isAuthRoute(new URL(url, self.location.origin).pathname)) {
+                return;
+              }
               const response = await fetch(url, { credentials: 'same-origin' });
               if (response.ok) {
                 await cache.put(url, response.clone());
@@ -245,8 +270,11 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// First install: activate ASAP. Updates wait for SKIP_WAITING from the app toast.
 self.addEventListener('install', () => {
-  self.skipWaiting();
+  if (!self.registration.active) {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {

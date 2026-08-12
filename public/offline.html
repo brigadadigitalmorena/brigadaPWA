@@ -120,9 +120,8 @@
   </div>
 
   <script>
-    window.addEventListener('online', () => {
-      window.location.reload();
-    });
+    // Manual retry only — auto-reload on "online" can loop forever when the SW
+    // keeps serving this page for navigations (e.g. /login fallback).
   </script>
 </body>
 </html>
