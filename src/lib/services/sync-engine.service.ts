@@ -188,6 +188,8 @@ async function processResponseItem(
     started_at,
     completed_at,
     device_info,
+    is_management,
+    survey_type,
   } = payload;
 
   options?.onProgress?.(`Enviando respuesta ${String(response_id).slice(0, 8)}...`);
@@ -230,7 +232,11 @@ async function processResponseItem(
         completed_at,
         duration_seconds: 0,
       },
-      fileAnswers
+      fileAnswers,
+      {
+        isManagement:
+          Boolean(is_management) || survey_type === 'gestion',
+      }
     );
   } catch (buildErr) {
     return {

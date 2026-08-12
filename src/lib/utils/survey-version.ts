@@ -96,7 +96,12 @@ export function normalizeSurveyVersion(version: SurveyVersion): SurveyVersion {
 
 export function cacheAssignment(
   surveyId: number,
-  assignment: { survey_id: number; survey_title: string; latest_version: SurveyVersion }
+  assignment: {
+    survey_id: number;
+    survey_title: string;
+    survey_type?: string;
+    latest_version: SurveyVersion;
+  }
 ): void {
   if (typeof window === 'undefined') return;
   sessionStorage.setItem(
@@ -107,7 +112,12 @@ export function cacheAssignment(
 
 export function readCachedAssignment(
   surveyId: number
-): { survey_id: number; survey_title: string; latest_version: SurveyVersion } | null {
+): {
+  survey_id: number;
+  survey_title: string;
+  survey_type?: string;
+  latest_version: SurveyVersion;
+} | null {
   if (typeof window === 'undefined') return null;
 
   const raw = sessionStorage.getItem(`${ASSIGNMENT_CACHE_PREFIX}${surveyId}`);
@@ -117,6 +127,7 @@ export function readCachedAssignment(
     return JSON.parse(raw) as {
       survey_id: number;
       survey_title: string;
+      survey_type?: string;
       latest_version: SurveyVersion;
     };
   } catch {
@@ -125,7 +136,12 @@ export function readCachedAssignment(
 }
 
 export function cacheAssignments(
-  assignments: { survey_id: number; survey_title: string; latest_version: SurveyVersion }[]
+  assignments: {
+    survey_id: number;
+    survey_title: string;
+    survey_type?: string;
+    latest_version: SurveyVersion;
+  }[]
 ): void {
   assignments.forEach((assignment) => {
     cacheAssignment(assignment.survey_id, assignment);

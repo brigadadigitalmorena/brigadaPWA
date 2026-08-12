@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/api/auth.service';
 import { LocalFilePreview } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
 import { SYNC_PRIORITY } from '@/lib/sync';
+import { readCachedAssignment } from '@/lib/utils/survey-version';
 
 export interface FinalizeResponseInput {
   responseId: string;
@@ -18,10 +19,23 @@ export interface FinalizeResponseInput {
     osVersion: string;
     appVersion: string;
   };
+  surveyType?: string | null;
 }
 
 function getAppVersion(): string {
   return process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0';
+}
+
+function resolveSurveyType(
+  surveyId: string,
+  explicitType?: string | null
+): string | undefined {
+  if (explicitType) return explicitType;
+  const numericId = Number(surveyId);
+  if (!Number.isFinite(numericId)) return undefined;
+  const session = readCachedAssignment(numericId);
+  if (session?.survey_type) return session.survey_type;
+  return undefined;
 }
 
 /**
@@ -36,6 +50,8 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
 
   const now = new Date().toISOString();
   const versionString = input.version.version_number.toString();
+  const surveyType = resolveSurveyType(input.surveyId, input.surveyType);
+  const isManagement = surveyType === 'gestion';
 
   const response: Response = {
     response_id: input.responseId,
@@ -172,10 +188,11 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
         started_at: input.startedAt,
         completed_at: now,
         device_info: input.deviceInfo,
+        survey_type: surveyType ?? null,
+        is_management: isManagement,
       }),
       status: 'pending',
-      // Responses before file uploads (mobile parity).
-      priority: SYNC_PRIORITY.RESPONSE,
+      priority: isManagement ? SYNC_PRIORITY.GESTION : SYNC_PRIORITY.RESPONSE,
       retry_count: 0,
       max_retries: 8,
       next_retry_at: now,

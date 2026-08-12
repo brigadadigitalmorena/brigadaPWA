@@ -247,7 +247,8 @@ export function buildSurveyResponseCreate(
   questions: { id: number; question_key?: string }[],
   location: LocationData | null,
   metadata: ResponseMetadata,
-  fileAnswers: FileAnswerRef[] = []
+  fileAnswers: FileAnswerRef[] = [],
+  options: { isManagement?: boolean } = {}
 ): SurveyResponseCreate {
   const now = new Date().toISOString();
   const byQuestion = new Map<number, QuestionAnswerCreate>();
@@ -313,6 +314,6 @@ export function buildSurveyResponseCreate(
     },
     capture_meta: {},
     answers: answerEntries,
-    is_management: false,
+    is_management: Boolean(options.isManagement),
   };
 }

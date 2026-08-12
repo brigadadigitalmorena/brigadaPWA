@@ -30,7 +30,7 @@ const allNavItems = [
     isActive: (path: string) => path.startsWith('/extras'),
   },
   {
-    label: 'Tracking',
+    label: 'Gestión',
     href: '/tracking',
     icon: MapPinned,
     module: 'tracking' as const,

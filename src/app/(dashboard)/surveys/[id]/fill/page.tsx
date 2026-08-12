@@ -16,6 +16,10 @@ import {
 } from '@/lib/services/response-submission.service';
 import { isAutoAdvanceType } from '@/lib/survey/field-types';
 import { useSurveyFormEngine } from '@/lib/forms/use-survey-form-engine';
+import {
+  questionKeyOf,
+  validateAnswer,
+} from '@/lib/forms/validate-answer';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -58,6 +62,7 @@ function SurveyFillPageContent() {
     nextQuestion,
     prevQuestion,
     goToSection,
+    goToQuestion,
     getFillableQuestions,
     getCurrentQuestionEntry,
     getProgress,
@@ -94,6 +99,7 @@ function SurveyFillPageContent() {
     reset: resetForm,
     trigger,
     getValues,
+    setError,
     formState: { errors, isDirty },
   } = useForm({
     defaultValues: answers,
@@ -166,10 +172,38 @@ function SurveyFillPageContent() {
     }
   };
 
+  const getFieldValidationMessage = (
+    question: NonNullable<typeof currentQuestion>,
+    value: unknown
+  ): string | null => {
+    const engineKey = questionKeyOf(question);
+    const engineError = formEngine?.getError?.(engineKey);
+    if (typeof engineError === 'string' && engineError.trim()) {
+      return engineError;
+    }
+    return validateAnswer(question, value);
+  };
+
   const finalizeSurvey = async () => {
     if (!version || !responseId || !startedAt) {
       toast.error('Faltan datos para finalizar la encuesta');
       return;
+    }
+
+    const formValues = getValues();
+    for (let index = 0; index < fillableQuestions.length; index += 1) {
+      const entry = fillableQuestions[index];
+      const key = questionKeyOf(entry.question);
+      const value =
+        formValues[key] !== undefined ? formValues[key] : answers[key];
+      const message = getFieldValidationMessage(entry.question, value);
+      if (message) {
+        goToQuestion(index);
+        setError(key, { type: 'validate', message });
+        toast.error(message);
+        scrollToFirstError();
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -217,17 +251,28 @@ function SurveyFillPageContent() {
   const handleNext = async () => {
     if (!currentQuestion) return;
 
-    const questionKey =
-      currentQuestion.question_key || currentQuestion.id.toString();
-    const valid = await trigger(questionKey);
+    const questionKey = questionKeyOf(currentQuestion);
+    const value = getValues(questionKey);
+    const message = getFieldValidationMessage(currentQuestion, value);
 
-    if (!valid) {
-      toast.error('Completa el campo obligatorio antes de continuar');
+    if (message) {
+      setError(questionKey, { type: 'validate', message });
+      await trigger(questionKey);
+      toast.error(message);
       scrollToFirstError();
       return;
     }
 
-    const value = getValues(questionKey);
+    const valid = await trigger(questionKey);
+    if (!valid) {
+      const rhfMessage =
+        (errors[questionKey]?.message as string | undefined) ||
+        'Completa el campo antes de continuar';
+      toast.error(rhfMessage);
+      scrollToFirstError();
+      return;
+    }
+
     setAnswer(questionKey, value);
     formEngine?.setAnswer(questionKey, value);
     await advanceOrFinalize();
@@ -239,6 +284,12 @@ function SurveyFillPageContent() {
     }
 
     autoAdvanceTimeoutRef.current = setTimeout(async () => {
+      if (!currentQuestion) return;
+      const message = getFieldValidationMessage(currentQuestion, value);
+      if (message) {
+        setError(questionKey, { type: 'validate', message });
+        return;
+      }
       const valid = await trigger(questionKey);
       if (!valid) return;
       setAnswer(questionKey, value);
@@ -414,19 +465,17 @@ function SurveyFillPageContent() {
             </div>
 
             <Controller
-              name={
-                currentQuestion.question_key || currentQuestion.id.toString()
-              }
+              name={questionKeyOf(currentQuestion)}
               control={control}
               rules={{
                 required: currentQuestion.is_required
                   ? 'Este campo es obligatorio'
                   : false,
+                validate: (value) =>
+                  getFieldValidationMessage(currentQuestion, value) ?? true,
               }}
               render={({ field }) => {
-                const questionKey =
-                  currentQuestion.question_key ||
-                  currentQuestion.id.toString();
+                const questionKey = questionKeyOf(currentQuestion);
 
                 return (
                   <QuestionRenderer

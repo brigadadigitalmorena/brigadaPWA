@@ -42,7 +42,7 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       isActive: (path: string) => path.startsWith('/extras'),
     },
     {
-      label: 'Tracking',
+      label: 'Gestión',
       href: '/tracking',
       icon: MapPinned,
       isActive: (path: string) => path.startsWith('/tracking'),

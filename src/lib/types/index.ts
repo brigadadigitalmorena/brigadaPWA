@@ -197,6 +197,8 @@ export interface Assignment {
   survey_title: string;
   survey_description?: string;
   survey_type?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
   assignment_status: string;
   inactive_reason?: string;
   management_status?: string;
