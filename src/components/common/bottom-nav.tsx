@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardList, RefreshCw, FileEdit, Zap, MapPinned } from 'lucide-react';
+import { ClipboardList, RefreshCw, FileEdit, Zap, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSync } from '@/contexts/sync.context';
 import { isModuleEnabled } from '@/lib/services/app-config.service';
@@ -32,12 +32,12 @@ const allNavItems = [
   {
     label: 'Gestión',
     href: '/tracking',
-    icon: MapPinned,
+    icon: Workflow,
     module: 'tracking' as const,
     isActive: (path: string) => path.startsWith('/tracking'),
   },
   {
-    label: 'Envíos',
+    label: 'Mis envíos',
     href: '/sync',
     icon: RefreshCw,
     module: 'sync' as const,

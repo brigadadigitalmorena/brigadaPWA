@@ -1,3 +1,5 @@
+import type { FieldTrackingConfig } from '@/lib/api/field-session.service';
+
 // User types
 export interface User {
   id: number;
@@ -214,6 +216,11 @@ export interface Assignment {
   assigned_at: string;
   min_responses_per_day?: number;
   max_responses_per_day?: number;
+  /**
+   * FIELD-TRACK-1 — route-tracking config frozen in the published version.
+   * Absent on older backends and on assignments cached before the rollout.
+   */
+  field_tracking?: FieldTrackingConfig | null;
 }
 
 // Sync types

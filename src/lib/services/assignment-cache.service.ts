@@ -56,6 +56,7 @@ export async function persistAssignments(assignments: Assignment[]): Promise<voi
       survey_id: assignment.survey_id,
       survey_title: assignment.survey_title,
       latest_version: version ?? assignment.latest_version,
+      field_tracking: assignment.field_tracking ?? null,
     });
   }
 

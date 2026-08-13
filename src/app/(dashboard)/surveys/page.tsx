@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
+import { RecorridoCard } from '@/components/recorrido/recorrido-card';
 import { SkeletonSurveyCard } from '@/components/ui/skeleton';
 import {
   ClipboardList,
@@ -362,6 +363,8 @@ export default function SurveysPage() {
           </Button>
         }
       />
+
+      <RecorridoCard />
 
       <div className="sticky top-0 z-10 -mx-1 border-b bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <TooltipProvider delay={300}>

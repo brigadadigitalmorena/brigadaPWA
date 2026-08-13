@@ -1,6 +1,20 @@
 import { Question, SurveySection, SurveyVersion } from '@/lib/types';
+import type { FieldTrackingConfig } from '@/lib/api/field-session.service';
 
 const ASSIGNMENT_CACHE_PREFIX = 'brigada_survey_assignment_';
+
+/**
+ * Subset of `Assignment` that the fill flow caches in sessionStorage so a
+ * survey can be opened offline.
+ */
+export interface CachedAssignment {
+  survey_id: number;
+  survey_title: string;
+  survey_type?: string;
+  latest_version: SurveyVersion;
+  /** FIELD-TRACK-1 — route config, used by the requires-active-session gate. */
+  field_tracking?: FieldTrackingConfig | null;
+}
 
 function sortByOrder<T extends { order: number }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.order - b.order);
@@ -96,12 +110,7 @@ export function normalizeSurveyVersion(version: SurveyVersion): SurveyVersion {
 
 export function cacheAssignment(
   surveyId: number,
-  assignment: {
-    survey_id: number;
-    survey_title: string;
-    survey_type?: string;
-    latest_version: SurveyVersion;
-  }
+  assignment: CachedAssignment
 ): void {
   if (typeof window === 'undefined') return;
   sessionStorage.setItem(
@@ -112,37 +121,20 @@ export function cacheAssignment(
 
 export function readCachedAssignment(
   surveyId: number
-): {
-  survey_id: number;
-  survey_title: string;
-  survey_type?: string;
-  latest_version: SurveyVersion;
-} | null {
+): CachedAssignment | null {
   if (typeof window === 'undefined') return null;
 
   const raw = sessionStorage.getItem(`${ASSIGNMENT_CACHE_PREFIX}${surveyId}`);
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as {
-      survey_id: number;
-      survey_title: string;
-      survey_type?: string;
-      latest_version: SurveyVersion;
-    };
+    return JSON.parse(raw) as CachedAssignment;
   } catch {
     return null;
   }
 }
 
-export function cacheAssignments(
-  assignments: {
-    survey_id: number;
-    survey_title: string;
-    survey_type?: string;
-    latest_version: SurveyVersion;
-  }[]
-): void {
+export function cacheAssignments(assignments: CachedAssignment[]): void {
   assignments.forEach((assignment) => {
     cacheAssignment(assignment.survey_id, assignment);
   });

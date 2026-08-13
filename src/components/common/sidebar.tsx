@@ -11,8 +11,13 @@ import {
   LogOut,
   FileEdit,
   Zap,
-  MapPinned,
+  Workflow,
 } from 'lucide-react';
+import { useSync } from '@/contexts/sync.context';
+import {
+  isModuleEnabled,
+  type ModuleKey,
+} from '@/lib/services/app-config.service';
 
 interface SidebarProps {
   user: User | null;
@@ -21,39 +26,54 @@ interface SidebarProps {
 
 export function Sidebar({ user, currentPath }: SidebarProps) {
   const { logout } = useAuth();
+  const { isOnline } = useSync();
 
-  const menuItems = [
+  const allMenuItems: Array<{
+    label: string;
+    href: string;
+    icon: typeof ClipboardList;
+    module: ModuleKey;
+    isActive: (path: string) => boolean;
+  }> = [
     {
       label: 'Encuestas',
       href: '/surveys',
       icon: ClipboardList,
+      module: 'surveys',
       isActive: (path: string) => path.startsWith('/surveys'),
     },
     {
       label: 'Borradores',
       href: '/drafts',
       icon: FileEdit,
+      module: 'drafts',
       isActive: (path: string) => path.startsWith('/drafts'),
     },
     {
       label: 'Extras',
       href: '/extras',
       icon: Zap,
+      module: 'extras',
       isActive: (path: string) => path.startsWith('/extras'),
     },
     {
       label: 'Gestión',
       href: '/tracking',
-      icon: MapPinned,
+      icon: Workflow,
+      module: 'tracking',
       isActive: (path: string) => path.startsWith('/tracking'),
     },
     {
-      label: 'Envíos',
+      label: 'Mis envíos',
       href: '/sync',
       icon: RefreshCw,
+      module: 'sync',
       isActive: (path: string) => path.startsWith('/sync'),
     },
   ];
+  const menuItems = allMenuItems.filter((item) =>
+    isModuleEnabled(item.module, isOnline)
+  );
 
   const handleLogout = async () => {
     await logout();

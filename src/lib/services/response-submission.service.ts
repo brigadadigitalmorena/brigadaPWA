@@ -5,6 +5,7 @@ import { LocalFilePreview } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
 import { SYNC_PRIORITY } from '@/lib/sync';
 import { readCachedAssignment } from '@/lib/utils/survey-version';
+import { fieldSessionService } from '@/lib/services/field-session.service';
 
 export interface FinalizeResponseInput {
   responseId: string;
@@ -52,6 +53,10 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
   const versionString = input.version.version_number.toString();
   const surveyType = resolveSurveyType(input.surveyId, input.surveyType);
   const isManagement = surveyType === 'gestion';
+  // FIELD-TRACK-1 — resolved now, not at sync time: by the time the queue
+  // drains, the brigadista may have already ended this route.
+  const fieldSessionClientId =
+    await fieldSessionService.getActiveSessionClientId();
 
   const response: Response = {
     response_id: input.responseId,
@@ -190,6 +195,7 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
         device_info: input.deviceInfo,
         survey_type: surveyType ?? null,
         is_management: isManagement,
+        field_session_client_id: fieldSessionClientId,
       }),
       status: 'pending',
       priority: isManagement ? SYNC_PRIORITY.GESTION : SYNC_PRIORITY.RESPONSE,

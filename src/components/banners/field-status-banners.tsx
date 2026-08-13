@@ -6,6 +6,7 @@ import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import { Button } from '@/components/ui/button';
+import { RecorridoBanner } from '@/components/banners/recorrido-banner';
 
 function goTo(path: string) {
   // Hard navigation so SW / offline soft-nav does not strand the user.
@@ -26,6 +27,10 @@ export function FieldStatusBanners() {
 
   return (
     <div className="space-y-2">
+      {/* FIELD-TRACK-1 — first, because an active route is the one thing the
+          brigadista must not lose track of. */}
+      <RecorridoBanner />
+
       {!isOnline && (
         <InlineBanner
           variant="warning"

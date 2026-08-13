@@ -43,6 +43,8 @@ export interface SurveyResponseCreate {
   capture_meta?: Record<string, unknown>;
   answers: QuestionAnswerCreate[];
   is_management?: boolean;
+  /** FIELD-TRACK-1 — UUID of the route session open when this was submitted. */
+  field_session_client_id?: string | null;
 }
 
 export interface BatchResponseCreate {
@@ -248,7 +250,14 @@ export function buildSurveyResponseCreate(
   location: LocationData | null,
   metadata: ResponseMetadata,
   fileAnswers: FileAnswerRef[] = [],
-  options: { isManagement?: boolean } = {}
+  options: {
+    isManagement?: boolean;
+    /**
+     * FIELD-TRACK-1 — route session open at submit time, so the CMS can pin
+     * this response onto the track line.
+     */
+    fieldSessionClientId?: string | null;
+  } = {}
 ): SurveyResponseCreate {
   const now = new Date().toISOString();
   const byQuestion = new Map<number, QuestionAnswerCreate>();
@@ -315,5 +324,8 @@ export function buildSurveyResponseCreate(
     capture_meta: {},
     answers: answerEntries,
     is_management: Boolean(options.isManagement),
+    ...(options.fieldSessionClientId
+      ? { field_session_client_id: options.fieldSessionClientId }
+      : {}),
   };
 }

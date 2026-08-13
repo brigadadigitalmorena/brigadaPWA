@@ -11,6 +11,11 @@ import {
 } from '@/lib/db/database';
 import { loadFileBlob, deleteFileBlob } from '@/lib/services/file-blob.service';
 import {
+  startFieldSession,
+  updateFieldSession,
+  uploadFieldSessionSamples,
+} from '@/lib/api/field-session.service';
+import {
   submitResponse,
   getPresignedUploadUrl,
   confirmFileUpload,
@@ -26,6 +31,14 @@ import {
   normalizeConfirmDocumentPayload,
   SYNC_PRIORITY,
 } from '@/lib/sync';
+import {
+  classifySampleReadiness,
+  FIELD_SAMPLE_BATCH_SIZE,
+  MAX_SAMPLE_BATCHES_PER_RUN,
+  operationRank,
+  parseSessionConfig,
+  toSampleUpload,
+} from '@/lib/sync/field-session-replay-utils';
 import { getApiErrorMessage } from '@/lib/utils/api-errors';
 
 interface SyncResult {
@@ -40,19 +53,6 @@ export interface SyncEngineOptions {
 }
 
 const inFlightUploads = new Set<string>();
-
-function operationRank(operationType: string): number {
-  switch (operationType) {
-    case 'CREATE_RESPONSE':
-      return 0;
-    case 'UPLOAD_FILE':
-      return 1;
-    case 'CONFIRM_DOCUMENT':
-      return 2;
-    default:
-      return 9;
-  }
-}
 
 /** Map local file_type / question_type → backend DocumentMetadata.document_type */
 function mapFileTypeToDocType(fileType: string | undefined): string {
@@ -132,6 +132,10 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
           result = await processFileItem(item, options);
         } else if (item.operation_type === 'CONFIRM_DOCUMENT') {
           result = await processConfirmItem(item, options);
+        } else if (item.operation_type === 'UPSERT_FIELD_SESSION') {
+          result = await processFieldSessionItem(item, options);
+        } else if (item.operation_type === 'UPLOAD_FIELD_SESSION_SAMPLES') {
+          result = await processFieldSamplesItem(item, options);
         } else {
           result = {
             success: false,
@@ -190,6 +194,7 @@ async function processResponseItem(
     device_info,
     is_management,
     survey_type,
+    field_session_client_id,
   } = payload;
 
   options?.onProgress?.(`Enviando respuesta ${String(response_id).slice(0, 8)}...`);
@@ -236,6 +241,7 @@ async function processResponseItem(
       {
         isManagement:
           Boolean(is_management) || survey_type === 'gestion',
+        fieldSessionClientId: field_session_client_id ?? null,
       }
     );
   } catch (buildErr) {
@@ -630,6 +636,142 @@ async function recoverOrphanUploads(options?: SyncEngineOptions): Promise<void> 
     });
     options?.onProgress?.(`Recuperado upload huérfano ${file.file_id.slice(0, 8)}`);
   }
+}
+
+/**
+ * FIELD-TRACK-1 — push the route session row.
+ *
+ * The current state is re-read from Dexie rather than trusting the queued
+ * payload: the session may have been closed since it was enqueued, and the
+ * close (with `ended_at`) is the part that matters most.
+ */
+async function processFieldSessionItem(
+  item: SyncQueue,
+  options?: SyncEngineOptions
+): Promise<SyncResult> {
+  const session = await db.field_sessions.get(item.entity_id);
+  if (!session) {
+    return {
+      success: false,
+      error: 'Recorrido local no encontrado',
+      errorCode: 'FIELD_SESSION_MISSING',
+      permanent: true,
+    };
+  }
+
+  options?.onProgress?.('Sincronizando recorrido...');
+
+  const remote = await startFieldSession({
+    client_id: session.client_id,
+    activity_type: session.activity_type,
+    survey_id: session.survey_id,
+    assignment_id: session.assignment_id,
+    started_at: session.started_at,
+    config_snapshot: parseSessionConfig(session.config_json),
+    degraded_reason: session.degraded_reason ?? null,
+    source: 'pwa',
+    device_info: {
+      platform: 'web',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    },
+  });
+
+  await db.field_sessions.update(session.client_id, { server_id: remote.id });
+
+  if (session.status !== 'active') {
+    await updateFieldSession(session.client_id, {
+      status: session.status,
+      ended_at: session.ended_at ?? null,
+      end_reason: session.end_reason ?? null,
+      degraded_reason: session.degraded_reason ?? null,
+    });
+  }
+
+  return { success: true };
+}
+
+/**
+ * FIELD-TRACK-1 — drain pending GPS samples in batches.
+ *
+ * `sample_seq` makes duplicates a server-side no-op, so a batch whose response
+ * is lost costs nothing on retry. Rejected rows are retired along with the
+ * accepted ones: they are malformed and would otherwise block the window.
+ */
+async function processFieldSamplesItem(
+  item: SyncQueue,
+  options?: SyncEngineOptions
+): Promise<SyncResult> {
+  const clientId = item.entity_id;
+  const session = await db.field_sessions.get(clientId);
+  const readiness = classifySampleReadiness(session);
+
+  if (readiness === 'session_missing') {
+    return {
+      success: false,
+      error: 'Recorrido local no encontrado',
+      errorCode: 'FIELD_SESSION_MISSING',
+      permanent: true,
+    };
+  }
+
+  if (readiness === 'not_synced') {
+    return {
+      success: false,
+      error: 'El recorrido aún no se ha sincronizado',
+      errorCode: 'FIELD_SESSION_NOT_SYNCED',
+    };
+  }
+
+  for (let batch = 0; batch < MAX_SAMPLE_BATCHES_PER_RUN; batch += 1) {
+    const pending = await db.field_session_samples
+      .where('[session_client_id+upload_status]')
+      .equals([clientId, 'pending'])
+      .sortBy('sample_seq');
+
+    if (pending.length === 0) break;
+
+    const slice = pending.slice(0, FIELD_SAMPLE_BATCH_SIZE);
+    options?.onProgress?.(`Enviando ${slice.length} puntos del recorrido...`);
+
+    await uploadFieldSessionSamples(clientId, slice.map(toSampleUpload));
+
+    const uploadedAt = new Date().toISOString();
+    await db.field_session_samples
+      .where('id')
+      .anyOf(slice.map((sample) => sample.id!).filter((id) => id !== undefined))
+      .modify({ upload_status: 'uploaded', uploaded_at: uploadedAt });
+  }
+
+  const remaining = await db.field_session_samples
+    .where('[session_client_id+upload_status]')
+    .equals([clientId, 'pending'])
+    .count();
+
+  if (remaining > 0) {
+    // Hit the per-run cap. Return the item to the queue without burning a
+    // retry — real progress was made.
+    return {
+      success: false,
+      error: `Quedan ${remaining} puntos por enviar`,
+      errorCode: 'IN_FLIGHT',
+    };
+  }
+
+  await pruneUploadedFieldSamples();
+  return { success: true };
+}
+
+/** Drop uploaded samples once they are too old to help diagnose anything. */
+async function pruneUploadedFieldSamples(olderThanDays = 3): Promise<void> {
+  const cutoff = new Date(
+    Date.now() - olderThanDays * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  await db.field_session_samples
+    .where('upload_status')
+    .equals('uploaded')
+    .filter((sample) => Boolean(sample.uploaded_at && sample.uploaded_at < cutoff))
+    .delete();
 }
 
 async function handleSyncResult(

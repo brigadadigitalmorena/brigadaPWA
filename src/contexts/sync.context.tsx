@@ -18,6 +18,7 @@ import {
   getQueueStats,
 } from '@/lib/services/sync-engine.service';
 import { configureOnlineModeKv } from '@/lib/sync';
+import { fieldSessionService } from '@/lib/services/field-session.service';
 
 interface SyncContextType extends SyncStatus {
   deadLetterCount: number;
@@ -62,7 +63,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     useLiveQuery(async () => {
       const pending = await db.sync_queue.where('status').equals('pending').count();
       const retry = await db.sync_queue.where('status').equals('retry_wait').count();
-      return pending + retry;
+      const leased = await db.sync_queue.where('status').equals('leased').count();
+      const syncing = await db.sync_queue.where('status').equals('syncing').count();
+      return pending + retry + leased + syncing;
     }, []) ?? 0;
 
   const deadLetterLive =
@@ -191,6 +194,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         });
     }
   }, [pendingCount]);
+
+  // FIELD-TRACK-1 — a reload kills the geolocation watch, so an open route has
+  // to be re-attached (and the dead interval recorded as a gap) on every mount.
+  useEffect(() => {
+    void fieldSessionService.resumeOnLoad().catch(() => {
+      // Route capture is best-effort in the browser; never block boot on it.
+    });
+  }, []);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {

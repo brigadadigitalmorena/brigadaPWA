@@ -109,7 +109,7 @@ export interface SyncQueue {
   id?: number;
   queue_id: string;
   operation_type: string;
-  entity_type: 'survey' | 'response' | 'user' | 'file';
+  entity_type: 'survey' | 'response' | 'user' | 'file' | 'field_session';
   entity_id: string;
   payload_json: string;
   status: SyncQueueStatus;
@@ -143,6 +143,59 @@ export interface FileBlob {
   created_at: string;
 }
 
+/**
+ * FIELD-TRACK-1 — brigadista route session.
+ *
+ * Mirrors the mobile SQLite table so both clients speak the same wire format.
+ * The browser is the source of truth until `server_id` is filled in by the
+ * queue, which is what lets a session start while offline.
+ */
+export interface FieldSession {
+  client_id: string;
+  server_id?: number;
+  activity_type: string;
+  survey_id?: number | null;
+  assignment_id?: number | null;
+  status: 'active' | 'completed' | 'abandoned';
+  started_at: string;
+  ended_at?: string;
+  end_reason?: string;
+  config_json: string;
+  degraded_reason?: string;
+  /** Next `sample_seq` to hand out; monotonic, never reused. */
+  next_seq: number;
+  sample_count: number;
+  distance_m: number;
+  last_lat?: number;
+  last_lng?: number;
+  last_sample_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FieldSessionSample {
+  id?: number;
+  session_client_id: string;
+  sample_seq: number;
+  sample_type: 'gps' | 'photo';
+  latitude?: number;
+  longitude?: number;
+  accuracy_m?: number;
+  altitude_m?: number;
+  speed_mps?: number;
+  heading_deg?: number;
+  recorded_at: string;
+  provider?: string;
+  app_state?: 'foreground' | 'background' | 'hidden';
+  is_mocked?: boolean;
+  battery_pct?: number;
+  media_file_id?: string;
+  payload_json?: string;
+  upload_status: 'pending' | 'uploaded';
+  uploaded_at?: string;
+  created_at: string;
+}
+
 class BrigadaDatabase extends Dexie {
   surveys!: Table<Survey>;
   responses!: Table<Response>;
@@ -151,6 +204,8 @@ class BrigadaDatabase extends Dexie {
   sync_queue!: Table<SyncQueue>;
   kv_cache!: Table<KVCache>;
   file_blobs!: Table<FileBlob>;
+  field_sessions!: Table<FieldSession>;
+  field_session_samples!: Table<FieldSessionSample>;
 
   constructor() {
     super('BrigadaPWA');
@@ -184,11 +239,27 @@ class BrigadaDatabase extends Dexie {
       kv_cache: 'cache_key, expires_at',
       file_blobs: '++id, file_id, response_id, created_at',
     });
+
+    // v4: FIELD-TRACK-1 route sessions. `[session_client_id+sample_seq]` is a
+    // compound index rather than a unique one — Dexie cannot express uniqueness
+    // on a compound key, so the repository guards duplicates via `next_seq`.
+    this.version(4).stores({
+      surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
+      responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
+      response_answers: '++id, response_id, question_key, created_at',
+      local_files: '++id, file_id, response_id, file_type, sync_status, created_at',
+      sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
+      kv_cache: 'cache_key, expires_at',
+      file_blobs: '++id, file_id, response_id, created_at',
+      field_sessions: 'client_id, status, started_at',
+      field_session_samples:
+        '++id, session_client_id, upload_status, [session_client_id+sample_seq], [session_client_id+upload_status]',
+    });
   }
 }
 
 export const db = new BrigadaDatabase();
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 const PROCESS_LOCK_KEY = 'sync_process_lock';
 const LEASE_OWNER = `pwa-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : 'local'}`;
@@ -218,6 +289,8 @@ export async function clearDatabase(): Promise<void> {
   await db.sync_queue.clear();
   await db.kv_cache.clear();
   await db.file_blobs.clear();
+  await db.field_sessions.clear();
+  await db.field_session_samples.clear();
 }
 
 export async function kvGet(key: string): Promise<string | null> {

@@ -8,6 +8,13 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/common/page-header';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import { SubmissionHistory } from '@/components/sync/submission-history';
+import {
   RefreshCw,
   Wifi,
   WifiOff,
@@ -52,6 +59,8 @@ export default function SyncPage() {
     clearDeadLetter,
   } = useSync();
 
+  const queueCount = pendingCount + (deadLetterCount ?? 0);
+
   const queueItems = useLiveQuery(async () => {
     const rows = await db.sync_queue
       .filter((item) => item.status !== 'completed' && item.status !== 'discarded')
@@ -61,11 +70,33 @@ export default function SyncPage() {
       .slice(0, 50);
   }, []);
 
+  const historyData = useLiveQuery(async () => {
+    const [responses, surveys] = await Promise.all([
+      db.responses
+        .filter((response) => response.sync_status === 'synced')
+        .toArray(),
+      db.surveys.toArray(),
+    ]);
+    responses.sort((a, b) => {
+      const aDate =
+        a.last_synced_at || a.completed_at || a.updated_at || a.created_at;
+      const bDate =
+        b.last_synced_at || b.completed_at || b.updated_at || b.created_at;
+      return bDate.localeCompare(aDate);
+    });
+    return {
+      responses,
+      surveyTitles: new Map(
+        surveys.map((survey) => [survey.survey_id, survey.title])
+      ),
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Envíos"
-        description="Estado de tus envíos pendientes"
+        title="Mis envíos"
+        description="Consulta tus respuestas confirmadas y el estado de sincronización"
       />
 
       {!isOnline && (
@@ -75,14 +106,43 @@ export default function SyncPage() {
         />
       )}
 
-      {(deadLetterCount ?? 0) > 0 && (
-        <InlineBanner
-          variant="error"
-          message={`${deadLetterCount} envío(s) con error. Revisa el detalle abajo o reintenta.`}
-        />
-      )}
+      <Tabs defaultValue="history" className="gap-5">
+        <TabsList className="grid h-14 w-full grid-cols-2 rounded-xl p-1 group-data-horizontal/tabs:h-14">
+          <TabsTrigger
+            value="history"
+            className="h-12 min-h-12 rounded-lg px-3 text-sm font-medium sm:text-base"
+          >
+            Historial
+          </TabsTrigger>
+          <TabsTrigger
+            value="queue"
+            className="h-12 min-h-12 rounded-lg px-3 text-sm font-medium sm:text-base"
+          >
+            <span>Pendientes</span>
+            {queueCount > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted-foreground/20 px-1.5 text-[11px] font-semibold tabular-nums">
+                {queueCount}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
+        <TabsContent value="history">
+          <SubmissionHistory
+            responses={historyData?.responses ?? []}
+            surveyTitles={historyData?.surveyTitles ?? new Map()}
+          />
+        </TabsContent>
+
+        <TabsContent value="queue" className="space-y-5">
+          {(deadLetterCount ?? 0) > 0 && (
+            <InlineBanner
+              variant="error"
+              message={`${deadLetterCount} envío(s) con error. Revisa el detalle abajo o reintenta.`}
+            />
+          )}
+
+          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
@@ -175,35 +235,35 @@ export default function SyncPage() {
             </CardTitle>
           </CardHeader>
         </Card>
-      </div>
+          </div>
 
-      {error && (
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              Error de sincronización
-            </CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={retryFailed} variant="outline" size="mobile" className="w-full">
-              Reintentar fallidos
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          {error && (
+            <Card className="border-destructive">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  Error de sincronización
+                </CardTitle>
+                <CardDescription>{error}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={retryFailed} variant="outline" size="mobile" className="w-full">
+                  Reintentar fallidos
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-      <div className="space-y-3">
-        <h2 className="text-base font-semibold">Detalle de cola</h2>
-        {!queueItems || queueItems.length === 0 ? (
-          <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              No hay envíos pendientes ni con error.
-            </CardContent>
-          </Card>
-        ) : (
-          queueItems.map((item) => {
+          <div className="space-y-3">
+            <h2 className="text-base font-semibold">Cola de sincronización</h2>
+            {!queueItems || queueItems.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 text-sm text-muted-foreground">
+                  No hay envíos pendientes ni con error.
+                </CardContent>
+              </Card>
+            ) : (
+              queueItems.map((item) => {
             const copy = getSyncErrorCopy(item.last_error_code);
             const isError = ['dead_letter', 'failed_permanent', 'failed', 'retry_wait'].includes(
               item.status
@@ -246,9 +306,11 @@ export default function SyncPage() {
                 )}
               </Card>
             );
-          })
-        )}
-      </div>
+              })
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

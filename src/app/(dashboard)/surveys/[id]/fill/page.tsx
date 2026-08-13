@@ -14,6 +14,7 @@ import {
   finalizeResponse,
   buildDeviceInfo,
 } from '@/lib/services/response-submission.service';
+import { useFieldSessionGate } from '@/hooks/use-field-session-gate';
 import { isAutoAdvanceType } from '@/lib/survey/field-types';
 import { useSurveyFormEngine } from '@/lib/forms/use-survey-form-engine';
 import {
@@ -150,6 +151,10 @@ function SurveyFillPageContent() {
       mounted = false;
     };
   }, [surveyId, init, titleFromUrl]);
+
+  // FIELD-TRACK-1 — surveys tied to a route activity may require an open
+  // recorrido before any data is captured.
+  useFieldSessionGate(surveyId, Boolean(version));
 
   useEffect(() => {
     resetForm(answers);
