@@ -435,7 +435,9 @@ class FieldSessionService {
     if (!session || session.status !== 'active') return;
 
     await this.appendSample(session, {
-      sample_type: 'gps',
+      // Not a `gps` sample: it carries no position, and the API rejects a GPS
+      // fix without coordinates.
+      sample_type: 'gap',
       recorded_at: new Date().toISOString(),
       provider: 'browser',
       app_state: state,

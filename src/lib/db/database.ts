@@ -177,7 +177,7 @@ export interface FieldSessionSample {
   id?: number;
   session_client_id: string;
   sample_seq: number;
-  sample_type: 'gps' | 'photo';
+  sample_type: 'gps' | 'photo' | 'gap';
   latitude?: number;
   longitude?: number;
   accuracy_m?: number;
@@ -255,6 +255,36 @@ class BrigadaDatabase extends Dexie {
       field_session_samples:
         '++id, session_client_id, upload_status, [session_client_id+sample_seq], [session_client_id+upload_status]',
     });
+
+    // v5: repair coverage-gap markers written as `gps` without coordinates.
+    // The API rejects those, and one of them 422s the whole batch on every
+    // retry, so a single hidden tab wedged the queue permanently.
+    this.version(5)
+      .stores({
+        surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
+        responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
+        response_answers: '++id, response_id, question_key, created_at',
+        local_files: '++id, file_id, response_id, file_type, sync_status, created_at',
+        sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
+        kv_cache: 'cache_key, expires_at',
+        file_blobs: '++id, file_id, response_id, created_at',
+        field_sessions: 'client_id, status, started_at',
+        field_session_samples:
+          '++id, session_client_id, upload_status, [session_client_id+sample_seq], [session_client_id+upload_status]',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('field_session_samples')
+          .toCollection()
+          .modify((sample: FieldSessionSample) => {
+            if (
+              sample.sample_type === 'gps' &&
+              (sample.latitude == null || sample.longitude == null)
+            ) {
+              sample.sample_type = 'gap';
+            }
+          })
+      );
   }
 }
 

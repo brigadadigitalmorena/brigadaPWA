@@ -95,14 +95,22 @@ test('absent optional fields become explicit nulls', () => {
 });
 
 test('a hidden-tab gap marker survives the round trip', () => {
+  // It must NOT go up as `gps`: the API rejects a GPS fix with no coordinates,
+  // and one such row used to 422 the whole batch on every retry.
   const upload = toSampleUpload(
     sampleRow({
       sample_seq: 7,
+      sample_type: 'gap',
+      latitude: undefined,
+      longitude: undefined,
       app_state: 'hidden',
       payload_json: '{"marker":"coverage_gap"}',
     })
   );
 
+  assert.equal(upload.sample_type, 'gap');
+  assert.equal(upload.latitude, null);
+  assert.equal(upload.longitude, null);
   assert.equal(upload.app_state, 'hidden');
   assert.deepEqual(upload.payload, { marker: 'coverage_gap' });
 });

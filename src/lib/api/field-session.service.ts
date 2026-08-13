@@ -61,7 +61,7 @@ export interface FieldSessionUpdatePayload {
 
 export interface FieldSampleUpload {
   sample_seq: number;
-  sample_type: 'gps' | 'photo';
+  sample_type: 'gps' | 'photo' | 'gap';
   recorded_at: string;
   latitude?: number | null;
   longitude?: number | null;
