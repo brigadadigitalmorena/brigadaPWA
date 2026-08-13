@@ -86,6 +86,7 @@ class FieldSessionService {
   private watchId: number | null = null;
   private wakeLock: WakeLockLike | null = null;
   private limitsTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   private visibilityBound = false;
   /**
    * `watchPosition` fires as fast as the device can produce fixes; we only
@@ -301,6 +302,10 @@ class FieldSessionService {
             settled = true;
             this.watchId = null;
             navigator.geolocation.clearWatch(id);
+            if (this.pollTimer) {
+              clearInterval(this.pollTimer);
+              this.pollTimer = null;
+            }
             reject(
               new Error(
                 error.code === error.PERMISSION_DENIED
@@ -321,13 +326,42 @@ class FieldSessionService {
       );
 
       this.watchId = id;
+      this.startPoll(config);
     });
+  }
+
+  /**
+   * `watchPosition` only emits when the position *changes*, so a brigadista
+   * standing still produces a single fix and the track flatlines. This ticker
+   * asks for a fix every `interval_s` so the sampling rate is the configured
+   * one regardless of movement; the interval gate in `handlePosition` still
+   * dedupes it against fixes the watch delivers on its own.
+   */
+  private startPoll(config: FieldTrackingConfig): void {
+    if (this.pollTimer) return;
+    this.pollTimer = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => void this.handlePosition(position, config),
+        () => {
+          // Missing a tick is a coverage gap, not an error worth surfacing.
+        },
+        {
+          enableHighAccuracy: config.gps.desired_accuracy !== 'low',
+          maximumAge: 0,
+          timeout: 30_000,
+        }
+      );
+    }, config.gps.interval_s * 1000);
   }
 
   private stopWatch(): void {
     if (this.watchId !== null) {
       navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
+    }
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
     if (this.limitsTimer) {
       clearInterval(this.limitsTimer);
@@ -340,10 +374,18 @@ class FieldSessionService {
     config: FieldTrackingConfig
   ): Promise<void> {
     const accuracy = position.coords.accuracy ?? null;
-    if (accuracy != null && accuracy > config.gps.max_accuracy_m) return;
-
-    const now = Date.now();
-    if (now - this.lastAcceptedAt < config.gps.interval_s * 1000) return;
+    const nowTs = Date.now();
+    const rejectedByAccuracy =
+      accuracy != null && accuracy > config.gps.max_accuracy_m;
+    const elapsedSinceAccepted = nowTs - this.lastAcceptedAt;
+    const rejectedByInterval =
+      !rejectedByAccuracy && elapsedSinceAccepted < config.gps.interval_s * 1000;
+    // #region agent log
+    fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H1',location:'field-session.service.ts:handlePosition',message:'watchPosition fix received',data:{accuracy,max_accuracy_m:config.gps.max_accuracy_m,interval_s:config.gps.interval_s,elapsedSinceAccepted,lastAcceptedAt:this.lastAcceptedAt,rejectedByAccuracy,rejectedByInterval,visibility:typeof document!=='undefined'?document.visibilityState:'n/a'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    if (rejectedByAccuracy) return;
+    if (rejectedByInterval) return;
+    const now = nowTs;
     this.lastAcceptedAt = now;
 
     const session = await this.getActiveSession();
@@ -421,6 +463,9 @@ class FieldSessionService {
       last_sample_at: sample.recorded_at,
       updated_at: now,
     });
+    // #region agent log
+    try{const all=await db.field_session_samples.where('session_client_id').equals(session.client_id).toArray();fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H2',location:'field-session.service.ts:appendSample',message:'sample stored',data:{seq,sample_type:sample.sample_type,hasCoords:sample.latitude!=null&&sample.longitude!=null,app_state:sample.app_state,totalStored:all.length,byType:all.reduce((acc:Record<string,number>,s)=>{acc[s.sample_type]=(acc[s.sample_type]||0)+1;return acc;},{}),pending:all.filter((s)=>s.upload_status==='pending').length},timestamp:Date.now()})}).catch(()=>{});}catch{}
+    // #endregion
   }
 
   /**

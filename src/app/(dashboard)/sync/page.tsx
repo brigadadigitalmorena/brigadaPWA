@@ -65,6 +65,9 @@ export default function SyncPage() {
     const rows = await db.sync_queue
       .filter((item) => item.status !== 'completed' && item.status !== 'discarded')
       .toArray();
+    // #region agent log
+    try{const allRows=await db.sync_queue.toArray();const sessions=await db.field_sessions.toArray();const samples=await db.field_session_samples.toArray();fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H5',location:'sync/page.tsx:queueItems',message:'sync page queue snapshot',data:{visibleRows:rows.length,allRows:allRows.length,allByOpStatus:allRows.map((r)=>({op:r.operation_type,st:r.status,err:r.last_error_code??r.last_error??null})),sessions:sessions.map((s)=>({cid:s.client_id.slice(0,8),status:s.status,server_id:s.server_id??null,count:s.sample_count})),samples:{total:samples.length,pending:samples.filter((s)=>s.upload_status==='pending').length,types:samples.reduce((acc:Record<string,number>,s)=>{acc[s.sample_type]=(acc[s.sample_type]||0)+1;return acc;},{})}},timestamp:Date.now()})}).catch(()=>{});}catch{}
+    // #endregion
     return rows
       .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
       .slice(0, 50);

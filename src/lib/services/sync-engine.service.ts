@@ -40,6 +40,7 @@ import {
   toSampleUpload,
 } from '@/lib/sync/field-session-replay-utils';
 import { getApiErrorMessage } from '@/lib/utils/api-errors';
+import { getAccessToken, loadTokensFromStorage } from '@/lib/api/client';
 
 interface SyncResult {
   success: boolean;
@@ -93,6 +94,18 @@ function resolveNumericQuestionId(
  * Process due items in the sync queue (pending + retry_wait).
  */
 export async function processSyncQueue(options?: SyncEngineOptions): Promise<void> {
+  // Without a token every request is rejected by the BFF proxy before it even
+  // reaches the API. Draining the queue then would only burn retries and push
+  // rows into a long backoff, so wait for the session instead of failing.
+  loadTokensFromStorage();
+  if (!getAccessToken()) {
+    // #region agent log
+    try{const rows=await db.sync_queue.filter((r)=>r.status!=='completed'&&r.status!=='discarded').toArray();fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H3',location:'sync-engine.service.ts:processSyncQueue:authGuard',message:'skipped sync: no access token (retries preserved)',data:{queued:rows.length,rows:rows.map((r)=>({op:r.operation_type,st:r.status,rc:r.retry_count}))},timestamp:Date.now()})}).catch(()=>{});}catch{}
+    // #endregion
+    options?.onProgress?.('Sesión no disponible; se reintentará al iniciar sesión');
+    return;
+  }
+
   await forceReleaseStaleLocks();
 
   const locked = await acquireProcessLock();
@@ -156,7 +169,13 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
         };
       }
 
+      // #region agent log
+      if(item.entity_type==='field_session'){try{const row=await db.sync_queue.get(item.id);const ses=await db.field_sessions.get(item.entity_id);fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H5',location:'sync-engine.service.ts:processSyncQueue',message:'field_session queue item outcome',data:{operation_type:item.operation_type,success:result.success,error:result.error,errorCode:result.errorCode,permanent:result.permanent,statusBefore:item.status,statusAfterLease:row?.status,retry_count:row?.retry_count,session_server_id:ses?.server_id??null,session_status:ses?.status??null},timestamp:Date.now()})}).catch(()=>{});}catch{}}
+      // #endregion
       await handleSyncResult(item.id, item, result, options);
+      // #region agent log
+      if(item.entity_type==='field_session'){try{const row=await db.sync_queue.get(item.id);fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H5',location:'sync-engine.service.ts:processSyncQueue:after',message:'field_session queue row after handleSyncResult',data:{operation_type:item.operation_type,status:row?.status,retry_count:row?.retry_count,next_retry_at:row?.next_retry_at,last_error:row?.last_error,last_error_code:row?.last_error_code},timestamp:Date.now()})}).catch(()=>{});}catch{}}
+      // #endregion
     }
 
     await recoverOrphanUploads(options);
@@ -676,6 +695,9 @@ async function processFieldSessionItem(
     },
   });
 
+  // #region agent log
+  fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H3',location:'sync-engine.service.ts:processFieldSessionItem',message:'startFieldSession returned',data:{client_id:session.client_id,remote_id:remote?.id??null,local_status:session.status},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   await db.field_sessions.update(session.client_id, { server_id: remote.id });
 
   if (session.status !== 'active') {
@@ -704,6 +726,9 @@ async function processFieldSamplesItem(
   const clientId = item.entity_id;
   const session = await db.field_sessions.get(clientId);
   const readiness = classifySampleReadiness(session);
+  // #region agent log
+  try{const all=await db.field_session_samples.where('session_client_id').equals(clientId).toArray();fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H3',location:'sync-engine.service.ts:processFieldSamplesItem',message:'samples item entry',data:{clientId,readiness,server_id:session?.server_id??null,session_status:session?.status??null,totalSamples:all.length,pending:all.filter((s)=>s.upload_status==='pending').length,pendingTypes:all.filter((s)=>s.upload_status==='pending').map((s)=>({seq:s.sample_seq,t:s.sample_type,hasCoords:s.latitude!=null&&s.longitude!=null}))},timestamp:Date.now()})}).catch(()=>{});}catch{}
+  // #endregion
 
   if (readiness === 'session_missing') {
     return {
@@ -733,7 +758,11 @@ async function processFieldSamplesItem(
     const slice = pending.slice(0, FIELD_SAMPLE_BATCH_SIZE);
     options?.onProgress?.(`Enviando ${slice.length} puntos del recorrido...`);
 
-    await uploadFieldSessionSamples(clientId, slice.map(toSampleUpload));
+    // #region agent log
+    const dbgPayload = slice.map(toSampleUpload);
+    try{await uploadFieldSessionSamples(clientId,dbgPayload);}catch(dbgErr){let body:unknown=null;try{body=(dbgErr as {response?:{data?:unknown}})?.response?.data??null;}catch{}fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H4',location:'sync-engine.service.ts:processFieldSamplesItem:upload',message:'uploadFieldSessionSamples threw',data:{clientId,batch,count:dbgPayload.length,status:(dbgErr as {response?:{status?:number}})?.response?.status??null,responseBody:JSON.stringify(body)?.slice(0,900)??null,sent:JSON.stringify(dbgPayload).slice(0,900)},timestamp:Date.now()})}).catch(()=>{});throw dbgErr;}
+    fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H4',location:'sync-engine.service.ts:processFieldSamplesItem:upload',message:'batch uploaded ok',data:{clientId,batch,count:dbgPayload.length,seqs:dbgPayload.map((s)=>s.sample_seq)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const uploadedAt = new Date().toISOString();
     await db.field_session_samples
