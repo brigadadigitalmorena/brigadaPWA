@@ -7,6 +7,10 @@ const PAGES_CACHE = 'pages-cache-v4';
 const STATIC_CACHE = 'static-resources-cache-v4';
 const IMAGES_CACHE = 'images-cache-v4';
 const API_CACHE = 'api-cache-v4';
+// Shared with offline-tiles.service.ts so explicitly downloaded packs are also
+// visible to normal MapLibre requests intercepted by this worker.
+const OFFLINE_TILE_CACHE = 'brigada-offline-tiles-v1';
+const TILE_MANIFEST_CACHE = 'tile-manifest-cache-v1';
 
 // Injected at build time; also seed critical shell URLs for first-visit offline.
 const shellUrls = [
@@ -15,6 +19,8 @@ const shellUrls = [
   '/manifest.json',
   '/surveys',
   '/sync',
+  '/maps',
+  '/recorridos',
   '/drafts',
   '/extras',
 ];
@@ -145,6 +151,40 @@ registerRoute(
       new ExpirationPlugin({
         maxEntries: 80,
         maxAgeSeconds: 20 * 24 * 60 * 60,
+      }),
+    ],
+  })
+);
+
+// Versioned CDN tile paths are immutable. This route is registered before the
+// generic image route so map tiles use their dedicated, long-lived cache.
+registerRoute(
+  ({ url, request }) =>
+    request.method === 'GET' &&
+    url.pathname.includes('/tiles/osm/') &&
+    !url.pathname.endsWith('/mobile/tiles/osm/manifest'),
+  new CacheFirst({
+    cacheName: OFFLINE_TILE_CACHE,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 100000,
+        maxAgeSeconds: 365 * 24 * 60 * 60,
+      }),
+    ],
+  })
+);
+
+// The API manifest is mutable (short backend TTL), so discovery remains
+// network-friendly while the last successful response is available offline.
+registerRoute(
+  ({ url, request }) =>
+    request.method === 'GET' && url.pathname.endsWith('/mobile/tiles/osm/manifest'),
+  new StaleWhileRevalidate({
+    cacheName: TILE_MANIFEST_CACHE,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 5,
+        maxAgeSeconds: 5 * 60,
       }),
     ],
   })
@@ -285,6 +325,8 @@ self.addEventListener('activate', (event) => {
         STATIC_CACHE,
         IMAGES_CACHE,
         API_CACHE,
+        OFFLINE_TILE_CACHE,
+        TILE_MANIFEST_CACHE,
         'next-rsc-cache',
         'google-fonts-cache',
         'default-cache',

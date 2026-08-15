@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
-import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Navigation, Save } from 'lucide-react';
 import { isAxiosError } from 'axios';
 
 import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
@@ -15,6 +15,7 @@ import {
   buildDeviceInfo,
 } from '@/lib/services/response-submission.service';
 import { useFieldSessionGate } from '@/hooks/use-field-session-gate';
+import { useFieldSession } from '@/hooks/use-field-session';
 import { isAutoAdvanceType } from '@/lib/survey/field-types';
 import { useSurveyFormEngine } from '@/lib/forms/use-survey-form-engine';
 import {
@@ -154,7 +155,9 @@ function SurveyFillPageContent() {
 
   // FIELD-TRACK-1 — surveys tied to a route activity may require an open
   // recorrido before any data is captured.
-  useFieldSessionGate(surveyId, Boolean(version));
+  const fieldSessionGate = useFieldSessionGate(surveyId, Boolean(version));
+  const { session: activeFieldSession, pendingSamples: pendingRouteSamples } =
+    useFieldSession();
 
   useEffect(() => {
     resetForm(answers);
@@ -371,6 +374,40 @@ function SurveyFillPageContent() {
     );
   }
 
+  if (fieldSessionGate.blocked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/20 p-4">
+        <Card className="w-full max-w-lg rounded-2xl text-center">
+          <CardHeader>
+            <Navigation className="mx-auto mb-2 h-9 w-9 text-primary" />
+            <CardTitle>Este trabajo requiere un recorrido</CardTitle>
+            <CardDescription>
+              Inícialo ahora para registrar la ruta y vincular esta respuesta.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              className="w-full"
+              size="mobile"
+              disabled={fieldSessionGate.starting}
+              onClick={() => void fieldSessionGate.startRequiredSession()}
+            >
+              {fieldSessionGate.starting ? 'Iniciando…' : 'Iniciar recorrido'}
+            </Button>
+            <Button
+              className="w-full"
+              size="mobile"
+              variant="outline"
+              onClick={() => router.replace('/surveys')}
+            >
+              Volver a encuestas
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (totalQuestions === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -414,6 +451,23 @@ function SurveyFillPageContent() {
             style={{ width: `${progress}%` }}
           />
         </div>
+
+        {activeFieldSession && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Recorrido activo
+            </span>
+            <span>·</span>
+            <span>{activeFieldSession.sample_count} puntos</span>
+            {pendingRouteSamples > 0 && (
+              <>
+                <span>·</span>
+                <span>{pendingRouteSamples} por enviar</span>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
           {version.sections?.map((section, index) => (

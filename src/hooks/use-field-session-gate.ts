@@ -8,8 +8,7 @@
  * that would never land on any track; `warn` only tells them. The config comes
  * from the cached assignment, so the gate works offline.
  */
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { FieldTrackingConfig } from '@/lib/api/field-session.service';
@@ -34,10 +33,22 @@ async function resolveConfig(
   );
 }
 
-export function useFieldSessionGate(surveyId: string, ready: boolean): void {
-  const router = useRouter();
+export interface FieldSessionGateState {
+  blocked: boolean;
+  starting: boolean;
+  startRequiredSession: () => Promise<void>;
+}
+
+export function useFieldSessionGate(
+  surveyId: string,
+  ready: boolean
+): FieldSessionGateState {
   // Fire once per screen entry; the effect deps churn as the survey loads.
   const shown = useRef(false);
+  const [blocked, setBlocked] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [requiredConfig, setRequiredConfig] =
+    useState<FieldTrackingConfig | null>(null);
 
   useEffect(() => {
     if (!ready || shown.current) return;
@@ -66,15 +77,37 @@ export function useFieldSessionGate(surveyId: string, ready: boolean): void {
         return;
       }
 
+      setRequiredConfig(config);
+      setBlocked(true);
       toast.error('Inicia tu recorrido para continuar', {
         description:
           'Esta encuesta solo puede responderse durante un recorrido activo.',
       });
-      router.replace('/surveys');
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [ready, surveyId, router]);
+  }, [ready, surveyId]);
+
+  const startRequiredSession = async () => {
+    if (!requiredConfig || starting) return;
+    setStarting(true);
+    try {
+      const result = await fieldSessionService.startSession({
+        surveyId: Number(surveyId),
+        config: requiredConfig,
+      });
+      if (result.ok || result.reason === 'already_active') {
+        setBlocked(false);
+        toast.success('Recorrido iniciado');
+        return;
+      }
+      toast.error(result.message);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  return { blocked, starting, startRequiredSession };
 }

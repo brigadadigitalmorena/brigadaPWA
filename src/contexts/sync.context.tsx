@@ -136,6 +136,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     if (isOnline && !wasOnline.current) {
       const t = setTimeout(() => {
         syncNow();
+        void import('@/lib/services/static-maps-sync.service').then((m) =>
+          m.syncStaticMaps()
+        );
       }, 1000);
       wasOnline.current = isOnline;
       return () => clearTimeout(t);

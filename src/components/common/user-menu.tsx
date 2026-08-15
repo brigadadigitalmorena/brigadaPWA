@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
+import { toast } from 'sonner';
 import { useTheme } from '@/contexts/theme-context';
 import { User as UserType } from '@/lib/types';
 import { ColorSchemeSelector } from '@/components/common/color-scheme-selector';
@@ -38,7 +39,13 @@ export function UserMenu({ user }: UserMenuProps) {
     if (!confirmed) return;
 
     setIsOpen(false);
-    await logout();
+    try {
+      await logout();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'No se pudo cerrar la sesión.'
+      );
+    }
   };
 
   const initials = user

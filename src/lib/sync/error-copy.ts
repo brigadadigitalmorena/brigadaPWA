@@ -198,6 +198,22 @@ const TABLE: Record<string, SyncErrorCopy> = {
     action: "Reintenta la sincronización.",
     needsManualFix: false,
   },
+  field_session_not_synced: {
+    title: "Preparando el recorrido",
+    body: "Primero se registrará el recorrido y después se enviarán sus puntos.",
+    action: "No necesitas hacer nada; se reintentará automáticamente.",
+    needsManualFix: false,
+  },
+  field_session_missing: {
+    title: "Recorrido local no encontrado",
+    action: "Actualiza la pantalla. Si persiste, contacta a soporte.",
+    needsManualFix: true,
+  },
+  invalid_field_sample: {
+    title: "Punto de recorrido inválido",
+    action: "El punto dañado se omitirá sin bloquear el resto del recorrido.",
+    needsManualFix: false,
+  },
 };
 
 /**

@@ -99,12 +99,104 @@ export interface FieldSampleBatchResult {
   session_distance_m: number;
 }
 
+export interface FieldSessionHistoryItem {
+  id: number;
+  client_id: string;
+  activity_type: string;
+  survey_id?: number | null;
+  survey_title?: string | null;
+  status: string;
+  started_at: string;
+  ended_at?: string | null;
+  end_reason?: string | null;
+  degraded_reason?: string | null;
+  source?: string | null;
+  duration_s?: number | null;
+  distance_m: number;
+  sample_count: number;
+  response_count: number;
+}
+
+export interface FieldSessionHistoryResponse {
+  items: FieldSessionHistoryItem[];
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+}
+
+export interface FieldSessionTrackResponse {
+  session: FieldSessionHistoryItem;
+  line?: { type: 'LineString'; coordinates: [number, number][] } | null;
+  points: Array<{
+    seq: number;
+    lat: number;
+    lng: number;
+    recorded_at: string;
+    accuracy_m?: number | null;
+    speed_mps?: number | null;
+    app_state?: string | null;
+    is_mocked: boolean;
+    sample_type: string;
+    media_url?: string | null;
+  }>;
+  gaps: Array<{
+    from_seq: number;
+    to_seq: number;
+    started_at: string;
+    ended_at: string;
+    duration_s: number;
+    distance_m: number;
+    reason?: string | null;
+  }>;
+  responses: Array<{
+    response_id: number;
+    client_id: string;
+    completed_at: string;
+    survey_title?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  }>;
+  stats: {
+    distance_m: number;
+    duration_s: number;
+    sample_count: number;
+    response_count: number;
+    avg_accuracy_m?: number | null;
+    max_accuracy_m?: number | null;
+    gap_count: number;
+    gap_duration_s: number;
+    mocked_count: number;
+    background_ratio?: number | null;
+  };
+}
+
 export async function startFieldSession(
   payload: FieldSessionStartPayload
 ): Promise<FieldSessionRead> {
   const response = await apiClient.post<FieldSessionRead>(
     '/mobile/field-sessions',
     payload
+  );
+  return response.data;
+}
+
+export async function listMyFieldSessions(
+  skip = 0,
+  limit = 50
+): Promise<FieldSessionHistoryResponse> {
+  const response = await apiClient.get<FieldSessionHistoryResponse>(
+    '/mobile/field-sessions',
+    { params: { skip, limit } }
+  );
+  return response.data;
+}
+
+export async function getMyFieldSessionTrack(
+  clientId: string
+): Promise<FieldSessionTrackResponse> {
+  const response = await apiClient.get<FieldSessionTrackResponse>(
+    `/mobile/field-sessions/${clientId}/track`
   );
   return response.data;
 }

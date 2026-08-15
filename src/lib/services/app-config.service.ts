@@ -9,6 +9,7 @@ export type ModuleKey =
   | 'extras'
   | 'drafts'
   | 'maps'
+  | 'recorridos'
   | 'notifications'
   | 'networks';
 
@@ -24,9 +25,18 @@ const DEFAULT_CONFIG: AppConfigModules = {
     'tracking',
     'extras',
     'drafts',
+    'maps',
+    'recorridos',
     'notifications',
   ],
-  offlineEnabledModules: ['surveys', 'sync', 'drafts', 'extras'],
+  offlineEnabledModules: [
+    'surveys',
+    'sync',
+    'drafts',
+    'extras',
+    'maps',
+    'recorridos',
+  ],
 };
 
 let cached: AppConfigModules = DEFAULT_CONFIG;

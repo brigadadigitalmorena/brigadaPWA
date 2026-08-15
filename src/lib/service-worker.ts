@@ -1,5 +1,8 @@
 const isDev =
   typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+const enableInDev =
+  typeof process !== 'undefined' &&
+  process.env.NEXT_PUBLIC_ENABLE_SW_DEV === 'true';
 
 async function clearServiceWorkerCaches(): Promise<void> {
   if (!('caches' in window)) return;
@@ -16,7 +19,7 @@ export async function registerServiceWorker() {
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator)) return;
 
-  if (isDev) {
+  if (isDev && !enableInDev) {
     const hadController = Boolean(navigator.serviceWorker.controller);
     await unregisterServiceWorker({ clearCaches: true });
     console.info(
@@ -38,7 +41,16 @@ export async function registerServiceWorker() {
 
     registration.active?.postMessage({
       type: 'WARM_URLS',
-      urls: ['/', '/surveys', '/sync', '/drafts', '/extras', '/offline.html'],
+      urls: [
+        '/',
+        '/surveys',
+        '/sync',
+        '/maps',
+        '/recorridos',
+        '/drafts',
+        '/extras',
+        '/offline.html',
+      ],
     });
 
     // Already-waiting update from a previous visit

@@ -12,8 +12,11 @@ import {
   FileEdit,
   Zap,
   Workflow,
+  Map,
+  Navigation,
 } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
+import { toast } from 'sonner';
 import {
   isModuleEnabled,
   type ModuleKey,
@@ -64,6 +67,20 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       isActive: (path: string) => path.startsWith('/tracking'),
     },
     {
+      label: 'Mapas',
+      href: '/maps',
+      icon: Map,
+      module: 'maps',
+      isActive: (path: string) => path.startsWith('/maps'),
+    },
+    {
+      label: 'Recorridos',
+      href: '/recorridos',
+      icon: Navigation,
+      module: 'recorridos',
+      isActive: (path: string) => path.startsWith('/recorridos'),
+    },
+    {
       label: 'Mis envíos',
       href: '/sync',
       icon: RefreshCw,
@@ -76,7 +93,13 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
   );
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'No se pudo cerrar la sesión.'
+      );
+    }
   };
 
   return (

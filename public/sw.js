@@ -3265,12 +3265,16 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   var STATIC_CACHE = "static-resources-cache-v4";
   var IMAGES_CACHE = "images-cache-v4";
   var API_CACHE = "api-cache-v4";
+  var OFFLINE_TILE_CACHE = "brigada-offline-tiles-v1";
+  var TILE_MANIFEST_CACHE = "tile-manifest-cache-v1";
   var shellUrls = [
     "/",
     "/offline.html",
     "/manifest.json",
     "/surveys",
     "/sync",
+    "/maps",
+    "/recorridos",
     "/drafts",
     "/extras"
   ];
@@ -3359,6 +3363,30 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
         new ExpirationPlugin({
           maxEntries: 80,
           maxAgeSeconds: 20 * 24 * 60 * 60
+        })
+      ]
+    })
+  );
+  registerRoute(
+    ({ url, request }) => request.method === "GET" && url.pathname.includes("/tiles/osm/") && !url.pathname.endsWith("/mobile/tiles/osm/manifest"),
+    new CacheFirst({
+      cacheName: OFFLINE_TILE_CACHE,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 1e5,
+          maxAgeSeconds: 365 * 24 * 60 * 60
+        })
+      ]
+    })
+  );
+  registerRoute(
+    ({ url, request }) => request.method === "GET" && url.pathname.endsWith("/mobile/tiles/osm/manifest"),
+    new StaleWhileRevalidate({
+      cacheName: TILE_MANIFEST_CACHE,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 5,
+          maxAgeSeconds: 5 * 60
         })
       ]
     })
@@ -3476,6 +3504,8 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
           STATIC_CACHE,
           IMAGES_CACHE,
           API_CACHE,
+          OFFLINE_TILE_CACHE,
+          TILE_MANIFEST_CACHE,
           "next-rsc-cache",
           "google-fonts-cache",
           "default-cache"

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 /**
  * FIELD-TRACK-1 — start/stop control for the brigadista's route session.
  *
@@ -132,6 +133,11 @@ export function RecorridoCard() {
                 apaga, el recorrido quedará con huecos.
               </p>
             )}
+            <Link href="/recorridos" className="inline-block">
+              <Button type="button" variant="outline" size="sm">
+                Ver mapa del recorrido
+              </Button>
+            </Link>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">

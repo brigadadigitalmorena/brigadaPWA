@@ -196,6 +196,28 @@ export interface FieldSessionSample {
   created_at: string;
 }
 
+export interface StaticMap {
+  map_id: number;
+  name: string;
+  description: string | null;
+  version: number;
+  manifest_etag: string;
+  published_at: string;
+  synced_at: string;
+}
+
+export interface StaticMapFeature {
+  /** Stable local key; backend feature ids are only assumed unique within a map/layer. */
+  feature_key: string;
+  feature_id: number;
+  map_id: number;
+  layer_id: number;
+  layer_name: string;
+  layer_type: string;
+  geometry_json: string;
+  properties_json: string | null;
+}
+
 class BrigadaDatabase extends Dexie {
   surveys!: Table<Survey>;
   responses!: Table<Response>;
@@ -206,6 +228,8 @@ class BrigadaDatabase extends Dexie {
   file_blobs!: Table<FileBlob>;
   field_sessions!: Table<FieldSession>;
   field_session_samples!: Table<FieldSessionSample>;
+  static_maps!: Table<StaticMap, number>;
+  static_map_features!: Table<StaticMapFeature, string>;
 
   constructor() {
     super('BrigadaPWA');
@@ -285,11 +309,29 @@ class BrigadaDatabase extends Dexie {
             }
           })
       );
+
+    // v6: published operational maps and flattened GeoJSON features for the
+    // offline viewer. Existing v1-v5 migrations remain untouched.
+    this.version(6).stores({
+      surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
+      responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
+      response_answers: '++id, response_id, question_key, created_at',
+      local_files: '++id, file_id, response_id, file_type, sync_status, created_at',
+      sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
+      kv_cache: 'cache_key, expires_at',
+      file_blobs: '++id, file_id, response_id, created_at',
+      field_sessions: 'client_id, status, started_at',
+      field_session_samples:
+        '++id, session_client_id, upload_status, [session_client_id+sample_seq], [session_client_id+upload_status]',
+      static_maps: 'map_id, name, version, manifest_etag, published_at, synced_at',
+      static_map_features:
+        'feature_key, feature_id, map_id, layer_id, layer_type, [map_id+layer_id], [map_id+layer_type]',
+    });
   }
 }
 
 export const db = new BrigadaDatabase();
-export const DB_VERSION = 4;
+export const DB_VERSION = 6;
 
 const PROCESS_LOCK_KEY = 'sync_process_lock';
 const LEASE_OWNER = `pwa-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : 'local'}`;
@@ -321,6 +363,8 @@ export async function clearDatabase(): Promise<void> {
   await db.file_blobs.clear();
   await db.field_sessions.clear();
   await db.field_session_samples.clear();
+  await db.static_maps.clear();
+  await db.static_map_features.clear();
 }
 
 export async function kvGet(key: string): Promise<string | null> {

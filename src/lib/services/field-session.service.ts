@@ -380,9 +380,6 @@ class FieldSessionService {
     const elapsedSinceAccepted = nowTs - this.lastAcceptedAt;
     const rejectedByInterval =
       !rejectedByAccuracy && elapsedSinceAccepted < config.gps.interval_s * 1000;
-    // #region agent log
-    fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H1',location:'field-session.service.ts:handlePosition',message:'watchPosition fix received',data:{accuracy,max_accuracy_m:config.gps.max_accuracy_m,interval_s:config.gps.interval_s,elapsedSinceAccepted,lastAcceptedAt:this.lastAcceptedAt,rejectedByAccuracy,rejectedByInterval,visibility:typeof document!=='undefined'?document.visibilityState:'n/a'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (rejectedByAccuracy) return;
     if (rejectedByInterval) return;
     const now = nowTs;
@@ -392,6 +389,27 @@ class FieldSessionService {
     if (!session) {
       this.stopWatch();
       return;
+    }
+
+    const distanceFilter = Math.max(0, config.gps.distance_filter_m ?? 0);
+    if (
+      distanceFilter > 0 &&
+      session.last_lat != null &&
+      session.last_lng != null
+    ) {
+      const moved = haversineM(
+        session.last_lat,
+        session.last_lng,
+        position.coords.latitude,
+        position.coords.longitude
+      );
+      const lastSampleAt = session.last_sample_at
+        ? new Date(session.last_sample_at).getTime()
+        : 0;
+      const presenceHeartbeatDue =
+        !Number.isFinite(lastSampleAt) ||
+        now - lastSampleAt >= config.gps.interval_s * 5_000;
+      if (moved < distanceFilter && !presenceHeartbeatDue) return;
     }
 
     const isHidden =
@@ -463,9 +481,6 @@ class FieldSessionService {
       last_sample_at: sample.recorded_at,
       updated_at: now,
     });
-    // #region agent log
-    try{const all=await db.field_session_samples.where('session_client_id').equals(session.client_id).toArray();fetch('http://127.0.0.1:7488/ingest/6a401daf-517a-44f2-8fde-9ecb47762753',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1a6513'},body:JSON.stringify({sessionId:'1a6513',runId:'post-fix',hypothesisId:'H2',location:'field-session.service.ts:appendSample',message:'sample stored',data:{seq,sample_type:sample.sample_type,hasCoords:sample.latitude!=null&&sample.longitude!=null,app_state:sample.app_state,totalStored:all.length,byType:all.reduce((acc:Record<string,number>,s)=>{acc[s.sample_type]=(acc[s.sample_type]||0)+1;return acc;},{}),pending:all.filter((s)=>s.upload_status==='pending').length},timestamp:Date.now()})}).catch(()=>{});}catch{}
-    // #endregion
   }
 
   /**
