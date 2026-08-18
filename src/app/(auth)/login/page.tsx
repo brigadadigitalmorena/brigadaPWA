@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ClipboardList, Loader2 } from 'lucide-react';
+import { CircleX, ClipboardList, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { PasswordInput } from '@/components/auth/password-input';
@@ -40,7 +40,6 @@ function LoginPageContent() {
   } | null>(null);
 
   const {
-    register,
     handleSubmit,
     control,
     formState: { errors },
@@ -132,14 +131,40 @@ function LoginPageContent() {
               <Label htmlFor="username" className="text-base">
                 Correo electrónico
               </Label>
-              <Input
-                id="username"
-                type="email"
-                inputSize="mobile"
-                placeholder="tu@correo.com"
-                autoComplete="email"
-                disabled={isLoading}
-                {...register('username')}
+              <Controller
+                name="username"
+                control={control}
+                render={({ field }) => (
+                  <div className="relative">
+                    <Input
+                      id="username"
+                      type="email"
+                      inputSize="mobile"
+                      placeholder="tu@correo.com"
+                      autoComplete="email"
+                      disabled={isLoading}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                      className={field.value ? 'pr-12' : undefined}
+                    />
+                    {field.value ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => field.onChange('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label="Borrar correo electrónico"
+                        disabled={isLoading}
+                      >
+                        <CircleX className="h-5 w-5" />
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
               />
               {errors.username && (
                 <p className="text-sm text-destructive">{errors.username.message}</p>
