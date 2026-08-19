@@ -44,7 +44,8 @@ export interface FieldSessionStartPayload {
   client_id: string;
   activity_type: string;
   survey_id?: number | null;
-  assignment_id?: number | null;
+  campaign_id?: number | null;
+  entitlement_id?: number | null;
   started_at: string;
   config_snapshot?: Record<string, unknown> | null;
   device_info?: Record<string, unknown> | null;

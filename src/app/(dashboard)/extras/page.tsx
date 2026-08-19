@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getMyAssignments } from '@/lib/api/survey.service';
+import { getMyEntitlements } from '@/lib/api/survey.service';
 import type { Assignment } from '@/lib/types';
+import { campaignLabel, surveyFillHref } from '@/lib/campaigns/scope';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,8 +13,8 @@ import { LoadingState } from '@/components/common/loading-state';
 import { Zap, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-function urgency(assignment: Assignment): 'high' | 'medium' | 'low' {
-  const endsAt = (assignment as Assignment & { ends_at?: string }).ends_at;
+function urgency(entitlement: Assignment): 'high' | 'medium' | 'low' {
+  const endsAt = (entitlement as Assignment & { ends_at?: string }).ends_at;
   if (!endsAt) return 'low';
   const hours = (new Date(endsAt).getTime() - Date.now()) / (1000 * 60 * 60);
   if (hours < 24) return 'high';
@@ -28,7 +29,7 @@ export default function ExtrasPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const all = await getMyAssignments();
+      const all = await getMyEntitlements();
       const extras = all.filter((a) => {
         const type = (a as Assignment & { survey_type?: string }).survey_type;
         return type === 'extra' || type === 'extras' || Boolean((a as Assignment & { is_extra?: boolean }).is_extra);
@@ -37,7 +38,7 @@ export default function ExtrasPage() {
       setItems(
         extras.length > 0
           ? extras
-          : all.filter((a) => a.assignment_status !== 'completed').slice(0, 5)
+          : all.filter((a) => a.entitlement_status !== 'completed').slice(0, 5)
       );
     } catch {
       setItems([]);
@@ -64,14 +65,14 @@ export default function ExtrasPage() {
         <EmptyState
           icon={Zap}
           title="Sin extras"
-          description="No hay encuestas extra asignadas por ahora."
+          description="No hay campañas extra por ahora."
         />
       ) : (
         <div className="flex flex-col gap-3">
           {items.map((item) => {
             const level = urgency(item);
             return (
-              <Card key={item.assignment_id}>
+              <Card key={item.entitlement_id}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base leading-snug">
@@ -89,12 +90,14 @@ export default function ExtrasPage() {
                     </Badge>
                   </div>
                   <CardDescription>
-                    Asignada {new Date(item.assigned_at).toLocaleDateString()}
+                    {campaignLabel(item)
+                      ? campaignLabel(item)
+                      : `Disponible ${new Date(item.assigned_at).toLocaleDateString()}`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Link
-                    href={`/surveys/${item.survey_id}/fill?title=${encodeURIComponent(item.survey_title)}`}
+                    href={surveyFillHref(item)}
                     className="inline-flex w-full h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-medium text-primary-foreground"
                   >
                     <Play className="h-4 w-4" />

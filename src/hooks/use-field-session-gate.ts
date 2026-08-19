@@ -6,29 +6,31 @@
  *
  * `block` pushes the brigadista back rather than letting them capture data
  * that would never land on any track; `warn` only tells them. The config comes
- * from the cached assignment, so the gate works offline.
+ * from the cached entitlement, so the gate works offline.
  */
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { FieldTrackingConfig } from '@/lib/api/field-session.service';
-import { readDurableAssignments } from '@/lib/services/assignment-cache.service';
+import { readDurableEntitlements } from '@/lib/services/entitlement-cache.service';
+import { matchEntitlement } from '@/lib/campaigns/scope';
 import { fieldSessionService } from '@/lib/services/field-session.service';
-import { readCachedAssignment } from '@/lib/utils/survey-version';
+import { readCachedEntitlement } from '@/lib/utils/survey-version';
 
 /**
  * sessionStorage is empty on a cold offline load, so fall back to the durable
- * assignment snapshot before deciding the survey has no tracking config.
+ * entitlement snapshot before deciding the survey has no tracking config.
  */
 async function resolveConfig(
-  surveyId: number
+  surveyId: number,
+  campaignId?: number | null,
 ): Promise<FieldTrackingConfig | null> {
-  const fromSession = readCachedAssignment(surveyId)?.field_tracking;
+  const fromSession = readCachedEntitlement(surveyId, campaignId)?.field_tracking;
   if (fromSession) return fromSession;
 
-  const assignments = await readDurableAssignments();
+  const entitlements = await readDurableEntitlements();
   return (
-    assignments.find((item) => item.survey_id === surveyId)?.field_tracking ??
+    matchEntitlement(entitlements, surveyId, { campaignId })?.field_tracking ??
     null
   );
 }
@@ -41,9 +43,9 @@ export interface FieldSessionGateState {
 
 export function useFieldSessionGate(
   surveyId: string,
-  ready: boolean
+  ready: boolean,
+  options?: { campaignId?: number | null; entitlementId?: number | null },
 ): FieldSessionGateState {
-  // Fire once per screen entry; the effect deps churn as the survey loads.
   const shown = useRef(false);
   const [blocked, setBlocked] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -59,7 +61,7 @@ export function useFieldSessionGate(
     let cancelled = false;
 
     void (async () => {
-      const config = await resolveConfig(numericId);
+      const config = await resolveConfig(numericId, options?.campaignId);
       if (cancelled || !config?.enabled) return;
       if (config.requires_active_session === 'off') return;
 
@@ -88,14 +90,27 @@ export function useFieldSessionGate(
     return () => {
       cancelled = true;
     };
-  }, [ready, surveyId]);
+  }, [ready, surveyId, options?.campaignId]);
 
   const startRequiredSession = async () => {
     if (!requiredConfig || starting) return;
     setStarting(true);
     try {
+      const numericId = Number(surveyId);
+      const fromSession = Number.isFinite(numericId)
+        ? readCachedEntitlement(numericId, options?.campaignId)
+        : null;
+      const fromDurable = Number.isFinite(numericId)
+        ? matchEntitlement(await readDurableEntitlements(), numericId, {
+            campaignId: options?.campaignId,
+            entitlementId: options?.entitlementId,
+          })
+        : undefined;
+      const entitlement = fromSession ?? fromDurable;
       const result = await fieldSessionService.startSession({
         surveyId: Number(surveyId),
+        campaignId: entitlement?.campaign_id ?? null,
+        entitlementId: entitlement?.entitlement_id ?? null,
         config: requiredConfig,
       });
       if (result.ok || result.reason === 'already_active') {

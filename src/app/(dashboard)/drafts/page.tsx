@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileEdit, Trash2 } from 'lucide-react';
-import { readCachedAssignment } from '@/lib/utils/survey-version';
+import { readCachedEntitlement } from '@/lib/utils/survey-version';
 import { deleteDraft } from '@/lib/services/draft.service';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -31,7 +31,7 @@ export default function DraftsPage() {
           .equals(String(draft.survey_id))
           .first();
 
-        const sessionTitle = readCachedAssignment(Number(draft.survey_id))
+        const sessionTitle = readCachedEntitlement(Number(draft.survey_id))
           ?.survey_title;
 
         return {

@@ -37,12 +37,13 @@ function normalizeCachedRows(value: string): GestionTrackingRow[] {
       .filter((row) => typeof row.request_id === 'string')
       .map((row) => ({
         request_id: row.request_id as string,
-        assignment_id: row.assignment_id ?? null,
+        entitlement_id: row.entitlement_id ?? null,
+        campaign_id: row.campaign_id ?? null,
         survey_id: Number(row.survey_id ?? 0),
         survey_title: row.survey_title || 'Gestión',
         tracking_id: row.tracking_id || '',
         folio_seq: Number(row.folio_seq ?? 0),
-        assignment_status: row.assignment_status || 'active',
+        entitlement_status: row.entitlement_status || 'active',
         inactive_reason: row.inactive_reason ?? null,
         management_status: row.management_status || 'pendiente',
         comments: row.comments || '',

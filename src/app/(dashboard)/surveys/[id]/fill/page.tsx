@@ -43,6 +43,13 @@ function SurveyFillPageContent() {
   const searchParams = useSearchParams();
   const surveyId = params.id as string;
   const titleFromUrl = searchParams.get('title');
+  const campaignIdParam = Number(searchParams.get('campaignId'));
+  const entitlementIdParam = Number(searchParams.get('entitlementId'));
+  const campaignId = Number.isFinite(campaignIdParam) ? campaignIdParam : null;
+  const entitlementId = Number.isFinite(entitlementIdParam)
+    ? entitlementIdParam
+    : null;
+  const campaignNameFromUrl = searchParams.get('campaign');
   const [surveyTitle, setSurveyTitle] = useState<string>(titleFromUrl ?? 'Encuesta');
   const formRef = useRef<HTMLFormElement>(null);
   const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +131,8 @@ function SurveyFillPageContent() {
       try {
         const { title, version } = await loadSurveyForFill(
           Number(surveyId),
-          titleFromUrl
+          titleFromUrl,
+          { campaignId, entitlementId }
         );
 
         if (mounted) {
@@ -151,11 +159,14 @@ function SurveyFillPageContent() {
     return () => {
       mounted = false;
     };
-  }, [surveyId, init, titleFromUrl]);
+  }, [surveyId, init, titleFromUrl, campaignId, entitlementId]);
 
   // FIELD-TRACK-1 — surveys tied to a route activity may require an open
   // recorrido before any data is captured.
-  const fieldSessionGate = useFieldSessionGate(surveyId, Boolean(version));
+  const fieldSessionGate = useFieldSessionGate(surveyId, Boolean(version), {
+    campaignId,
+    entitlementId,
+  });
   const { session: activeFieldSession, pendingSamples: pendingRouteSamples } =
     useFieldSession();
 
@@ -226,6 +237,8 @@ function SurveyFillPageContent() {
         location,
         startedAt,
         deviceInfo: buildDeviceInfo(),
+        campaignId,
+        entitlementId,
       });
 
       toast.success('Encuesta guardada. Sincronizando...');
@@ -432,9 +445,16 @@ function SurveyFillPageContent() {
     <div className="flex flex-col h-screen min-h-screen bg-muted/20">
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b px-4 pt-3 pb-2 safe-area-top">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-lg font-semibold truncate pr-4 text-foreground">
-            {surveyTitle}
-          </h1>
+          <div className="min-w-0 pr-4">
+            <h1 className="text-lg font-semibold truncate text-foreground">
+              {surveyTitle}
+            </h1>
+            {campaignNameFromUrl ? (
+              <p className="text-xs text-muted-foreground truncate">
+                {campaignNameFromUrl}
+              </p>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2 whitespace-nowrap">
             <span className="text-sm font-medium text-primary">
               {Math.round(progress)}%

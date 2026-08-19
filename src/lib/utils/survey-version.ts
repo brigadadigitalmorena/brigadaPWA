@@ -1,17 +1,22 @@
 import { Question, SurveySection, SurveyVersion } from '@/lib/types';
 import type { FieldTrackingConfig } from '@/lib/api/field-session.service';
 
-const ASSIGNMENT_CACHE_PREFIX = 'brigada_survey_assignment_';
+const ENTITLEMENT_CACHE_PREFIX = 'brigada_survey_entitlement_';
+const LEGACY_ASSIGNMENT_CACHE_PREFIX = 'brigada_survey_assignment_';
 
 /**
  * Subset of `Assignment` that the fill flow caches in sessionStorage so a
  * survey can be opened offline.
  */
-export interface CachedAssignment {
+export interface CachedEntitlement {
   survey_id: number;
   survey_title: string;
   survey_type?: string;
   latest_version: SurveyVersion;
+  campaign_id?: number;
+  entitlement_id: number;
+  geo_enforcement?: string | null;
+  area_names?: string[];
   /** FIELD-TRACK-1 — route config, used by the requires-active-session gate. */
   field_tracking?: FieldTrackingConfig | null;
 }
@@ -22,7 +27,7 @@ function sortByOrder<T extends { order: number }>(items: T[]): T[] {
 
 function questionBelongsToSection(
   question: Question,
-  section: SurveySection
+  section: SurveySection,
 ): boolean {
   if (question.section_id == null) return false;
 
@@ -89,7 +94,7 @@ export function normalizeSurveyVersion(version: SurveyVersion): SurveyVersion {
   });
 
   const unassignedQuestions = questions.filter(
-    (question) => !assignedQuestionIds.has(question.id)
+    (question) => !assignedQuestionIds.has(question.id),
   );
 
   if (unassignedQuestions.length > 0 && nestedSections.length > 0) {
@@ -108,34 +113,89 @@ export function normalizeSurveyVersion(version: SurveyVersion): SurveyVersion {
   };
 }
 
-export function cacheAssignment(
+function entitlementStorageKeys(
   surveyId: number,
-  assignment: CachedAssignment
-): void {
-  if (typeof window === 'undefined') return;
-  sessionStorage.setItem(
-    `${ASSIGNMENT_CACHE_PREFIX}${surveyId}`,
-    JSON.stringify(assignment)
-  );
+  campaignId?: number | null,
+): string[] {
+  const keys = [`${ENTITLEMENT_CACHE_PREFIX}${surveyId}`];
+  if (campaignId != null) {
+    keys.unshift(`${ENTITLEMENT_CACHE_PREFIX}c${campaignId}`);
+  }
+  return keys;
 }
 
-export function readCachedAssignment(
-  surveyId: number
-): CachedAssignment | null {
-  if (typeof window === 'undefined') return null;
+function legacyAssignmentStorageKeys(
+  surveyId: number,
+  campaignId?: number | null,
+): string[] {
+  const keys = [`${LEGACY_ASSIGNMENT_CACHE_PREFIX}${surveyId}`];
+  if (campaignId != null) {
+    keys.unshift(`${LEGACY_ASSIGNMENT_CACHE_PREFIX}c${campaignId}`);
+  }
+  return keys;
+}
 
-  const raw = sessionStorage.getItem(`${ASSIGNMENT_CACHE_PREFIX}${surveyId}`);
-  if (!raw) return null;
+function migrateLegacyEntitlementCache(
+  surveyId: number,
+  campaignId?: number | null,
+): void {
+  if (typeof window === 'undefined') return;
 
-  try {
-    return JSON.parse(raw) as CachedAssignment;
-  } catch {
-    return null;
+  for (const legacyKey of legacyAssignmentStorageKeys(surveyId, campaignId)) {
+    const legacyValue = sessionStorage.getItem(legacyKey);
+    if (!legacyValue) continue;
+
+    const canonicalKey = legacyKey.replace(
+      LEGACY_ASSIGNMENT_CACHE_PREFIX,
+      ENTITLEMENT_CACHE_PREFIX,
+    );
+    if (!sessionStorage.getItem(canonicalKey)) {
+      sessionStorage.setItem(canonicalKey, legacyValue);
+    }
+    sessionStorage.removeItem(legacyKey);
   }
 }
 
-export function cacheAssignments(assignments: CachedAssignment[]): void {
-  assignments.forEach((assignment) => {
-    cacheAssignment(assignment.survey_id, assignment);
+export function cacheEntitlement(
+  surveyId: number,
+  entitlement: CachedEntitlement,
+): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(
+    `${ENTITLEMENT_CACHE_PREFIX}${surveyId}`,
+    JSON.stringify(entitlement),
+  );
+  if (entitlement.campaign_id != null) {
+    sessionStorage.setItem(
+      `${ENTITLEMENT_CACHE_PREFIX}c${entitlement.campaign_id}`,
+      JSON.stringify(entitlement),
+    );
+  }
+}
+
+export function readCachedEntitlement(
+  surveyId: number,
+  campaignId?: number | null,
+): CachedEntitlement | null {
+  if (typeof window === 'undefined') return null;
+
+  migrateLegacyEntitlementCache(surveyId, campaignId);
+
+  for (const key of entitlementStorageKeys(surveyId, campaignId)) {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      return JSON.parse(raw) as CachedEntitlement;
+    } catch {
+      /* try next key */
+    }
+  }
+
+  return null;
+}
+
+export function cacheEntitlements(entitlements: CachedEntitlement[]): void {
+  entitlements.forEach((entitlement) => {
+    cacheEntitlement(entitlement.survey_id, entitlement);
   });
 }

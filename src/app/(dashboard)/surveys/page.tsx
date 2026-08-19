@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { getMyAssignments } from '@/lib/api/survey.service';
+import { getMyEntitlements } from '@/lib/api/survey.service';
 import type { Assignment } from '@/lib/types';
+import { campaignLabel, surveyFillHref } from '@/lib/campaigns/scope';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -70,14 +71,14 @@ const SORT_OPTIONS: Array<{
 }> = [
   { key: 'ends_at', label: 'Ordenar por fecha de fin', icon: CalendarClock },
   { key: 'starts_at', label: 'Ordenar por fecha de inicio', icon: CalendarPlus },
-  { key: 'assigned_at', label: 'Ordenar por fecha de asignación', icon: Calendar },
+  { key: 'assigned_at', label: 'Ordenar por fecha de campaña', icon: Calendar },
   { key: 'title', label: 'Ordenar por título', icon: Type },
   { key: 'status', label: 'Ordenar por estado', icon: CircleDot },
   { key: 'type', label: 'Ordenar por tipo (gestión primero)', icon: GitBranch },
 ];
 
 function fillHref(survey: AssignedSurvey): string {
-  return `/surveys/${survey.survey_id}/fill?title=${encodeURIComponent(survey.survey_title)}`;
+  return surveyFillHref(survey);
 }
 
 function generatesFollowUp(survey: AssignedSurvey): boolean {
@@ -144,7 +145,7 @@ function sortSurveys(
         break;
       }
       case 'status': {
-        const cmp = statusRank(a.assignment_status) - statusRank(b.assignment_status);
+        const cmp = statusRank(a.entitlement_status) - statusRank(b.entitlement_status);
         result = dir === 'asc' ? cmp : -cmp;
         break;
       }
@@ -155,7 +156,7 @@ function sortSurveys(
       }
     }
     if (result !== 0) return result;
-    return a.assignment_id - b.assignment_id;
+    return a.entitlement_id - b.entitlement_id;
   });
   return sorted;
 }
@@ -202,7 +203,7 @@ export default function SurveysPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await getMyAssignments();
+      const data = await getMyEntitlements();
       setSurveys(data);
       warmSurveyFillUrls(data);
     } catch (err) {
@@ -259,7 +260,7 @@ export default function SurveysPage() {
     event: React.MouseEvent<HTMLAnchorElement>,
     survey: AssignedSurvey
   ) => {
-    if (survey.assignment_status === 'completed') {
+    if (survey.entitlement_status === 'completed') {
       event.preventDefault();
       return;
     }
@@ -331,15 +332,15 @@ export default function SurveysPage() {
         />
         <EmptyState
           icon={ClipboardList}
-          title="No tienes encuestas asignadas"
-          description="Cuando te asignen encuestas, aparecerán aquí para que puedas completarlas desde tu dispositivo."
+          title="No tienes campañas activas"
+          description="Cuando te asignen campañas, aparecerán aquí para que puedas completarlas desde tu dispositivo."
         />
       </div>
     );
   }
 
   const pendingCount = surveys.filter(
-    (survey) => survey.assignment_status !== 'completed'
+    (survey) => survey.entitlement_status !== 'completed'
   ).length;
 
   return (
@@ -418,7 +419,7 @@ export default function SurveysPage() {
 
       <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
         {sortedSurveys.map((survey) => {
-          const isCompleted = survey.assignment_status === 'completed';
+          const isCompleted = survey.entitlement_status === 'completed';
           const isFollowUp = generatesFollowUp(survey);
           const startLabel = formatShortDate(survey.starts_at) ?? 'Sin inicio';
           const endLabel = formatShortDate(survey.ends_at) ?? 'Sin fin';
@@ -427,7 +428,7 @@ export default function SurveysPage() {
 
           return (
             <Card
-              key={survey.assignment_id}
+              key={survey.entitlement_id}
               className={cn(
                 'overflow-hidden transition-shadow hover:shadow-md',
                 isCompleted && 'opacity-80'
@@ -483,13 +484,21 @@ export default function SurveysPage() {
                   {assignedLabel && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span>Asignada: {assignedLabel}</span>
+                      <span>Disponible: {assignedLabel}</span>
                     </div>
                   )}
-                  {survey.group_name && (
+                  {campaignLabel(survey) && (
                     <div className="flex items-center gap-2 text-sm">
                       <Users className="h-4 w-4 flex-shrink-0" />
-                      <span>{survey.group_name}</span>
+                      <span>{campaignLabel(survey)}</span>
+                    </div>
+                  )}
+                  {survey.area_names && survey.area_names.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      {survey.area_names.slice(0, 2).join(' · ')}
+                      {survey.area_names.length > 2
+                        ? ` +${survey.area_names.length - 2} más`
+                        : ''}
                     </div>
                   )}
                 </CardDescription>

@@ -1,4 +1,4 @@
-export * from './assignment-cache-policy';
+export * from './entitlement-cache-policy';
 export * from './response-batch-replay-utils';
 export * from './timeouts';
 export * from './priority';

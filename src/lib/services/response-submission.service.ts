@@ -4,8 +4,11 @@ import { getCurrentUser } from '@/lib/api/auth.service';
 import { LocalFilePreview } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
 import { SYNC_PRIORITY } from '@/lib/sync';
-import { readCachedAssignment } from '@/lib/utils/survey-version';
+import { readCachedEntitlement } from '@/lib/utils/survey-version';
+import { readDurableEntitlements } from '@/lib/services/entitlement-cache.service';
+import { matchEntitlement } from '@/lib/campaigns/scope';
 import { fieldSessionService } from '@/lib/services/field-session.service';
+import { captureLocationIfRequired } from '@/lib/api/survey.service';
 
 export interface FinalizeResponseInput {
   responseId: string;
@@ -21,6 +24,8 @@ export interface FinalizeResponseInput {
     appVersion: string;
   };
   surveyType?: string | null;
+  campaignId?: number | null;
+  entitlementId?: number | null;
 }
 
 function getAppVersion(): string {
@@ -29,12 +34,12 @@ function getAppVersion(): string {
 
 function resolveSurveyType(
   surveyId: string,
-  explicitType?: string | null
+  explicitType?: string | null,
 ): string | undefined {
   if (explicitType) return explicitType;
   const numericId = Number(surveyId);
   if (!Number.isFinite(numericId)) return undefined;
-  const session = readCachedAssignment(numericId);
+  const session = readCachedEntitlement(numericId);
   if (session?.survey_type) return session.survey_type;
   return undefined;
 }
@@ -51,8 +56,24 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
 
   const now = new Date().toISOString();
   const versionString = input.version.version_number.toString();
+  const numericSurveyId = Number(input.surveyId);
+  const cachedEntitlement = Number.isFinite(numericSurveyId)
+    ? readCachedEntitlement(numericSurveyId, input.campaignId)
+    : null;
+  const durableMatch =
+    Number.isFinite(numericSurveyId)
+      ? matchEntitlement(await readDurableEntitlements(), numericSurveyId, {
+          campaignId: input.campaignId,
+          entitlementId: input.entitlementId,
+        })
+      : null;
+  const resolvedEntitlement = cachedEntitlement ?? durableMatch;
   const surveyType = resolveSurveyType(input.surveyId, input.surveyType);
   const isManagement = surveyType === 'gestion';
+  const location = await captureLocationIfRequired(
+    resolvedEntitlement,
+    input.location,
+  );
   // FIELD-TRACK-1 — resolved now, not at sync time: by the time the queue
   // drains, the brigadista may have already ended this route.
   const fieldSessionClientId =
@@ -67,10 +88,10 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
     brigadista_user_id: user.id.toString(),
     brigadista_name: `${user.nombre} ${user.apellido}`,
     brigadista_role: user.role_key,
-    latitude: input.location?.latitude,
-    longitude: input.location?.longitude,
-    accuracy: input.location?.accuracy,
-    location_captured_at: input.location?.captured_at,
+    latitude: location?.latitude,
+    longitude: location?.longitude,
+    accuracy: location?.accuracy,
+    location_captured_at: location?.captured_at,
     device_platform: input.deviceInfo.platform,
     device_os_version: input.deviceInfo.osVersion,
     device_app_version: input.deviceInfo.appVersion,
@@ -78,7 +99,7 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
     completed_at: now,
     duration_seconds: Math.max(
       0,
-      Math.round((new Date(now).getTime() - new Date(input.startedAt).getTime()) / 1000)
+      Math.round((new Date(now).getTime() - new Date(input.startedAt).getTime()) / 1000),
     ),
     validation_status: 'pending',
     sync_status: 'pending',
@@ -94,7 +115,6 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
   };
 
   await db.transaction('rw', db.responses, db.local_files, db.sync_queue, async () => {
-    // Upsert the response as completed
     const existing = await db.responses
       .where('response_id')
       .equals(input.responseId)
@@ -106,7 +126,6 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
 
     await db.responses.put(response);
 
-    // Persist local files and queue upload tasks
     const allFiles = Object.values(input.files).flat();
 
     for (const preview of allFiles) {
@@ -160,7 +179,6 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
           ine_ocr_data: preview.ineOcrData,
         }),
         status: 'pending',
-        // Files after responses (mobile parity).
         priority: SYNC_PRIORITY.FILE,
         retry_count: 0,
         max_retries: 12,
@@ -176,7 +194,6 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
       });
     }
 
-    // Queue the response submission
     await db.sync_queue.add({
       queue_id: generateLocalId(),
       operation_type: 'CREATE_RESPONSE',
@@ -189,13 +206,19 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
         questions: input.version.sections
           ?.flatMap((s) => s.questions || [])
           .map((q) => ({ id: q.id, question_key: q.question_key })),
-        location: input.location,
+        location,
         started_at: input.startedAt,
         completed_at: now,
         device_info: input.deviceInfo,
         survey_type: surveyType ?? null,
         is_management: isManagement,
         field_session_client_id: fieldSessionClientId,
+        campaign_id:
+          input.campaignId ?? resolvedEntitlement?.campaign_id ?? null,
+        entitlement_id:
+          input.entitlementId ?? resolvedEntitlement?.entitlement_id ?? null,
+        geo_enforcement: resolvedEntitlement?.geo_enforcement ?? null,
+        area_names: resolvedEntitlement?.area_names ?? null,
       }),
       status: 'pending',
       priority: isManagement ? SYNC_PRIORITY.GESTION : SYNC_PRIORITY.RESPONSE,
