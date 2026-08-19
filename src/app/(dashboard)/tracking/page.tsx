@@ -7,9 +7,7 @@ import {
   getManagementStatusLabels,
   type GestionTrackingRow,
 } from '@/lib/api/gestion.service';
-import {
-  normalizeStatusLabels,
-} from '@/lib/gestion/display';
+import { normalizeStatusLabels } from '@/lib/gestion/display';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { Button } from '@/components/ui/button';
@@ -73,9 +71,7 @@ export default function TrackingPage() {
     if (typeof window === 'undefined') return null;
     return new URLSearchParams(window.location.search).get('requestId');
   });
-  const [statusLabels, setStatusLabels] = useState(
-    normalizeStatusLabels()
-  );
+  const [statusLabels, setStatusLabels] = useState(normalizeStatusLabels());
   const deepLinkScrolled = useRef(false);
 
   const enabled = isModuleEnabled('tracking', isOnline);
@@ -83,22 +79,29 @@ export default function TrackingPage() {
   const refreshFromNetwork = useCallback(async (silent = false) => {
     if (!navigator.onLine) return;
     if (!silent) setRefreshing(true);
-    setError(null);
-    try {
-      const [freshRows, labels] = await Promise.all([
-        getGestionTrackingRows(),
-        getManagementStatusLabels().catch(() => ({})),
-      ]);
-      setRows(freshRows);
-      setStatusLabels(normalizeStatusLabels(labels));
+
+    const [trackingResult, labelsResult] = await Promise.allSettled([
+      getGestionTrackingRows(),
+      getManagementStatusLabels(),
+    ]);
+
+    if (trackingResult.status === 'fulfilled') {
+      setRows(trackingResult.value);
       setFromCache(false);
-      await kvSet(CACHE_KEY, JSON.stringify(freshRows));
-    } catch {
-      setError('No se pudo actualizar. Se conserva la última información disponible.');
-    } finally {
-      setRefreshing(false);
-      setInitialLoading(false);
+      setError(null);
+      await kvSet(CACHE_KEY, JSON.stringify(trackingResult.value));
+    } else {
+      setError((current) =>
+        current ?? 'No se pudo cargar el seguimiento. Revisa tu conexión e intenta de nuevo.'
+      );
     }
+
+    if (labelsResult.status === 'fulfilled') {
+      setStatusLabels(normalizeStatusLabels(labelsResult.value));
+    }
+
+    setRefreshing(false);
+    setInitialLoading(false);
   }, []);
 
   const loadStaleFirst = useCallback(async () => {
@@ -116,7 +119,9 @@ export default function TrackingPage() {
       await refreshFromNetwork(true);
     } else {
       setInitialLoading(false);
-      if (!cached) setError('Sin datos de gestiones guardados en este dispositivo.');
+      if (!cached) {
+        setError('Sin datos de gestiones guardados en este dispositivo.');
+      }
     }
   }, [refreshFromNetwork]);
 
@@ -215,7 +220,7 @@ export default function TrackingPage() {
     <div className="space-y-5">
       <PageHeader
         title="Gestión"
-        description="Consulta el avance y conversa sobre tus solicitudes"
+        description="Consulta el avance y conversa sobre tus solicitudes enviadas"
         action={
           <Button
             variant="outline"
@@ -243,6 +248,7 @@ export default function TrackingPage() {
           }
         />
       )}
+
       {error && rows.length > 0 && (
         <InlineBanner variant="warning" message={error} />
       )}
@@ -276,7 +282,7 @@ export default function TrackingPage() {
         <EmptyState
           icon={GitBranch}
           title="No tienes gestiones aún"
-          description="Cuando completes una encuesta de tipo Gestión, su avance aparecerá aquí."
+          description="Cuando completes una encuesta de tipo Gestión desde Encuestas, su seguimiento aparecerá aquí."
         />
       ) : filteredRows.length === 0 ? (
         <EmptyState

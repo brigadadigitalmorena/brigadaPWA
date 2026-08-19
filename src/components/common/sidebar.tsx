@@ -53,7 +53,7 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       isActive: (path: string) => path.startsWith('/drafts'),
     },
     {
-      label: 'Extras',
+      label: 'Prioritarias',
       href: '/extras',
       icon: Zap,
       module: 'extras',

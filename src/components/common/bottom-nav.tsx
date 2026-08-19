@@ -31,7 +31,7 @@ const allNavItems = [
     isActive: (path: string) => path.startsWith('/drafts'),
   },
   {
-    label: 'Extras',
+    label: 'Prioritarias',
     href: '/extras',
     icon: Zap,
     module: 'extras' as const,
