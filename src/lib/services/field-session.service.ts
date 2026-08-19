@@ -147,7 +147,8 @@ class FieldSessionService {
   async startSession(params?: {
     activityType?: string;
     surveyId?: number | null;
-    assignmentId?: number | null;
+    campaignId?: number | null;
+    entitlementId?: number | null;
     config?: FieldTrackingConfig;
   }): Promise<StartSessionResult> {
     if (await this.getActiveSession()) {
@@ -174,7 +175,8 @@ class FieldSessionService {
       client_id: clientId,
       activity_type: params?.activityType ?? config.activity_type,
       survey_id: params?.surveyId ?? null,
-      assignment_id: params?.assignmentId ?? null,
+      campaign_id: params?.campaignId ?? null,
+      entitlement_id: params?.entitlementId ?? null,
       status: 'active',
       started_at: now,
       config_json: JSON.stringify(config),
@@ -622,7 +624,8 @@ class FieldSessionService {
         client_id: session.client_id,
         activity_type: session.activity_type,
         survey_id: session.survey_id,
-        assignment_id: session.assignment_id,
+        campaign_id: session.campaign_id ?? null,
+        entitlement_id: session.entitlement_id ?? null,
         started_at: session.started_at,
         config_snapshot: parseConfig(session.config_json),
         source: 'pwa',

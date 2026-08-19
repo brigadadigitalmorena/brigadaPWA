@@ -18,12 +18,13 @@ export interface GestionStatusHistoryEntry {
 
 export interface GestionTrackingRow {
   request_id: string;
-  assignment_id: number | null;
+  entitlement_id: number | null;
+  campaign_id?: number | null;
   survey_id: number;
   survey_title: string;
   tracking_id: string;
   folio_seq: number;
-  assignment_status: string;
+  entitlement_status: string;
   inactive_reason?: string | null;
   management_status: ManagementStatus;
   comments: string;

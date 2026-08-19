@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { migrateEntitlementCacheKeys } from '@/lib/sync/entitlement-cache-policy';
 
 export interface Survey {
   id?: number;
@@ -17,6 +18,8 @@ export interface Survey {
   sync_status: 'pending' | 'synced' | 'error';
   last_synced_at?: string;
   remote_updated_at?: string;
+  entitlement_json?: string;
+  /** @deprecated Read-only during v7 migration from assignment_json */
   assignment_json?: string;
   created_at: string;
   updated_at: string;
@@ -155,7 +158,8 @@ export interface FieldSession {
   server_id?: number;
   activity_type: string;
   survey_id?: number | null;
-  assignment_id?: number | null;
+  campaign_id?: number | null;
+  entitlement_id?: number | null;
   status: 'active' | 'completed' | 'abandoned';
   started_at: string;
   ended_at?: string;
@@ -327,11 +331,40 @@ class BrigadaDatabase extends Dexie {
       static_map_features:
         'feature_key, feature_id, map_id, layer_id, layer_type, [map_id+layer_id], [map_id+layer_type]',
     });
+
+    // v7: rename assignment_json → entitlement_json on cached survey rows.
+    this.version(7)
+      .stores({
+        surveys: '++id, survey_id, version, title, sync_status, last_synced_at, created_at',
+        responses: '++id, response_id, survey_id, status, sync_status, brigadista_user_id, created_at, updated_at',
+        response_answers: '++id, response_id, question_key, created_at',
+        local_files: '++id, file_id, response_id, file_type, sync_status, created_at',
+        sync_queue: '++id, queue_id, operation_type, entity_type, entity_id, status, priority, next_retry_at, created_at',
+        kv_cache: 'cache_key, expires_at',
+        file_blobs: '++id, file_id, response_id, created_at',
+        field_sessions: 'client_id, status, started_at',
+        field_session_samples:
+          '++id, session_client_id, upload_status, [session_client_id+sample_seq], [session_client_id+upload_status]',
+        static_maps: 'map_id, name, version, manifest_etag, published_at, synced_at',
+        static_map_features:
+          'feature_key, feature_id, map_id, layer_id, layer_type, [map_id+layer_id], [map_id+layer_type]',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('surveys')
+          .toCollection()
+          .modify((row: Survey & { assignment_json?: string }) => {
+            if (row.assignment_json && !row.entitlement_json) {
+              row.entitlement_json = row.assignment_json;
+            }
+            delete row.assignment_json;
+          }),
+      );
   }
 }
 
 export const db = new BrigadaDatabase();
-export const DB_VERSION = 6;
+export const DB_VERSION = 7;
 
 const PROCESS_LOCK_KEY = 'sync_process_lock';
 const LEASE_OWNER = `pwa-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : 'local'}`;
@@ -347,6 +380,11 @@ export function getLeaseDurationMs(): number {
 
 export async function initializeDatabase(): Promise<void> {
   await db.open();
+  await migrateEntitlementCacheKeys({
+    getItem: kvGet,
+    setItem: (key, value) => kvSet(key, value),
+    removeItem: kvRemove,
+  });
 }
 
 export async function closeDatabase(): Promise<void> {

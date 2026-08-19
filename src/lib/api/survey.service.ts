@@ -7,15 +7,20 @@ import {
   ResponseMetadata,
 } from '@/lib/types';
 import {
-  cacheAssignment,
+  cacheEntitlement,
   normalizeSurveyVersion,
-  readCachedAssignment,
+  readCachedEntitlement,
 } from '@/lib/utils/survey-version';
 import {
-  persistAssignments,
-  readDurableAssignments,
+  persistEntitlements,
+  readDurableEntitlements,
   readCachedSurveyVersion,
-} from '@/lib/services/assignment-cache.service';
+} from '@/lib/services/entitlement-cache.service';
+import {
+  geoLocationRequired,
+  GEO_ERROR_MESSAGES,
+  matchEntitlement,
+} from '@/lib/campaigns/scope';
 import { isAcceptedBatchStatus } from '@/lib/sync';
 
 export interface QuestionAnswerCreate {
@@ -43,6 +48,8 @@ export interface SurveyResponseCreate {
   capture_meta?: Record<string, unknown>;
   answers: QuestionAnswerCreate[];
   is_management?: boolean;
+  campaign_id?: number | null;
+  entitlement_id?: number | null;
   /** FIELD-TRACK-1 — UUID of the route session open when this was submitted. */
   field_session_client_id?: string | null;
 }
@@ -91,40 +98,87 @@ export interface DocumentConfirmRequest {
   storage_key: string;
 }
 
+type GeoEntitlement = Pick<Assignment, 'geo_enforcement' | 'area_names'>;
+
+/**
+ * Capture GPS when the campaign enforces block-mode geo with configured areas.
+ */
+export async function captureLocationIfRequired(
+  entitlement: GeoEntitlement | null | undefined,
+  existing: LocationData | null,
+): Promise<LocationData | null> {
+  if (
+    !entitlement ||
+    !geoLocationRequired(entitlement.geo_enforcement, entitlement.area_names)
+  ) {
+    return existing;
+  }
+
+  if (existing?.latitude != null && existing?.longitude != null) {
+    return existing;
+  }
+
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    throw new Error(GEO_ERROR_MESSAGES.GEO_LOCATION_REQUIRED);
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? 0,
+          captured_at: new Date(position.timestamp).toISOString(),
+        });
+      },
+      () => reject(new Error(GEO_ERROR_MESSAGES.GEO_LOCATION_REQUIRED)),
+      { enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 },
+    );
+  });
+}
+
 /**
  * Get my assigned surveys (network-first with durable Dexie fallback).
  */
-export async function getMyAssignments(): Promise<Assignment[]> {
+export async function getMyEntitlements(): Promise<Assignment[]> {
   try {
     const response = await apiClient.get<Assignment[]>('/mobile/surveys');
-    await persistAssignments(response.data);
+    await persistEntitlements(response.data);
     return response.data;
   } catch (err) {
-    const cached = await readDurableAssignments();
+    const cached = await readDurableEntitlements();
     if (cached.length > 0) {
-      console.warn('Using durable assignment cache (offline)', err);
+      console.warn('Using durable entitlement cache (offline)', err);
       return cached;
     }
     throw err;
   }
 }
 
-export async function getAssignmentForSurvey(
-  surveyId: number
+/** @deprecated Use getMyEntitlements */
+export const getMyAssignments = getMyEntitlements;
+
+export async function getEntitlementForSurvey(
+  surveyId: number,
+  options?: { campaignId?: number | null; entitlementId?: number | null },
 ): Promise<Assignment | null> {
-  const assignments = await getMyAssignments();
-  return assignments.find((assignment) => assignment.survey_id === surveyId) ?? null;
+  const entitlements = await getMyEntitlements();
+  return matchEntitlement(entitlements, surveyId, options) ?? null;
 }
 
+/** @deprecated Use getEntitlementForSurvey */
+export const getAssignmentForSurvey = getEntitlementForSurvey;
+
 export async function getSurveyTitle(surveyId: number): Promise<string> {
-  const session = readCachedAssignment(surveyId);
+  const session = readCachedEntitlement(surveyId);
   if (session?.survey_title) return session.survey_title;
 
   const durable = await readCachedSurveyVersion(surveyId);
   if (durable?.title) return durable.title;
 
-  const assignment = await getAssignmentForSurvey(surveyId);
-  return assignment?.survey_title ?? `Encuesta #${surveyId}`;
+  const entitlement = await getEntitlementForSurvey(surveyId);
+  return entitlement?.survey_title ?? `Encuesta #${surveyId}`;
 }
 
 /**
@@ -132,9 +186,10 @@ export async function getSurveyTitle(surveyId: number): Promise<string> {
  */
 export async function loadSurveyForFill(
   surveyId: number,
-  titleFromUrl?: string | null
+  titleFromUrl?: string | null,
+  options?: { campaignId?: number | null; entitlementId?: number | null },
 ): Promise<{ title: string; version: SurveyVersion }> {
-  const session = readCachedAssignment(surveyId);
+  const session = readCachedEntitlement(surveyId, options?.campaignId);
   if (session?.latest_version) {
     return {
       title: titleFromUrl ?? session.survey_title,
@@ -143,24 +198,24 @@ export async function loadSurveyForFill(
   }
 
   const durable = await readCachedSurveyVersion(surveyId);
-  if (durable) {
+  if (durable && options?.campaignId == null && options?.entitlementId == null) {
     return {
       title: titleFromUrl ?? durable.title,
       version: durable.version,
     };
   }
 
-  const assignment = await getAssignmentForSurvey(surveyId);
-  if (!assignment?.latest_version) {
+  const entitlement = await getEntitlementForSurvey(surveyId, options);
+  if (!entitlement?.latest_version) {
     throw new Error('No published version available for this survey');
   }
 
-  cacheAssignment(surveyId, assignment);
-  await persistAssignments([assignment]);
+  cacheEntitlement(surveyId, entitlement);
+  await persistEntitlements([entitlement]);
 
   return {
-    title: titleFromUrl ?? assignment.survey_title,
-    version: normalizeSurveyVersion(assignment.latest_version),
+    title: titleFromUrl ?? entitlement.survey_title,
+    version: normalizeSurveyVersion(entitlement.latest_version),
   };
 }
 
@@ -170,7 +225,7 @@ export async function getLatestSurveyVersion(surveyId: number): Promise<SurveyVe
 }
 
 export async function submitBatchResponses(
-  batch: BatchResponseCreate
+  batch: BatchResponseCreate,
 ): Promise<{ results?: BatchResponseResult[]; status?: string }> {
   const response = await apiClient.post<{
     results?: BatchResponseResult[];
@@ -180,7 +235,7 @@ export async function submitBatchResponses(
 }
 
 export async function submitResponse(
-  responseData: SurveyResponseCreate
+  responseData: SurveyResponseCreate,
 ): Promise<{ results?: BatchResponseResult[]; status?: string }> {
   const result = await submitBatchResponses({ responses: [responseData] });
 
@@ -195,17 +250,17 @@ export async function submitResponse(
 }
 
 export async function getPresignedUploadUrl(
-  request: DocumentUploadRequest
+  request: DocumentUploadRequest,
 ): Promise<DocumentUploadResponse> {
   const response = await apiClient.post<DocumentUploadResponse>(
     '/mobile/documents/upload',
-    request
+    request,
   );
   return response.data;
 }
 
 export async function confirmFileUpload(
-  request: DocumentConfirmRequest
+  request: DocumentConfirmRequest,
 ): Promise<unknown> {
   const response = await apiClient.post<unknown>('/mobile/documents/confirm', request);
   return response.data;
@@ -218,7 +273,7 @@ export async function getMyResponses(): Promise<SurveyFormData[]> {
 
 function resolveAnswerValue(
   answers: Record<string, unknown>,
-  question: { id: number; question_key?: string }
+  question: { id: number; question_key?: string },
 ): unknown {
   const key = question.question_key?.trim();
   if (key && answers[key] !== undefined) {
@@ -252,13 +307,27 @@ export function buildSurveyResponseCreate(
   fileAnswers: FileAnswerRef[] = [],
   options: {
     isManagement?: boolean;
+    campaignId?: number | null;
+    entitlementId?: number | null;
     /**
      * FIELD-TRACK-1 — route session open at submit time, so the CMS can pin
      * this response onto the track line.
      */
     fieldSessionClientId?: string | null;
-  } = {}
+    geoEntitlement?: GeoEntitlement | null;
+  } = {},
 ): SurveyResponseCreate {
+  if (
+    options.geoEntitlement &&
+    geoLocationRequired(
+      options.geoEntitlement.geo_enforcement,
+      options.geoEntitlement.area_names,
+    ) &&
+    (location?.latitude == null || location?.longitude == null)
+  ) {
+    throw new Error(GEO_ERROR_MESSAGES.GEO_LOCATION_REQUIRED);
+  }
+
   const now = new Date().toISOString();
   const byQuestion = new Map<number, QuestionAnswerCreate>();
 
@@ -299,7 +368,7 @@ export function buildSurveyResponseCreate(
   const answerEntries = Array.from(byQuestion.values());
   if (answerEntries.length === 0) {
     throw new Error(
-      'La respuesta no tiene respuestas para enviar. Completa al menos una pregunta.'
+      'La respuesta no tiene respuestas para enviar. Completa al menos una pregunta.',
     );
   }
 
@@ -324,6 +393,10 @@ export function buildSurveyResponseCreate(
     capture_meta: {},
     answers: answerEntries,
     is_management: Boolean(options.isManagement),
+    ...(options.campaignId != null ? { campaign_id: options.campaignId } : {}),
+    ...(options.entitlementId != null
+      ? { entitlement_id: options.entitlementId }
+      : {}),
     ...(options.fieldSessionClientId
       ? { field_session_client_id: options.fieldSessionClientId }
       : {}),

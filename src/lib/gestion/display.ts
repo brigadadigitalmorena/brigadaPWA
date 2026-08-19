@@ -51,7 +51,8 @@ const TECHNICAL_SOURCE_KEYS = new Set([
   'id',
   'request_id',
   'tracking_id',
-  'assignment_id',
+  'campaign_id',
+  'entitlement_id',
   'survey_id',
 ]);
 

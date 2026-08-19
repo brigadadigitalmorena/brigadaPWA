@@ -205,6 +205,10 @@ async function processResponseItem(
     is_management,
     survey_type,
     field_session_client_id,
+    campaign_id,
+    entitlement_id,
+    geo_enforcement,
+    area_names,
   } = payload;
 
   options?.onProgress?.(`Enviando respuesta ${String(response_id).slice(0, 8)}...`);
@@ -251,8 +255,17 @@ async function processResponseItem(
       {
         isManagement:
           Boolean(is_management) || survey_type === 'gestion',
+        campaignId: campaign_id ?? null,
+        entitlementId: entitlement_id ?? null,
         fieldSessionClientId: field_session_client_id ?? null,
-      }
+        geoEntitlement:
+          geo_enforcement != null || area_names != null
+            ? {
+                geo_enforcement,
+                area_names,
+              }
+            : null,
+      },
     );
   } catch (buildErr) {
     return {
@@ -675,7 +688,8 @@ async function processFieldSessionItem(
     client_id: session.client_id,
     activity_type: session.activity_type,
     survey_id: session.survey_id,
-    assignment_id: session.assignment_id,
+    campaign_id: session.campaign_id ?? null,
+    entitlement_id: session.entitlement_id ?? null,
     started_at: session.started_at,
     config_snapshot: parseSessionConfig(session.config_json),
     degraded_reason: session.degraded_reason ?? null,

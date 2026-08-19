@@ -192,23 +192,23 @@ export interface QuestionUI {
   [key: string]: unknown;
 }
 
-// Assignment types (matches backend AssignedSurveyResponse)
+// Entitlement snapshot (matches backend AssignedSurveyResponse)
 export interface Assignment {
-  assignment_id: number;
+  entitlement_id: number;
+  campaign_id?: number;
+  campaign_name?: string;
+  campaign_status?: string;
+  geo_enforcement?: "off" | "warn" | "block" | string | null;
   survey_id: number;
   survey_title: string;
   survey_description?: string;
   survey_type?: string;
   starts_at?: string | null;
   ends_at?: string | null;
-  assignment_status: string;
+  entitlement_status: string;
   inactive_reason?: string;
   management_status?: string;
   assigned_location?: string;
-  group_id?: number;
-  group_name?: string;
-  group_path?: string;
-  group_depth?: number;
   area_names?: string[];
   notes?: string;
   latest_version: SurveyVersion;
@@ -218,10 +218,13 @@ export interface Assignment {
   max_responses_per_day?: number;
   /**
    * FIELD-TRACK-1 — route-tracking config frozen in the published version.
-   * Absent on older backends and on assignments cached before the rollout.
+   * Absent on older backends and on entitlements cached before the rollout.
    */
   field_tracking?: FieldTrackingConfig | null;
 }
+
+/** Alias for campaign entitlement rows cached offline or listed in the UI. */
+export type EntitlementSnapshot = Assignment;
 
 // Sync types
 export interface SyncStatus {
