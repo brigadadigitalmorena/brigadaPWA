@@ -17,4 +17,8 @@ Solo **seguimiento de solicitudes ya enviadas** (`GET /mobile/gestiones/tracking
 
 ## Encuestas (`/surveys`)
 
-Todas las entitlements activas, incluidas gestión (badge "Gestión").
+Lista `GET /mobile/surveys` (asignaciones del usuario autenticado).
+
+El backend actual emite `assignment_id` / `group_*`; la PWA los mapea a `entitlement_id` / `campaign_*` antes de pintar.
+
+Si el login funciona pero la pantalla queda vacía, no hay filas en `assignments` para ese usuario — el seed local debe crearlas.

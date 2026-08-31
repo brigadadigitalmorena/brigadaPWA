@@ -16,6 +16,7 @@ import {
   readDurableEntitlements,
   readCachedSurveyVersion,
 } from '@/lib/services/entitlement-cache.service';
+import { normalizeAssignedSurveys } from '@/lib/campaigns/normalize';
 import {
   geoLocationRequired,
   GEO_ERROR_MESSAGES,
@@ -143,9 +144,14 @@ export async function captureLocationIfRequired(
  */
 export async function getMyEntitlements(): Promise<Assignment[]> {
   try {
-    const response = await apiClient.get<Assignment[]>('/mobile/surveys');
-    await persistEntitlements(response.data);
-    return response.data;
+    const response = await apiClient.get<unknown>('/mobile/surveys');
+    const entitlements = normalizeAssignedSurveys(response.data);
+    try {
+      await persistEntitlements(entitlements);
+    } catch (cacheErr) {
+      console.warn('Failed to persist entitlements locally', cacheErr);
+    }
+    return entitlements;
   } catch (err) {
     const cached = await readDurableEntitlements();
     if (cached.length > 0) {

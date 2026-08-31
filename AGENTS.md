@@ -124,7 +124,7 @@ await logout();
 ```typescript
 import { getMyAssignments, submitResponse } from '@/lib/api/survey.service';
 
-// Get assignments
+// Get assignments (GET /mobile/surveys — only surveys assigned to the logged-in user)
 const assignments = await getMyAssignments();
 
 // Submit response

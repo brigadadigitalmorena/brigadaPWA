@@ -74,7 +74,7 @@ export function RecorridoCard() {
   return (
     <Card className={session ? 'border-green-500/40' : undefined}>
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 md:items-center">
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2">
               <Navigation
@@ -91,6 +91,7 @@ export function RecorridoCard() {
           <Button
             variant={session ? 'destructive' : 'default'}
             size="sm"
+            className="md:h-12 md:min-w-32 md:rounded-xl md:px-6 md:text-base"
             disabled={busy}
             onClick={session ? handleEnd : handleStart}
           >

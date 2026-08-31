@@ -192,7 +192,8 @@ export interface QuestionUI {
   [key: string]: unknown;
 }
 
-// Entitlement snapshot (matches backend AssignedSurveyResponse)
+// Entitlement snapshot. Current backend still emits assignment_id / group_*;
+// getMyEntitlements() maps those onto entitlement_id / campaign_*.
 export interface Assignment {
   entitlement_id: number;
   campaign_id?: number;
