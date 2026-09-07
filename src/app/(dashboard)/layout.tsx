@@ -69,7 +69,7 @@ export default function DashboardLayout({
         </header>
 
         <main
-          className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] md:pb-6"
+          className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(var(--bottom-nav-chrome)+1rem)] md:pb-6"
         >
           <div className="mb-4">
             <FieldStatusBanners />

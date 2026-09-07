@@ -12,6 +12,12 @@
   /* Mobile layout */
   --touch-min: 48px;
   --bottom-nav-height: 64px;
+  --bottom-nav-lift: 24px;
+  --bottom-nav-gap: 10px;
+  --bottom-nav-chrome: calc(
+    var(--bottom-nav-lift) + var(--bottom-nav-height) + var(--bottom-nav-gap) +
+      env(safe-area-inset-bottom, 0px)
+  );
   --header-height: 56px;
 
   /* Brand — light mode (pink) */
