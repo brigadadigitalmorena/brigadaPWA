@@ -138,12 +138,24 @@ function parseManifest(value: unknown, item: MobileMapSyncItem): StaticMapManife
   };
 }
 
+function resolveManifestRequestUrl(manifestUrl: string): string {
+  if (typeof window === 'undefined') return manifestUrl;
+  try {
+    const parsed = new URL(manifestUrl, window.location.origin);
+    if (parsed.origin === window.location.origin) return manifestUrl;
+  } catch {
+    return manifestUrl;
+  }
+  // R2 / CDN URLs fail in the browser with CORS ("Failed to fetch").
+  return `/api/maps-manifest?url=${encodeURIComponent(manifestUrl)}`;
+}
+
 async function downloadManifest(
   item: MobileMapSyncItem,
   signal?: AbortSignal
 ): Promise<StaticMapManifest> {
   if (!item.manifest_url) throw new Error('La publicación no tiene manifest_url.');
-  const response = await fetch(item.manifest_url, {
+  const response = await fetch(resolveManifestRequestUrl(item.manifest_url), {
     method: 'GET',
     headers: { Accept: 'application/json' },
     signal,

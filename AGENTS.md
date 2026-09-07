@@ -119,6 +119,13 @@ await login(username, password);
 await logout();
 ```
 
+### Offline maps
+
+Browser calls go through `/api/backend` (see `src/app/api/backend/[...path]/route.ts`). There are no Next.js `rewrites` for the API.
+
+- `GET /api/backend/mobile/tiles/osm/manifest` is a dedicated App Router route. It proxies FastAPI `GET /mobile/tiles/osm/manifest`. If the backend has not published `tiles/osm/manifest.json` in R2 (404), development serves a local OSM test pack.
+- Static map GeoJSON files on `manifest_url` (R2) are fetched server-side via `GET /api/maps-manifest?url=…` to avoid browser CORS (`Failed to fetch`).
+
 ### Survey Operations
 
 ```typescript
@@ -148,6 +155,7 @@ await submitResponse(responseData);
 | Auth context | `src/contexts/auth.context.tsx` |
 | Sync context | `src/contexts/sync.context.tsx` |
 | API client | `src/lib/api/client.ts` |
+| OSM tile fallback | `src/lib/api/osm-tile-manifest-fallback.ts` |
 
 ## Workflow Requirements
 
