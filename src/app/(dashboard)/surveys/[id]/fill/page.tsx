@@ -23,11 +23,11 @@ import {
   validateAnswer,
 } from '@/lib/forms/validate-answer';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
+import { SurveyFillHeader } from '@/components/survey/survey-fill-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LoadingState } from '@/components/common/loading-state';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
-import { cn } from '@/lib/utils';
 
 export default function SurveyFillPage() {
   return (
@@ -443,74 +443,24 @@ function SurveyFillPageContent() {
 
   return (
     <div className="flex flex-col h-screen min-h-screen bg-muted/20">
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b px-4 pt-3 pb-2 safe-area-top">
-        <div className="flex items-center justify-between mb-2">
-          <div className="min-w-0 pr-4">
-            <h1 className="text-lg font-semibold truncate text-foreground">
-              {surveyTitle}
-            </h1>
-            {campaignNameFromUrl ? (
-              <p className="text-xs text-muted-foreground truncate">
-                {campaignNameFromUrl}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="text-sm font-medium text-primary">
-              {Math.round(progress)}%
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {currentQuestionIndex + 1} / {totalQuestions}
-            </span>
-          </div>
-        </div>
-
-        <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-          <div
-            className="bg-primary h-full rounded-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        {activeFieldSession && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Recorrido activo
-            </span>
-            <span>·</span>
-            <span>{activeFieldSession.sample_count} puntos</span>
-            {pendingRouteSamples > 0 && (
-              <>
-                <span>·</span>
-                <span>{pendingRouteSamples} por enviar</span>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-          {version.sections?.map((section, index) => (
-            <button
-              key={section.section_key || index}
-              type="button"
-              onClick={() => goToSection(index)}
-              className={cn(
-                'flex-shrink-0 h-9 px-3 rounded-full text-xs font-medium transition-colors touch-target',
-                index === currentSectionIndex
-                  ? 'bg-primary text-primary-foreground'
-                  : index < currentSectionIndex
-                    ? 'bg-primary/20 text-primary'
-                    : 'bg-muted text-muted-foreground'
-              )}
-              aria-label={`Ir a sección ${index + 1}: ${section.title}`}
-              aria-current={index === currentSectionIndex ? 'step' : undefined}
-            >
-              <span className="truncate max-w-[120px]">{section.title}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <SurveyFillHeader
+        surveyTitle={surveyTitle}
+        campaignName={campaignNameFromUrl}
+        progress={progress}
+        currentQuestionIndex={currentQuestionIndex}
+        totalQuestions={totalQuestions}
+        sections={version.sections}
+        currentSectionIndex={currentSectionIndex}
+        onGoToSection={goToSection}
+        fieldSession={
+          activeFieldSession
+            ? {
+                sampleCount: activeFieldSession.sample_count,
+                pendingSamples: pendingRouteSamples,
+              }
+            : null
+        }
+      />
 
       {showSectionHeader && currentEntry && (
         <div className="px-4 pt-4 pb-2">
