@@ -403,6 +403,15 @@ export async function clearDatabase(): Promise<void> {
   await db.field_session_samples.clear();
   await db.static_maps.clear();
   await db.static_map_features.clear();
+
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith('api-cache') || key === 'default-cache')
+        .map((key) => caches.delete(key))
+    );
+  }
 }
 
 export async function kvGet(key: string): Promise<string | null> {

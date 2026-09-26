@@ -3,10 +3,10 @@ import { registerRoute, NavigationRoute, setDefaultHandler } from 'workbox-routi
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-const PAGES_CACHE = 'pages-cache-v4';
-const STATIC_CACHE = 'static-resources-cache-v4';
-const IMAGES_CACHE = 'images-cache-v4';
-const API_CACHE = 'api-cache-v4';
+const PAGES_CACHE = 'pages-cache-v5';
+const STATIC_CACHE = 'static-resources-cache-v5';
+const IMAGES_CACHE = 'images-cache-v5';
+const API_CACHE = 'api-cache-v5';
 // Shared with offline-tiles.service.ts so explicitly downloaded packs are also
 // visible to normal MapLibre requests intercepted by this worker.
 const OFFLINE_TILE_CACHE = 'brigada-offline-tiles-v1';
@@ -225,7 +225,9 @@ registerRoute(
 
 registerRoute(
   ({ url, request }) =>
-    url.pathname.startsWith('/api/') && request.method === 'GET',
+    url.pathname.startsWith('/api/') &&
+    !url.pathname.startsWith('/api/backend/') &&
+    request.method === 'GET',
   new NetworkFirst({
     cacheName: API_CACHE,
     networkTimeoutSeconds: 3,
@@ -257,6 +259,12 @@ setDefaultHandler(
   new NetworkFirst({
     cacheName: 'default-cache',
     networkTimeoutSeconds: 3,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 100,
+        maxAgeSeconds: 24 * 60 * 60,
+      }),
+    ],
   })
 );
 

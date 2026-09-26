@@ -3261,10 +3261,10 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   };
 
   // workers/sw.js
-  var PAGES_CACHE = "pages-cache-v4";
-  var STATIC_CACHE = "static-resources-cache-v4";
-  var IMAGES_CACHE = "images-cache-v4";
-  var API_CACHE = "api-cache-v4";
+  var PAGES_CACHE = "pages-cache-v5";
+  var STATIC_CACHE = "static-resources-cache-v5";
+  var IMAGES_CACHE = "images-cache-v5";
+  var API_CACHE = "api-cache-v5";
   var OFFLINE_TILE_CACHE = "brigada-offline-tiles-v1";
   var TILE_MANIFEST_CACHE = "tile-manifest-cache-v1";
   var shellUrls = [
@@ -3417,7 +3417,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     })
   );
   registerRoute(
-    ({ url, request }) => url.pathname.startsWith("/api/") && request.method === "GET",
+    ({ url, request }) => url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/backend/") && request.method === "GET",
     new NetworkFirst({
       cacheName: API_CACHE,
       networkTimeoutSeconds: 3,
@@ -3444,7 +3444,13 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   setDefaultHandler(
     new NetworkFirst({
       cacheName: "default-cache",
-      networkTimeoutSeconds: 3
+      networkTimeoutSeconds: 3,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 100,
+          maxAgeSeconds: 24 * 60 * 60
+        })
+      ]
     })
   );
   self.addEventListener("sync", (event) => {
