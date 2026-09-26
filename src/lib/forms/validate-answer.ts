@@ -5,6 +5,11 @@
  */
 
 import type { Question, ValidationRules } from '@/lib/types';
+import {
+  DEFAULT_REQUIRED_INE_FIELDS,
+  INE_REQUIRED_FIELD_LABELS,
+  type IneRequiredField,
+} from '@/lib/ocr/ine-required-fields';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[\d+\-() ]{7,20}$/;
@@ -42,6 +47,63 @@ function isPlainEmptyObject(value: unknown): boolean {
   return entries.every((entry) => {
     if (isEmptyAnswerValue(entry)) return true;
     return isPlainEmptyObject(entry);
+  });
+}
+
+function isEmptyIneValue(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim() === '';
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return Boolean(value);
+  }
+  return Object.values(value as Record<string, unknown>).some(isEmptyIneValue);
+}
+
+function getRequiredIneFields(rules: ValidationRules): string[] {
+  const raw = Array.isArray(rules.required_fields)
+    ? rules.required_fields
+    : Array.isArray(rules.requiredFields)
+      ? rules.requiredFields
+      : [];
+  return raw.filter((field): field is string => typeof field === 'string');
+}
+
+function resolveRequiredIneFields(
+  rules: ValidationRules,
+  required: boolean,
+): string[] {
+  const configured = getRequiredIneFields(rules);
+  if (configured.length > 0) return ['front', 'back', ...configured];
+  return required ? [...DEFAULT_REQUIRED_INE_FIELDS] : ['front', 'back'];
+}
+
+function hasRequiredIneValue(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return Boolean(value);
+  }
+  return Object.values(value as Record<string, unknown>).some(hasRequiredIneValue);
+}
+
+function getMissingRequiredIneFields(
+  value: unknown,
+  requiredFields: string[],
+): string[] {
+  const data =
+    typeof value === 'string'
+      ? { front: value, back: null, ocrData: null }
+      : value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+  const ocrData =
+    data['ocrData'] && typeof data['ocrData'] === 'object'
+      ? (data['ocrData'] as Record<string, unknown>)
+      : {};
+
+  return requiredFields.filter((field) => {
+    if (field === 'front' || field === 'back' || field === 'ocrData') {
+      return !hasRequiredIneValue(data[field]);
+    }
+    return !hasRequiredIneValue(ocrData[field]);
   });
 }
 
@@ -105,6 +167,24 @@ export function validateAnswer(
   }
   if (!required && empty) {
     return null;
+  }
+
+  if (questionType === 'ine' || questionType === 'ine_ocr' || questionType === 'credential') {
+    if (required && isEmptyIneValue(value)) {
+      return 'Este campo es obligatorio';
+    }
+    if (!required && isEmptyIneValue(value)) {
+      return null;
+    }
+    const requiredIneFields = Array.from(
+      new Set(resolveRequiredIneFields(rules, required)),
+    );
+    const missingFields = getMissingRequiredIneFields(value, requiredIneFields);
+    if (missingFields.length > 0) {
+      return `Faltan campos requeridos del INE: ${missingFields
+        .map((field) => INE_REQUIRED_FIELD_LABELS[field] ?? field)
+        .join(', ')}`;
+    }
   }
 
   if (typeof value === 'string') {
