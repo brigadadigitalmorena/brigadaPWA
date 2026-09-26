@@ -225,6 +225,17 @@ function SurveyFillPageContent() {
       }
     }
 
+    // Prune payload to ONLY visible (fillable) questions — prevents hidden answers
+    // from being submitted and causing form_engine_violation (PWA-P0-1).
+    const prunedAnswers: Record<string, unknown> = {};
+    for (const entry of fillableQuestions) {
+      const key = questionKeyOf(entry.question);
+      const value = formValues[key] !== undefined ? formValues[key] : answers[key];
+      if (value !== undefined && value !== null && value !== '') {
+        prunedAnswers[key] = value;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -232,7 +243,7 @@ function SurveyFillPageContent() {
         responseId,
         surveyId,
         version,
-        answers,
+        answers: prunedAnswers,
         files,
         location,
         startedAt,

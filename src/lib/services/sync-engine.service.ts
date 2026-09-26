@@ -371,6 +371,24 @@ async function processResponseItem(
         errorCode: 'SERVER_ERROR',
       };
     }
+
+    // form_engine_violation: hidden answers submitted. Not permanent —
+    // the payload can be pruned and retried. Treat as retryable.
+    const detail = axiosErr.response?.data?.detail;
+    if (
+      (typeof detail === 'string' && detail.includes('form_engine_violation')) ||
+      (Array.isArray(detail) &&
+        detail.some((d) => typeof d === 'string' && d.includes('form_engine_violation')))
+    ) {
+      recordSubmitOutcome('non_network_error');
+      return {
+        success: false,
+        error: 'Respuesta contiene campos ocultos. Se reintentará automáticamente.',
+        errorCode: 'FORM_ENGINE_VIOLATION',
+        permanent: false,
+      };
+    }
+
     const outcome = classifySubmitError(err);
     recordSubmitOutcome(outcome);
     throw err;
@@ -840,6 +858,21 @@ async function handleSyncResult(
       updated_at: now,
     });
     options?.onProgress?.(result.error || 'Sesión expirada');
+    return;
+  }
+
+  // FORM_ENGINE_VIOLATION: reintentable sin quemar reintentos (igual que IN_FLIGHT)
+  if (result.errorCode === 'FORM_ENGINE_VIOLATION') {
+    await db.sync_queue.update(itemId, {
+      status: 'retry_wait',
+      next_retry_at: new Date(Date.now() + 30 * 1000).toISOString(),
+      last_error: result.error,
+      last_error_code: result.errorCode,
+      lease_owner: undefined,
+      lease_until: undefined,
+      updated_at: now,
+    });
+    options?.onProgress?.(result.error || 'Reintentando tras form_engine_violation');
     return;
   }
 
