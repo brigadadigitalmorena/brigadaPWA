@@ -94,13 +94,13 @@ const TABLE: Record<string, SyncErrorCopy> = {
   validation_error: {
     title: "Datos inválidos",
     action:
-      "Toca Corregir respuesta para volver a la encuesta y ajustar el dato marcado.",
+      "Esta respuesta no se puede enviar tal como está. Reintenta si el error fue temporal, o descarta y vuelve a capturar la encuesta.",
     needsManualFix: true,
   },
   other_failed_rejection: {
     title: "Respuesta rechazada",
     action:
-      "Toca Corregir respuesta para revisar la encuesta antes de reintentar.",
+      "El servidor rechazó esta respuesta. Reintenta si fue un error temporal, o descarta y vuelve a capturar la encuesta.",
     needsManualFix: true,
   },
   invalid_payload: {
