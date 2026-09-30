@@ -138,6 +138,8 @@ const assignments = await getMyAssignments();
 await submitResponse(responseData);
 ```
 
+Resume a local draft from `/drafts` via `surveyResumeHref` (`resumeDraftId` + campaign/entitlement). Missing query ids must stay `null` (`Number(null) === 0` breaks Dexie fallback). Offline Continuar uses a hard navigation so the SW fill shell can load.
+
 ## Conventions
 
 - **File naming:** kebab-case for files, PascalCase for components
@@ -151,11 +153,17 @@ await submitResponse(responseData);
 | Topic | File |
 |-------|------|
 | API types | `src/lib/types/index.ts` |
+| INE compound answers | `src/lib/forms/ine-answer.ts` |
+| ZIP autofill | `src/lib/forms/zip-answer.ts` |
 | Database schema | `src/lib/db/database.ts` |
 | Auth context | `src/contexts/auth.context.tsx` |
 | Sync context | `src/contexts/sync.context.tsx` |
 | API client | `src/lib/api/client.ts` |
 | OSM tile fallback | `src/lib/api/osm-tile-manifest-fallback.ts` |
+| Survey fill header | `src/components/survey/survey-fill-header.tsx` |
+| Resume draft / fill scope | `src/lib/campaigns/scope.ts` |
+| PWA vs CMS vs móvil | `ai-context/pwa-cms-mobile-differences.md` |
+| Paridad PWA vs app nativa | `ai-context/feature-parity-heatmap.md` |
 
 ## Workflow Requirements
 
@@ -250,4 +258,9 @@ Users can install the PWA:
 - [ ] Advanced offline maps
 - [ ] Multi-language support
 - [ ] INE OCR server-side validation
-- [ ] Image compression before upload
+- [x] Image compression before upload
+- [x] INE compound answer + ocr_autofill
+- [x] ZIP colonia lookup
+- [x] Corregir respuesta from failed sync
+- [x] Profile / password / avatar
+- [x] In-app notifications inbox
