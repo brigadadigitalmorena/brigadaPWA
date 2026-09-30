@@ -1,7 +1,7 @@
 # Feature Parity: brigadaPWA vs brigadaApp
 
 > **Scope:** Comparación exhaustiva de features entre la PWA (Next.js) y la app nativa (Expo/React Native)
-> **Last updated:** 2026-08-31
+> **Last updated:** 2026-09-30
 > **Purpose:** Referencia obligatoria para desarrolladores — cualquier feature nueva debe consult aquí antes de implementarse.
 
 ---
@@ -24,10 +24,11 @@
 | Survey fill store (Zustand) | █ | █ | — |
 | Step-by-step navigation | █ | █ | — |
 | Auto-save drafts | █ Dexie | █ SQLite | — |
+| Resume draft (Continuar) | █ scope + Dexie fallback | █ | — |
 | Entitlement model (Assignment) | █ | █ | — |
 | Geo enforcement (off/warn/block) | █ | █ | — |
 | Campaign scope matching | █ | █ | — |
-| ZIP code autocomplete | ░ | █ | **MEDIO** — campo cae a text input genérico |
+| ZIP code autocomplete | █ lookup colonias | █ | — |
 
 ### 2. INE OCR
 
@@ -41,11 +42,9 @@
 | Diccionario nombres mexicanos | █ ~400 | █ ~200 | **PWA SUPERIOR** |
 | Confianza por campo | █ | █ | — |
 | Correcciones OCR aprendidas | █ localStorage | █ | — |
-| Compound sub-fields (19) | ░ | █ | **ALTO** — no resuelve JSONLogic |
-| Flat answer (snake_case) | ░ | █ | **ALTO** — no hay `buildFlatIneAnswer()` |
-| `translateSexo()` H/M/X | ░ | █ | **MEDIO** — sexo crudo sin traducir |
-| `parseIneValue()` dual format | ░ | █ | **ALTO** — no reconoce flat fields |
-| `IneValidationRules` extract toggles | ░ | █ | **ALTO** — 15 toggles ausentes |
+| Compound sub-fields (editor) | █ | █ | — |
+| `ocr_autofill` to other questions | █ | █ | — |
+| `parseIneValue()` dual format | █ | █ | — |
 | Cámara notched (guía visual) | ░ | █ | ⚠ **LIMITACIÓN WEB** — sin overlay nativo |
 | Document scanner (edge detection) | ░ | █ | ⚠ **LIMITACIÓN WEB** — sin ML Kit |
 
@@ -101,7 +100,7 @@
 | Push notifications | ░ stub mínimo | █ expo-notifications | **ALTO** — no conectado a pipeline |
 | Foreground notification display | ░ | █ | **ALTO** |
 | Notification tap → deep link | ░ | █ navigate to screen | **ALTO** |
-| Pantalla de notificaciones | ░ | █ lista + badge | **ALTO** |
+| Pantalla de notificaciones | █ lista + badge | █ lista + badge | — |
 | Notificación sesión campo + action | ░ | █ "Finalizar recorrido" | **ALTO** — no posible en web |
 
 ### 7. Maps
@@ -139,7 +138,7 @@
 | Score details screen | ░ | █ | **MEDIO** |
 | Mis envíos screen | ░ | █ | **MEDIO** |
 | Report issue screen | ░ | █ + expo-mail-composer | **BAJO** |
-| Change avatar / edit profile | ░ | █ | **MEDIO** |
+| Change avatar / edit profile | █ | █ | — |
 | Debug screens (session replay) | ░ | █ | **BAJO** |
 
 ### 10. Observabilidad

@@ -153,6 +153,12 @@ La aplicación incluye:
 - Analytics (PostHog)
 - Performance monitoring
 
+## 📚 Documentación para desarrollo
+
+- [PWA vs CMS vs app móvil](./ai-context/pwa-cms-mobile-differences.md) — roles, APIs, stacks, offline y cómo portar features.
+- [Heatmap de paridad PWA ↔ nativa](./ai-context/feature-parity-heatmap.md) — gaps de captura en campo.
+- [AGENTS.md](./AGENTS.md) — convenciones del repo.
+
 ## 🤝 Contribuir
 
 1. Fork el repositorio
