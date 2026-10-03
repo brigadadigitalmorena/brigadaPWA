@@ -51,6 +51,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@slidev/cli": "^53.0.0",
+    "@slidev/theme-default": "^0.25.0",
     "@tailwindcss/postcss": "^4",
     "@types/json-logic-js": "^2.0.8",
     "@types/node": "^20",
