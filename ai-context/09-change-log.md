@@ -5,6 +5,49 @@
 
 ---
 
+## [2026-10-03] docs(paridad): port de `main` a `dev` + corrección de afirmaciones
+
+Porta dos commits de `origin/main` que nunca llegaron a `dev` (el compañero trabajó
+directamente en `main`; según `AGENTS.md` eso solo aplica a P0 y esto era P2):
+
+- `6e9bc25` — extrae la barra de `/surveys/[id]/fill` a `survey-fill-header.tsx`.
+- `384ab25` — añade `ai-context/pwa-cms-mobile-differences.md` (roles, APIs, stacks,
+  trampas de porteo entre los tres clientes).
+
+El cherry-pick de docs no aplicó limpio en `AGENTS.md` (dev lo había cambiado
++171/-80); la tabla y el checklist se resolvieron a mano.
+
+### Correcciones aplicadas al port
+
+El doc mezclaba features de **brigadaApp** con las de PWA. Verificado contra `dev`:
+
+| Afirmación | Realidad en `dev` |
+|---|---|
+| `src/lib/forms/ine-answer.ts` | no existe → `src/lib/ocr/build-flat-ine-answer.ts` |
+| `src/lib/forms/zip-answer.ts` | no existe → `.../QuestionTypes/zip-autofill-question.tsx` + `src/lib/ocr/ine-address.ts` |
+| `/mobile/zip-lookup/{code}` | endpoint real `/mobile/zip/{code}` |
+| `surveyResumeHref` / `resumeDraftId` | 0 ocurrencias; `/drafts` usa href plano |
+| `ocr_autofill` en PWA | no existe; el autofill real es `codigo_postal_autofill` / `compound_zip` |
+| `[x] Profile / password / avatar` | sin rutas; solo `avatar_url` en types |
+| `[x] In-app notifications inbox` | sin pantalla; solo `web-push.service.ts` |
+| `[x] Corregir respuesta from failed sync` | la cadena no existe; PR #3 la retiró por engañosa |
+| Heatmap: Resume draft / notificaciones / avatar en █ | revertidos a ░ |
+| PWA tiene copia de `jsonlogic-operator-matrix.v2.json` | **no** — BackEnd, CMS y FrontEnd sí |
+
+Se conservaron como ciertas: `[x] Image compression before upload`, `[x] ZIP colonia
+lookup`, y el heatmap `ZIP code autocomplete █ lookup colonias`.
+
+Además, las 3 filas de INE que el commit **borraba** del heatmap
+(`Flat answer`, `translateSexo()`, `IneValidationRules extract toggles`) están
+realmente resueltas por PR #5 — se marcaron █ en vez de eliminarlas, para no perder
+el registro.
+
+### Verificación
+
+`npm run type-check` limpio · `npm run test:ine` 20/20 · `npm run test:sync` 11/11 ·
+`npm run build` OK · eslint sin errores nuevos (los 2 de `fill/page.tsx` ya estaban en
+`dev`) · link-check de rutas citadas en `AGENTS.md`, `README.md` y los dos docs.
+
 ## [2026-09-26] fix(sw): secure API cache against cross-user PII exposure
 
 - Excluir `/api/backend/*` del caché runtime del Service Worker (`workers/sw.js:226-239`)
