@@ -39,7 +39,7 @@
 | P1-V1 | Portar 28 reglas faltantes (GIS, multimedia, tiempo, tipos) | 6 DH | Módulo compartido o replicar `validate-answer.ts`. INE `required_fields` ya está hecho (P0-4), reste de 28. |
 | P1-V2 | `normalizeAnswerByRules` (7 reglas `normalize_*`) | 3 DH | Pre-procesamiento antes de submit |
 | P1-V3 | ~~`required_fields` INE~~ | — | 🟢 Hecho en PR #5 (P0-4). Contract cascade + labels + tests en `tests/ine/` |
-| P1-V7 | Recortar `required_fields` INE en el seed del backend | 1 DH | `backEnd/scripts/seed_v2_full.py:412` configura 13 campos; la política acordada es 4. Es config del CMS, no bug de cliente. |
+| P1-V7 | `required_fields` INE en el backend | 2 DH | El backend no lo implementa: la enforcement es solo cliente (PWA y App con copias separadas). Decidir enforcement server-side o modulo compartido. |
 | P1-V4 | `data_list` renderer (`DataListQuestion`) | 3 DH | Autocompletar SEPOMEX (ver P1-C4) |
 | P1-V5 | `read_only` / `calculated` honrados en renderers | 2 DH | `field-types.ts` + `question-renderer.tsx` |
 | P1-V6 | `requires_active_session` default `warn` | 1 DH | `use-field-session-gate.ts` |

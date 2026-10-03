@@ -46,8 +46,19 @@
   número truthy (p. ej. `confidence: 0.9`) marcaba la respuesta INE completa como vacía.
 - `DEFAULT_REQUIRED_INE_FIELDS` reducido a `front, back, nombre, curp` (camelCase) y labels
   cubren ambas convenciones para no filtrar claves crudas al usuario.
+- `require_front` / `require_back` ahora se validan. Son las reglas que el CMS emite para
+  `ine_ocr` (`webCMS/src/lib/survey/question-type-registry.ts:578-592`) y que nadie honraba:
+  el backend no las implementa y ningun cliente las leia. Semantica: exigen la **foto**, no los
+  campos extraidos, porque un reverso con OCR incompleto sigue siendo una captura valida.
+  Un `require_*: false` explicito gana sobre los defaults.
 - `npm run type-check` y `npm run build` en verde; `npm run lint` sin errores en los archivos
   tocados (quedan 27 errores preexistentes en otros archivos).
+
+### Gap que NO se cierra aqui
+
+`required_fields` solo existe en `backEnd/scripts/seed_v2_full.py` (demo). El CMS nunca lo
+escribe, asi que las encuestas de produccion caen a los defaults del cliente. El backend no
+implementa `required_fields` en ningun punto de `app/`: la enforcement es exclusivamente cliente.
 
 ---
 

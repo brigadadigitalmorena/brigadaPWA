@@ -64,7 +64,9 @@
   - Tipos: `types`
   - INE: `required_fields` — **implementado** en PR #5 (ver nota de contrato abajo)
   - Normalización: `normalize_trim`, `normalize_uppercase`, `normalize_lowercase`, `normalize_strip_accents`, `normalize_remove_spaces`, `normalize_alpha_numeric`, `normalize_phone`
-- **Contrato INE (PR #5)**: `required_fields` se resuelve en cascada sobre la respuesta plana, `ocrData.data` y `ocrData`, aceptando alias camelCase (config del backend) y snake_case (respuesta persistida). Los defaults del cliente se redujeron a `front, back, nombre, curp` (desviación deliberada frente a los 13 de la App); el seed del backend sigue configurando 13 campos, y esos mandan porque el cliente no ignora la config de la oficina.
+- **Contrato INE (PR #5)**: `required_fields` se resuelve en cascada sobre la respuesta plana, `ocrData.data` y `ocrData`, aceptando alias camelCase (config del backend) y snake_case (respuesta persistida). Los defaults del cliente se redujeron a `front, back, nombre, curp` (desviación deliberada frente a los 13 de la App).
+- **`require_front` / `require_back` (PR #5)**: el CMS las emite para `ine_ocr` (`webCMS/src/lib/survey/question-type-registry.ts:578-592`) pero el backend no las implementa y ningún cliente las leía. Ahora se validan como requisito de **captura**, no de campos extraídos. Un `require_*: false` explícito gana sobre los defaults.
+- **Enforcement solo cliente**: el backend no implementa `required_fields` en ningún punto de `app/`, y `required_fields` solo aparece en el seed de demo. Las encuestas creadas desde el CMS nunca lo traen, así que caen a los defaults del cliente. Riesgo residual: App y PWA pueden divergir porque cada uno tiene su propia copia de la lógica.
 - **Impacto**: Validación pasa en cliente → falla en backend → reintentos queman `max_retries` → `dead_letter`. Divergencia silenciosa (sin `normalize_*` texto crudo).
 - **Fix**: Portar reglas faltantes a módulo compartido o replicar. Añadir `normalizeAnswerByRules`.
 - **Referencia App**: `MOB-TYPE-RULE-VALIDATION-2026-05-14`, `MOB-SUBMIT-VALIDATION-PARITY-2026-05-15`.

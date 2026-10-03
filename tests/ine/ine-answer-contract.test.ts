@@ -129,3 +129,103 @@ test('pregunta no requerida y vacía no bloquea', () => {
 test('pregunta requerida y vacía bloquea con mensaje genérico', () => {
   assert.equal(validateAnswer(ineQuestion(null, true), undefined), 'Este campo es obligatorio');
 });
+
+/**
+ * `require_front` / `require_back` are the rules the CMS actually emits for
+ * `ine_ocr` (webCMS/src/lib/survey/question-type-registry.ts). The backend
+ * never validated them, so they were honoured by nobody.
+ */
+
+test('exige la foto declared en require_back aunque el OCR no extraiga nada', () => {
+  const rules = { require_front: true, require_back: true };
+  const answer = {
+    front: 'file-front',
+    back: 'file-back',
+    ocrData: { data: { nombre: 'JUAN', curp: 'PEPJ000101HDFRPN09' } },
+  };
+  // Foto presente + OCR del frente completo: la foto del reverso basta.
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
+test('require_back:true bloquea cuando falta la foto del reverso', () => {
+  const rules = { require_front: true, require_back: true };
+  const answer = {
+    front: 'file-front',
+    back: null,
+    nombre: 'JUAN',
+    curp: 'PEPJ000101HDFRPN09',
+  };
+  const message = validateAnswer(ineQuestion(rules), answer);
+  assert.ok(message);
+  assert.match(message, /Reverso/);
+});
+
+test('require_back:false no exige la foto del reverso', () => {
+  const rules = { require_front: true, require_back: false };
+  const answer = {
+    front: 'file-front',
+    back: null,
+    ocrData: { data: { nombre: 'JUAN', curp: 'PEPJ000101HDFRPN09' } },
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
+test('require_back:false gana sobre los defaults que exigen el reverso', () => {
+  // Defaults de la App incluyen `back`; un false explicito debe descartarlo.
+  const rules = { require_back: false };
+  const answer = {
+    front: 'file-front',
+    back: null,
+    nombre: 'JUAN',
+    curp: 'PEPJ000101HDFRPN09',
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
+test('require_front:false exime la foto del frente aunque los defaults la pidan', () => {
+  // Los defaults incluyen `front`; un false explicito debe descartarlo.
+  const rules = { require_front: false, require_back: true };
+  const answer = {
+    front: null,
+    back: 'file-back',
+    ocrData: { data: { nombre: 'JUAN', curp: 'PEPJ000101HDFRPN09' } },
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
+test('sin require_*, ambos lados siguen siendo exigidos (comportamiento previo)', () => {
+  const answer = {
+    front: 'file-front',
+    back: null,
+    ocrData: { data: { nombre: 'JUAN', curp: 'PEPJ000101HDFRPN09' } },
+  };
+  const message = validateAnswer(ineQuestion({}), answer);
+  assert.ok(message);
+  assert.match(message, /Reverso/);
+});
+
+test('un reverso con OCR vacío sigue cumpliendo require_back', () => {
+  // El requisito es la captura, no la extracción de campos.
+  const rules = { require_front: true, require_back: true };
+  const answer = {
+    front: 'file-front',
+    back: 'file-back',
+    back_ocr: '{}',
+    ocrData: { data: { nombre: 'JUAN', curp: 'PEPJ000101HDFRPN09' } },
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
+test('require_* combinadas con required_fields del backend', () => {
+  const rules = {
+    require_front: true,
+    require_back: true,
+    required_fields: ['front', 'back', 'curp', 'domicilio'],
+  };
+  const answer = {
+    front: 'file-front',
+    back: 'file-back',
+    ocrData: { data: { curp: 'PEPJ000101HDFRPN09', domicilio: 'PUEBLA' } },
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});

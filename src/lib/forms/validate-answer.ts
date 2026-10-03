@@ -58,14 +58,42 @@ function getRequiredIneFields(rules: ValidationRules): string[] {
   return raw.filter((field): field is string => typeof field === 'string');
 }
 
+/**
+ * Which INE sides must be captured.
+ *
+ * The CMS emits `require_front` / `require_back`
+ * (webCMS/src/lib/survey/question-type-registry.ts, `ine_ocr` defaults) but the
+ * backend never validated them, so they were previously honoured by nobody.
+ * They are capture requirements, not field requirements: a back-side photo with
+ * incomplete OCR must still satisfy `require_back`.
+ */
+function resolveRequiredCaptures(rules: ValidationRules): string[] {
+  const captures: string[] = [];
+  if (rules.require_front !== false) captures.push('front');
+  if (rules.require_back !== false) captures.push('back');
+  return captures;
+}
+
 function resolveRequiredIneFields(
   rules: ValidationRules,
   required: boolean,
 ): string[] {
+  const captures = resolveRequiredCaptures(rules);
   const configured = getRequiredIneFields(rules);
-  // Office-configured fields win: the client must not silently ignore them.
-  if (configured.length > 0) return ['front', 'back', ...configured];
-  return required ? [...DEFAULT_REQUIRED_INE_FIELDS] : ['front', 'back'];
+  const base =
+    configured.length > 0
+      ? [...captures, ...configured]
+      : required
+        ? [...DEFAULT_REQUIRED_INE_FIELDS]
+        : captures;
+  // An explicit `require_*: false` always wins, including over the defaults.
+  const denied = new Set(
+    [
+      rules.require_front === false ? 'front' : null,
+      rules.require_back === false ? 'back' : null,
+    ].filter((field): field is string => field !== null),
+  );
+  return base.filter((field) => !denied.has(field));
 }
 
 function hasIneValue(value: unknown): boolean {
