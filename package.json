@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "test:sync": "node --test --import tsx tests/sync/*.test.ts",
     "test:campaigns": "node --test --import tsx tests/campaigns/*.test.ts",
+    "test:ine": "node --test --import tsx tests/ine/*.test.ts",
     "generate-icons": "node scripts/generate-icons.mjs",
     "build:sw": "node scripts/build-sw.mjs",
     "predev": "npm run build:sw",

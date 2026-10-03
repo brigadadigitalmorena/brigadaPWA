@@ -85,9 +85,8 @@ POST /mobile/token/refresh
    - Asegúrate de que el Service Worker esté registrado
 
 3. **Login:**
-   - Usa credenciales de mobile: `admin@brigada.com` / `admin123`
-   - O: `encargado@brigada.com` / `encargado123`
-   - O: `brigadista@brigada.com` / `brigadista123`
+   - Usa las credenciales de mobile que te proportione el administrador.
+     No hay credenciales por defecto en este repo.
 
 4. **Esperar el prompt:**
    - Después de 3 segundos en el dashboard, aparecerá el modal de instalación
@@ -258,10 +257,8 @@ import { Download, X, Smartphone, Wifi, Zap } from 'lucide-react';
    ```
 
 2. **Verifica las credenciales:**
-   - Usa las mismas que en mobile
-   - admin@brigada.com / admin123
-   - encargado@brigada.com / encargado123
-   - brigadista@brigada.com / brigadista123
+   - Usa las mismas que en mobile, provistas por el administrador
+   - No hay credenciales por defecto en este repo
 
 3. **Verifica el endpoint:**
    - Abre DevTools → Network

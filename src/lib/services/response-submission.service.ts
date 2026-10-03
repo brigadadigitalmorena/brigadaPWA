@@ -153,8 +153,14 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
         created_at: now,
       };
 
+      // Dedup by file_id, which is unique per capture. Keying on
+      // {response_id, question_id} collapsed the two INE sides (ine_front /
+      // ine_back) onto one row, so the second put orphaned the first file_id and
+      // the upload worker (sync-engine.service.ts, which resolves blobs by
+      // file_id) could never find that blob again.
       const existingFile = await db.local_files
-        .where({ response_id: input.responseId, question_id: preview.questionId })
+        .where('file_id')
+        .equals(localFile.file_id)
         .first();
 
       if (existingFile?.id !== undefined) {

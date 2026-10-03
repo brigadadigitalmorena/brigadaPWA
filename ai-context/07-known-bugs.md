@@ -45,9 +45,11 @@
 - **Archivo**: `src/components/survey/QuestionTypes/ine-question.tsx:18`
 - **Síntoma**: Usuario captura INE frente/reverso → OCR extrae CURP, nombre, domicilio → UI muestra datos → finaliza encuesta → respuesta enviada **sin** campo INE.
 - **Causa**: `Omit<QuestionRendererProps, 'onChange' | 'value' | 'disabled'>`. Componente no recibe `onChange` ni `value`. Guarda en estado local, nunca llama `onChange(buildFlatIneAnswer(...))`.
-- **Fix**: Recibir `onChange`, `value`. Al completar OCR (ambos lados si config): `onChange(buildFlatIneAnswer({ curp, nombre, domicilio, ... }))`. Añadir validación `required_fields` INE en `validate-answer.ts`.
+- **Causa secundaria**: `getIneSide()` solo devolvía `'back'` para `question_type === 'ine_back'`, pero el contrato real del backend es **una** pregunta `ine_ocr` que exige `front` **y** `back` (`backEnd/scripts/seed_v2_full.py:406-428`). Con la config de producción el reverso nunca era capturable.
+- **Causa terciaria**: `response-submission.service.ts` deduplicaba `local_files` por `{response_id, question_id}`, colapsando `ine_front` + `ine_back` en una fila y huérfanando el `file_id` del frente (el worker resuelve blobs por `file_id`).
+- **Fix aplicado**: el componente recibe `value`/`onChange`/`disabled`, captura ambos lados con `file_type` `ine_front`/`ine_back`, y emite `onChange(buildFlatIneAnswer(...))`; el dedup pasa a ser por `file_id`.
 - **Referencia App**: `brigadaApp/components/survey/ine-question.tsx:310,470-479` (llama `onChange`).
-- **Estado**: 🔴 Abierto
+- **Estado**: 🟢 Resuelto (PR #5)
 
 ---
 
@@ -60,12 +62,15 @@
   - Multimedia: `max_size_mb`, `allowed_formats`, `allowed_mimes`, `formats`, `max_duration_s`
   - Tiempo: `min_time`, `max_time`, `min_datetime`, `max_datetime`, `step`
   - Tipos: `types`
-  - INE: `required_fields` (CURP, nombre, domicilio, vigencia)
+  - INE: `required_fields` — **implementado** en PR #5 (ver nota de contrato abajo)
   - Normalización: `normalize_trim`, `normalize_uppercase`, `normalize_lowercase`, `normalize_strip_accents`, `normalize_remove_spaces`, `normalize_alpha_numeric`, `normalize_phone`
+- **Contrato INE (PR #5)**: `required_fields` se resuelve en cascada sobre la respuesta plana, `ocrData.data` y `ocrData`, aceptando alias camelCase (config del backend) y snake_case (respuesta persistida). Los defaults del cliente se redujeron a `front, back, nombre, curp` (desviación deliberada frente a los 13 de la App).
+- **`require_front` / `require_back` (PR #5)**: el CMS las emite para `ine_ocr` (`webCMS/src/lib/survey/question-type-registry.ts:578-592`) pero el backend no las implementa y ningún cliente las leía. Ahora se validan como requisito de **captura**, no de campos extraídos. Un `require_*: false` explícito gana sobre los defaults.
+- **Enforcement solo cliente**: el backend no implementa `required_fields` en ningún punto de `app/`, y `required_fields` solo aparece en el seed de demo. Las encuestas creadas desde el CMS nunca lo traen, así que caen a los defaults del cliente. Riesgo residual: App y PWA pueden divergir porque cada uno tiene su propia copia de la lógica.
 - **Impacto**: Validación pasa en cliente → falla en backend → reintentos queman `max_retries` → `dead_letter`. Divergencia silenciosa (sin `normalize_*` texto crudo).
 - **Fix**: Portar reglas faltantes a módulo compartido o replicar. Añadir `normalizeAnswerByRules`.
 - **Referencia App**: `MOB-TYPE-RULE-VALIDATION-2026-05-14`, `MOB-SUBMIT-VALIDATION-PARITY-2026-05-15`.
-- **Estado**: 🔴 Abierto
+- **Estado**: 🟡 Parcial (`required_fields` INE hecho; faltan GIS, multimedia, tiempo, `types` y `normalize_*`)
 
 ---
 
@@ -153,7 +158,7 @@
 | PWA-P2-9 | ZIP autocomplete "Missing" en heatmap pero componente existe | `zip-autofill-question.tsx` | Dos inputs sin índice SEPOMEX (App: `lib/zip-cache.ts` + `ZipAutocompleteField.tsx`) → **Partial**, no Missing |
 | PWA-P2-10 | Lockfiles duplicados | `bun.lock` + `package-lock.json` | Igual que App. npm es canónico (AGENTS.md). |
 | PWA-P2-11 | Dockerfile corre `npm run dev` | `Dockerfile` | No multi-stage, no `npm run start` |
-| PWA-P2-12 | Credenciales dev en repo | `PROJECT_STATUS.md:196` | `admin@brigada.com / admin123` — rotar y remover |
+| PWA-P2-12 | Credenciales dev en repo | `PROJECT_STATUS.md`, `PWA_INSTALLATION.md` | Eliminadas del repo en PR #5 (6 ocurrencias, 3 cuentas). **Pendiente del administrador**: rotar las credenciales reales en el backend, ya que la rotación no se puede hacer desde el repo. |
 
 ---
 
