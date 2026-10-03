@@ -193,7 +193,8 @@ npm run dev
 - http://localhost:3000
 
 ### 3. Probar login
-- Usa credenciales del backend (admin@brigada.com / admin123)
+- Usa las credenciales del backend que te proporcione el administrador. No hay
+  credenciales por defecto documentadas en el repo.
 
 ### 4. Probar offline
 - Abre DevTools → Application → Service Workers

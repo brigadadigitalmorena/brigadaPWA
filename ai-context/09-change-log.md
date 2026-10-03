@@ -16,11 +16,38 @@
 
 ---
 
-## [2026-09-26] chore(sec): rotate dev credentials and remove from repo
+## [2026-09-26] sec: remove dev credentials from repo (rotation still pending on backend)
 
-- Rotada credencial `admin@brigada.com / admin123` expuesta en `PROJECT_STATUS.md:196`
-- Removida del archivo; placeholder genérico en su lugar
-- **Motivo**: Credenciales de desarrollo publicadas en repositorio (baja severidad pero higiene obligatoria).
+- **Corrección**: la entrada anterior de este changelog afirmaba que la credencial había sido
+  rotada. No lo fue. El archivo `PROJECT_STATUS.md` nunca se modificó y las credenciales
+  siguieron presentes en el repo. Este registro corrige el estado real.
+- Eliminadas 6 ocurrencias de credenciales de desarrollo en 2 archivos:
+  `PROJECT_STATUS.md` (1) y `PWA_INSTALLATION.md` (5, tres cuentas: admin, encargado, brigadista)
+- Sustituidas por indicación de pedir credenciales al administrador
+- **Pendiente fuera del repo**: rotar las credenciales reales en el backend
+  (ver `07-known-bugs.md` PWA-P2-12)
+
+---
+
+## [2026-09-26] fix(ine): persist INE answer, capture both sides, unblock submit
+
+- `IneQuestion` ahora recibe `value`/`onChange`/`disabled` y emite `onChange(buildFlatIneAnswer(...))`.
+  Antes nunca escribía la respuesta (PWA-P0-4 abierto desde `0541d2a`).
+- Captura ambos lados en una sola pregunta `ine_ocr` con `file_type` `ine_front`/`ine_back`.
+  `getIneSide()` solo resolvía `'back'` para `question_type === 'ine_back'`, un tipo que no existe
+  en el seed del backend, así que el reverso era incapturable con la config real.
+- `response-submission.service.ts` deduplica `local_files` por `file_id` en vez de
+  `{response_id, question_id}`; la clave anterior colapsaba ambos lados en una fila y huérfanaba
+  el `file_id` del frente, que el worker resuelve en `sync-engine.service.ts:409,593`.
+- `required_fields` INE se resuelve en cascada: respuesta plana → `ocrData.data` → `ocrData`,
+  con alias camelCase (config del backend) y snake_case (respuesta persistida). Antes solo buscaba
+  en `ocrData[field]`, que siempre daba `undefined` para los campos OCR.
+- Eliminado `isEmptyIneValue`: su rama no-objeto devolvía `Boolean(value)`, así que cualquier
+  número truthy (p. ej. `confidence: 0.9`) marcaba la respuesta INE completa como vacía.
+- `DEFAULT_REQUIRED_INE_FIELDS` reducido a `front, back, nombre, curp` (camelCase) y labels
+  cubren ambas convenciones para no filtrar claves crudas al usuario.
+- `npm run type-check` y `npm run build` en verde; `npm run lint` sin errores en los archivos
+  tocados (quedan 27 errores preexistentes en otros archivos).
 
 ---
 

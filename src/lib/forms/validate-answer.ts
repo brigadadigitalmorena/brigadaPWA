@@ -8,7 +8,6 @@ import type { Question, ValidationRules } from '@/lib/types';
 import {
   DEFAULT_REQUIRED_INE_FIELDS,
   INE_REQUIRED_FIELD_LABELS,
-  type IneRequiredField,
 } from '@/lib/ocr/ine-required-fields';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,14 +49,6 @@ function isPlainEmptyObject(value: unknown): boolean {
   });
 }
 
-function isEmptyIneValue(value: unknown): boolean {
-  if (typeof value === 'string') return value.trim() === '';
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return Boolean(value);
-  }
-  return Object.values(value as Record<string, unknown>).some(isEmptyIneValue);
-}
-
 function getRequiredIneFields(rules: ValidationRules): string[] {
   const raw = Array.isArray(rules.required_fields)
     ? rules.required_fields
@@ -72,16 +63,55 @@ function resolveRequiredIneFields(
   required: boolean,
 ): string[] {
   const configured = getRequiredIneFields(rules);
+  // Office-configured fields win: the client must not silently ignore them.
   if (configured.length > 0) return ['front', 'back', ...configured];
   return required ? [...DEFAULT_REQUIRED_INE_FIELDS] : ['front', 'back'];
 }
 
-function hasRequiredIneValue(value: unknown): boolean {
+function hasIneValue(value: unknown): boolean {
   if (typeof value === 'string') return value.trim().length > 0;
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return Boolean(value);
   }
-  return Object.values(value as Record<string, unknown>).some(hasRequiredIneValue);
+  return Object.values(value as Record<string, unknown>).some(hasIneValue);
+}
+
+function toSnakeCase(field: string): string {
+  return field.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Resolves an INE field across every shape the answer can take:
+ *   1. flat answer top level   — buildFlatIneAnswer emits snake_case here
+ *   2. `ocrData.data`          — PWA `IneOcrResult` nests OCR fields in `.data`
+ *   3. `ocrData` top level     — brigadaApp's `INEOcrResult` is already flat
+ * plus the snake_case alias of each, because the backend `required_fields`
+ * config uses camelCase while the persisted answer uses snake_case.
+ */
+function findIneField(
+  data: Record<string, unknown>,
+  ocrData: Record<string, unknown>,
+  field: string,
+): unknown {
+  const snake = toSnakeCase(field);
+  const ocrPayload = asRecord(ocrData['data']);
+  const aliases = snake === field ? [field] : [field, snake];
+  for (const key of aliases) {
+    if (hasIneValue(data[key])) return data[key];
+  }
+  for (const key of aliases) {
+    if (hasIneValue(ocrPayload[key])) return ocrPayload[key];
+  }
+  for (const key of aliases) {
+    if (hasIneValue(ocrData[key])) return ocrData[key];
+  }
+  return undefined;
 }
 
 function getMissingRequiredIneFields(
@@ -90,20 +120,13 @@ function getMissingRequiredIneFields(
 ): string[] {
   const data =
     typeof value === 'string'
-      ? { front: value, back: null, ocrData: null }
-      : value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {};
-  const ocrData =
-    data['ocrData'] && typeof data['ocrData'] === 'object'
-      ? (data['ocrData'] as Record<string, unknown>)
-      : {};
+      ? { front: value, back: null }
+      : asRecord(value);
+  const ocrData = asRecord(data['ocrData']);
 
   return requiredFields.filter((field) => {
-    if (field === 'front' || field === 'back' || field === 'ocrData') {
-      return !hasRequiredIneValue(data[field]);
-    }
-    return !hasRequiredIneValue(ocrData[field]);
+    if (field === 'ocrData') return !hasIneValue(ocrData);
+    return !findIneField(data, ocrData, field);
   });
 }
 
@@ -170,12 +193,6 @@ export function validateAnswer(
   }
 
   if (questionType === 'ine' || questionType === 'ine_ocr' || questionType === 'credential') {
-    if (required && isEmptyIneValue(value)) {
-      return 'Este campo es obligatorio';
-    }
-    if (!required && isEmptyIneValue(value)) {
-      return null;
-    }
     const requiredIneFields = Array.from(
       new Set(resolveRequiredIneFields(rules, required)),
     );

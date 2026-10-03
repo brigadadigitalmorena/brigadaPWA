@@ -11,7 +11,7 @@
 | P0-1 | **Payload submit = solo `fillableQuestions`** + poda en replay `form_engine_violation` | 3 DH | `fill/page.tsx`, `sync-engine.service.ts` | 🔴 Por hacer |
 | P0-2 | **Implementar "Corregir respuesta" O cambiar copy** | 2 DH | `submission-history.tsx`, `error-copy.ts`, routing a fill | 🔴 Por hacer |
 | P0-3 | **Confirmar deploy SW v5 en prod + auditoría exposición** | 1 DH | Deploy Vercel/Docker, verificación DevTools | 🟡 En curso (code done) |
-| P0-4 | **INE `onChange` + validación `required_fields`** | 3 DH | `ine-question.tsx`, `validate-answer.ts`, `buildFlatIneAnswer` | 🔴 Por hacer |
+| P0-4 | **INE `onChange` + captura ambos lados + validación `required_fields`** | 3 DH | `ine-question.tsx`, `validate-answer.ts`, `build-flat-ine-answer.ts`, `response-submission.service.ts` | 🟢 Hecho (PR #5) |
 | P0-5 | **CMS: leer `?doc=` en help page** (51 permalinks) | 1 DH | `webCMS/src/app/dashboard/help/page.tsx` | 🔴 Por hacer |
 | P0-6 | **CMS: borrar instrucciones ficticias Auditoría/Revertir + corregir Analytics/Dashboard** | 2 DH | `webCMS/src/data/docs-manual.ts` | 🔴 Por hacer |
 
@@ -36,9 +36,10 @@
 ### Validación y FormEngine (paridad completa)
 | ID | Título | Estimación | Notas |
 |----|--------|------------|-------|
-| P1-V1 | Portar 28 reglas faltantes (GIS, multimedia, tiempo, tipos, INE) | 8 DH | Módulo compartido o replicar `validate-answer.ts` |
+| P1-V1 | Portar 28 reglas faltantes (GIS, multimedia, tiempo, tipos) | 6 DH | Módulo compartido o replicar `validate-answer.ts`. INE `required_fields` ya está hecho (P0-4), reste de 28. |
 | P1-V2 | `normalizeAnswerByRules` (7 reglas `normalize_*`) | 3 DH | Pre-procesamiento antes de submit |
-| P1-V3 | `required_fields` INE (CURP, nombre, domicilio, vigencia) | 2 DH | Gate en submit fill |
+| P1-V3 | ~~`required_fields` INE~~ | — | 🟢 Hecho en PR #5 (P0-4). Contract cascade + labels + tests en `tests/ine/` |
+| P1-V7 | Recortar `required_fields` INE en el seed del backend | 1 DH | `backEnd/scripts/seed_v2_full.py:412` configura 13 campos; la política acordada es 4. Es config del CMS, no bug de cliente. |
 | P1-V4 | `data_list` renderer (`DataListQuestion`) | 3 DH | Autocompletar SEPOMEX (ver P1-C4) |
 | P1-V5 | `read_only` / `calculated` honrados en renderers | 2 DH | `field-types.ts` + `question-renderer.tsx` |
 | P1-V6 | `requires_active_session` default `warn` | 1 DH | `use-field-session-gate.ts` |
