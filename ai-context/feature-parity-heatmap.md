@@ -1,7 +1,7 @@
 # Feature Parity: brigadaPWA vs brigadaApp
 
 > **Scope:** Comparación exhaustiva de features entre la PWA (Next.js) y la app nativa (Expo/React Native)
-> **Last updated:** 2026-09-30
+> **Last updated:** 2026-10-03 (port desde `main`, corregido contra `dev`)
 > **Purpose:** Referencia obligatoria para desarrolladores — cualquier feature nueva debe consult aquí antes de implementarse.
 
 ---
@@ -24,7 +24,7 @@
 | Survey fill store (Zustand) | █ | █ | — |
 | Step-by-step navigation | █ | █ | — |
 | Auto-save drafts | █ Dexie | █ SQLite | — |
-| Resume draft (Continuar) | █ scope + Dexie fallback | █ | — |
+| Resume draft (Continuar) | ░ | █ | **MEDIO** — `/drafts` navega con href plano; sin `resumeDraftId` |
 | Entitlement model (Assignment) | █ | █ | — |
 | Geo enforcement (off/warn/block) | █ | █ | — |
 | Campaign scope matching | █ | █ | — |
@@ -43,8 +43,11 @@
 | Confianza por campo | █ | █ | — |
 | Correcciones OCR aprendidas | █ localStorage | █ | — |
 | Compound sub-fields (editor) | █ | █ | — |
-| `ocr_autofill` to other questions | █ | █ | — |
+| Flat answer (snake_case) | █ `buildFlatIneAnswer()` | █ | — |
+| Autofill entre preguntas | █ `codigo_postal_autofill` / `compound_zip` | █ `ocr_autofill` | ⚠ **PWA parcial** — sin `ocr_autofill`; solo ZIP |
+| `translateSexo()` H/M/X | █ | █ | — |
 | `parseIneValue()` dual format | █ | █ | — |
+| `IneValidationRules` extract toggles | █ `extract_*` | █ | — |
 | Cámara notched (guía visual) | ░ | █ | ⚠ **LIMITACIÓN WEB** — sin overlay nativo |
 | Document scanner (edge detection) | ░ | █ | ⚠ **LIMITACIÓN WEB** — sin ML Kit |
 
@@ -100,7 +103,7 @@
 | Push notifications | ░ stub mínimo | █ expo-notifications | **ALTO** — no conectado a pipeline |
 | Foreground notification display | ░ | █ | **ALTO** |
 | Notification tap → deep link | ░ | █ navigate to screen | **ALTO** |
-| Pantalla de notificaciones | █ lista + badge | █ lista + badge | — |
+| Pantalla de notificaciones | ░ | █ lista + badge | **ALTO** — sin inbox en PWA (solo `web-push.service.ts`) |
 | Notificación sesión campo + action | ░ | █ "Finalizar recorrido" | **ALTO** — no posible en web |
 
 ### 7. Maps
@@ -138,7 +141,7 @@
 | Score details screen | ░ | █ | **MEDIO** |
 | Mis envíos screen | ░ | █ | **MEDIO** |
 | Report issue screen | ░ | █ + expo-mail-composer | **BAJO** |
-| Change avatar / edit profile | █ | █ | — |
+| Change avatar / edit profile | ░ | █ | **MEDIO** — sin rutas en PWA; solo `avatar_url` en types |
 | Debug screens (session replay) | ░ | █ | **BAJO** |
 
 ### 10. Observabilidad
