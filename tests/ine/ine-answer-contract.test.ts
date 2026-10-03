@@ -70,6 +70,31 @@ test('lee los campos desde ocrData plano (forma INEOcrResult de la App)', () => 
   assert.equal(validateAnswer(ineQuestion(null), answer), null);
 });
 
+test('resuelve required_fields en snake_case contra ocrData camelCase', () => {
+  // Regresion: los alias eran unidireccionales (solo camel -> snake). Si el CMS
+  // envia required_fields en snake_case y el OCR trae camelCase, el campo no se
+  // encontraba y la pregunta quedaba bloqueada sin salida para el brigadista.
+  const rules = { required_fields: ['front', 'back', 'apellido_paterno'] };
+  const answer = {
+    front: 'f',
+    back: 'b',
+    ocrData: {
+      data: { apellidoPaterno: 'PEREZ' },
+    },
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
+test('resuelve required_fields camelCase contra un payload plano snake_case', () => {
+  const rules = { required_fields: ['front', 'back', 'apellidoPaterno'] };
+  const answer = {
+    front: 'f',
+    back: 'b',
+    ocrData: { apellido_paterno: 'PEREZ' },
+  };
+  assert.equal(validateAnswer(ineQuestion(rules), answer), null);
+});
+
 test('resuelve required_fields del backend en camelCase', () => {
   // El seed real (backEnd/scripts/seed_v2_full.py) configura 13 campos camelCase.
   const rules = {

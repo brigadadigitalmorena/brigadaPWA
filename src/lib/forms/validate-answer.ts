@@ -108,6 +108,17 @@ function toSnakeCase(field: string): string {
   return field.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 }
 
+function toCamelCase(field: string): string {
+  return field.replace(/_([a-z0-9])/g, (_, chr: string) => chr.toUpperCase());
+}
+
+/** Both key conventions, so a snake_case config resolves a camelCase field. */
+function ineFieldAliases(field: string): string[] {
+  const snake = toSnakeCase(field);
+  const camel = toCamelCase(field);
+  return snake === camel ? [field] : [field, snake, camel];
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -127,9 +138,8 @@ function findIneField(
   ocrData: Record<string, unknown>,
   field: string,
 ): unknown {
-  const snake = toSnakeCase(field);
   const ocrPayload = asRecord(ocrData['data']);
-  const aliases = snake === field ? [field] : [field, snake];
+  const aliases = ineFieldAliases(field);
   for (const key of aliases) {
     if (hasIneValue(data[key])) return data[key];
   }
