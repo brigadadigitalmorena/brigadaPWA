@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+		"slides": "slidev ai-context/slides/slides.md",
+		"slides:build": "slidev build ai-context/slides/slides.md",
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
@@ -51,6 +53,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@slidev/cli": "^53.0.0",
+    "@slidev/theme-default": "^0.25.0",
     "@tailwindcss/postcss": "^4",
     "@types/json-logic-js": "^2.0.8",
     "@types/node": "^20",
