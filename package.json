@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-		"slides": "slidev ai-context/slides/slides.md",
-		"slides:build": "slidev build ai-context/slides/slides.md",
+		"slides": "slidev scripts/slidev.config.ts ai-context/slides/slides.md",
+		"slides:build": "slidev build scripts/slidev.config.ts ai-context/slides/slides.md",
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
