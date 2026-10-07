@@ -5,6 +5,14 @@
  */
 
 import type { Question, ValidationRules } from '@/lib/types';
+import {
+  formatMissingIneFields,
+  getMissingRequiredIneFields,
+  isIneQuestionType,
+  resolveRequiredIneFields,
+} from '@/lib/forms/ine-answer';
+import { isCompleteZip, parseZipValue } from '@/lib/forms/zip-answer';
+import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[\d+\-() ]{7,20}$/;
@@ -53,6 +61,22 @@ export function isEmptyAnswerValue(value: unknown): boolean {
   return isPlainEmptyObject(value);
 }
 
+const YES_NO_TRUE = new Set(['true', '1', 'sí', 'si', 'yes']);
+const YES_NO_FALSE = new Set(['false', '0', '2', 'no']);
+
+/** Backend `yes_no` answers must be booleans. */
+export function coerceYesNoValue(value: unknown): boolean | undefined {
+  if (value === true || value === false) return value;
+  if (value === 1) return true;
+  if (value === 0) return false;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (YES_NO_TRUE.has(normalized)) return true;
+    if (YES_NO_FALSE.has(normalized)) return false;
+  }
+  return undefined;
+}
+
 function parseDateValue(value: unknown): Date | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   const parsed = new Date(value);
@@ -91,8 +115,38 @@ export function validateAnswer(
   question: Question,
   value: unknown
 ): string | null {
-  const questionType = String(question.question_type ?? '');
+  const questionType = normalizeQuestionType(question.question_type);
   if (questionType === 'read_only' || questionType === 'data_list') {
+    return null;
+  }
+
+  if (isIneQuestionType(question.question_type)) {
+    const empty = isEmptyAnswerValue(value);
+    if (!question.is_required && empty) {
+      return null;
+    }
+    const missing = getMissingRequiredIneFields(
+      value,
+      resolveRequiredIneFields(question)
+    );
+    if (missing.length > 0) {
+      return formatMissingIneFields(missing);
+    }
+    return null;
+  }
+
+  if (questionType === 'codigo_postal_autofill') {
+    const zip = parseZipValue(value);
+    const requiredZip = Boolean(question.is_required);
+    if (requiredZip && !isCompleteZip(zip.codigo_postal)) {
+      return 'Ingresa un código postal de 5 dígitos';
+    }
+    if (!requiredZip && !isCompleteZip(zip.codigo_postal)) {
+      return null;
+    }
+    if (requiredZip && !zip.colonia.trim()) {
+      return 'Selecciona una colonia';
+    }
     return null;
   }
 

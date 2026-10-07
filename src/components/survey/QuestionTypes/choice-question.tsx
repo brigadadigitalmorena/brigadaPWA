@@ -2,8 +2,17 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AnswerOption } from '@/lib/types';
-import { getRendererKind } from '@/lib/survey/question-type-registry';
+import { coerceYesNoValue } from '@/lib/forms/validate-answer';
+import {
+  getRendererKind,
+  normalizeQuestionType,
+} from '@/lib/survey/question-type-registry';
 import { QuestionRendererProps } from './question-renderer';
+
+const YES_NO_OPTIONS: AnswerOption[] = [
+  { id: 1, question_id: 0, option_text: 'Sí', order: 0 },
+  { id: 0, question_id: 0, option_text: 'No', order: 1 },
+];
 
 export function ChoiceQuestion({
   question,
@@ -14,22 +23,32 @@ export function ChoiceQuestion({
 }: QuestionRendererProps) {
   const rendererKind = getRendererKind(question.question_type);
   const isMulti = rendererKind === 'choice_multi';
-  const isYesNo = rendererKind === 'choice' && question.question_type === 'yes_no';
+  const isYesNo = normalizeQuestionType(question.question_type) === 'yes_no';
 
   const options: AnswerOption[] = isYesNo
-    ? [
-        { id: 1, question_id: question.id, option_text: 'Sí', order: 0 },
-        { id: 2, question_id: question.id, option_text: 'No', order: 1 },
-      ]
+    ? YES_NO_OPTIONS.map((option) => ({ ...option, question_id: question.id }))
     : question.options || [];
 
   const selectedValues: string[] = Array.isArray(value)
-    ? value
+    ? value.map((entry) => String(entry))
     : value !== undefined && value !== null
       ? [String(value)]
       : [];
 
+  const yesNoSelected = isYesNo ? coerceYesNoValue(value) : undefined;
+  const radioValue = isYesNo
+    ? yesNoSelected === true
+      ? 'true'
+      : yesNoSelected === false
+        ? 'false'
+        : ''
+    : selectedValues[0] || '';
+
   const handleSingleChange = (newValue: string) => {
+    if (isYesNo) {
+      onChange(newValue === 'true');
+      return;
+    }
     onChange(newValue);
   };
 
@@ -87,7 +106,7 @@ export function ChoiceQuestion({
         </div>
       ) : (
         <RadioGroup
-          value={selectedValues[0] || ''}
+          value={radioValue}
           onValueChange={handleSingleChange}
           disabled={disabled}
           className="space-y-3"
@@ -97,7 +116,16 @@ export function ChoiceQuestion({
               key={String(option.id)}
               className="flex items-center gap-3 rounded-xl border border-input bg-background p-4 min-h-12 active:bg-accent/50"
             >
-              <RadioGroupItem value={String(option.id)} className="size-5" />
+              <RadioGroupItem
+                value={
+                  isYesNo
+                    ? option.order === 0
+                      ? 'true'
+                      : 'false'
+                    : String(option.id)
+                }
+                className="size-5"
+              />
               <span className="text-base font-medium">{option.option_text}</span>
             </label>
           ))}

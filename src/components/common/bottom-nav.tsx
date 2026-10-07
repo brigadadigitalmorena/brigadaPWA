@@ -4,18 +4,27 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   ClipboardList,
+  House,
   RefreshCw,
   FileEdit,
   Zap,
   Workflow,
   Map,
   Navigation,
+  Share2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSync } from '@/contexts/sync.context';
 import { isModuleEnabled } from '@/lib/services/app-config.service';
 
 const allNavItems = [
+  {
+    label: 'Inicio',
+    href: '/home',
+    icon: House,
+    module: 'home' as const,
+    isActive: (path: string) => path === '/home' || path.startsWith('/home/'),
+  },
   {
     label: 'Encuestas',
     href: '/surveys',
@@ -57,6 +66,13 @@ const allNavItems = [
     icon: Navigation,
     module: 'recorridos' as const,
     isActive: (path: string) => path.startsWith('/recorridos'),
+  },
+  {
+    label: 'Redes',
+    href: '/networks',
+    icon: Share2,
+    module: 'networks' as const,
+    isActive: (path: string) => path.startsWith('/networks'),
   },
   {
     label: 'Mis envíos',

@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
@@ -23,6 +26,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSyncErrorCopy } from '@/lib/sync/error-copy';
+import { reopenForCorrection } from '@/lib/services/draft.service';
+import { parseOptionalScopeId, surveyResumeHref } from '@/lib/campaigns/scope';
+import { toast } from 'sonner';
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -64,6 +70,8 @@ function operationLabel(operationType: string): string {
 }
 
 export default function SyncPage() {
+  const router = useRouter();
+  const [correctingId, setCorrectingId] = useState<string | null>(null);
   const {
     isOnline,
     isSyncing,
@@ -114,6 +122,11 @@ export default function SyncPage() {
       <PageHeader
         title="Mis envíos"
         description="Consulta tus respuestas confirmadas y el estado de sincronización"
+        action={
+          <Link href="/sync/map" className="text-sm font-medium text-primary">
+            Ver mapa
+          </Link>
+        }
       />
 
       {!isOnline && (
@@ -285,6 +298,10 @@ export default function SyncPage() {
             const isError = ['dead_letter', 'failed_permanent', 'failed', 'retry_wait'].includes(
               item.status
             );
+            const canCorrect =
+              item.operation_type === 'CREATE_RESPONSE' &&
+              (item.status === 'dead_letter' || item.status === 'failed_permanent') &&
+              copy.needsManualFix;
 
             return (
               <Card
@@ -302,16 +319,85 @@ export default function SyncPage() {
                     {item.entity_id}
                   </CardDescription>
                 </CardHeader>
-                {(item.last_error || item.last_error_code) && (
-                  <CardContent className="pt-0 text-sm space-y-1">
-                    <p className="font-medium text-destructive">{copy.title}</p>
-                    <p className="text-muted-foreground">
-                      {item.last_error || copy.body || copy.action}
-                    </p>
+                {(item.last_error || item.last_error_code || canCorrect) && (
+                  <CardContent className="pt-0 text-sm space-y-2">
+                    {(item.last_error || item.last_error_code) && (
+                      <>
+                        <p className="font-medium text-destructive">{copy.title}</p>
+                        <p className="text-muted-foreground">
+                          {item.last_error || copy.body || copy.action}
+                        </p>
+                      </>
+                    )}
                     {item.retry_count > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Intentos: {item.retry_count}/{item.max_retries}
                       </p>
+                    )}
+                    {canCorrect && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={correctingId === item.queue_id}
+                        onClick={async () => {
+                          setCorrectingId(item.queue_id);
+                          try {
+                            const result = await reopenForCorrection(
+                              item.queue_id,
+                              item.entity_id
+                            );
+                            if (!result) {
+                              toast.error('No se encontró la respuesta para corregir.');
+                              return;
+                            }
+                            const survey = await db.surveys
+                              .where('survey_id')
+                              .equals(String(result.surveyId))
+                              .first();
+                            const title = survey?.title || `Encuesta #${result.surveyId}`;
+                            let fromRow: {
+                              campaign_id?: number | null;
+                              entitlement_id?: number | null;
+                              campaign_name?: string | null;
+                            } = {};
+                            const raw =
+                              survey?.entitlement_json ?? survey?.assignment_json;
+                            if (raw) {
+                              try {
+                                fromRow = JSON.parse(raw) as typeof fromRow;
+                              } catch {
+                                fromRow = {};
+                              }
+                            }
+                            const href = surveyResumeHref({
+                              survey_id: result.surveyId,
+                              response_id: item.entity_id,
+                              survey_title: title,
+                              campaign_id: parseOptionalScopeId(fromRow.campaign_id),
+                              entitlement_id: parseOptionalScopeId(
+                                fromRow.entitlement_id
+                              ),
+                              campaign_name: fromRow.campaign_name,
+                            });
+                            if (navigator.onLine) {
+                              router.push(href);
+                            } else {
+                              window.location.assign(href);
+                            }
+                          } catch (err) {
+                            toast.error(
+                              err instanceof Error
+                                ? err.message
+                                : 'No se pudo reabrir la respuesta.'
+                            );
+                          } finally {
+                            setCorrectingId(null);
+                          }
+                        }}
+                      >
+                        Corregir respuesta
+                      </Button>
                     )}
                   </CardContent>
                 )}

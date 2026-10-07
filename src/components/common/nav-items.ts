@@ -1,9 +1,11 @@
 import {
   ClipboardList,
   FilePenLine,
+  House,
   ListChecks,
   MapPinned,
   Route,
+  Share2,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -36,6 +38,16 @@ export const SIDEBAR_GROUPS: Array<{ id: SidebarGroupId; label: string }> = [
 ];
 
 export const NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Inicio',
+    href: '/home',
+    icon: House,
+    module: 'home',
+    isActive: (path) => path === '/home' || path.startsWith('/home/'),
+    placement: 'primary',
+    sidebarGroup: 'trabajo',
+    description: 'Resumen del día',
+  },
   {
     label: 'Encuestas',
     href: '/surveys',
@@ -98,6 +110,16 @@ export const NAV_ITEMS: NavItem[] = [
     description: 'Sesiones de campo',
   },
   {
+    label: 'Redes',
+    href: '/networks',
+    icon: Share2,
+    module: 'networks',
+    isActive: (path) => path.startsWith('/networks'),
+    placement: 'more',
+    sidebarGroup: 'campo',
+    description: 'Canales para compartir',
+  },
+  {
     label: 'Mis envíos',
     shortLabel: 'Envíos',
     href: '/sync',
@@ -110,8 +132,8 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-const PRIMARY_ORDER = ['/surveys', '/tracking', '/sync'] as const;
-const MORE_ORDER = ['/drafts', '/extras', '/maps', '/recorridos'] as const;
+const PRIMARY_ORDER = ['/home', '/surveys', '/tracking', '/sync'] as const;
+const MORE_ORDER = ['/drafts', '/extras', '/maps', '/recorridos', '/networks'] as const;
 
 function sortByHref(items: NavItem[], order: readonly string[]): NavItem[] {
   return [...items].sort(

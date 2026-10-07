@@ -251,7 +251,16 @@ Users can install the PWA:
 
 ## Future Enhancements
 
-- [ ] Push notifications
+- [x] In-app notifications inbox
+- [x] Home + daily metrics
+- [x] Submission map
+- [x] Photo annotation, in-app audio/video, barcode pattern
+- [x] GIS auto-track
+- [x] Sentry / PostHog (env-gated)
+- [x] Help, networks, report issue, theme, welcome, debug, response history
+- [x] Storage / schema / pending-confirm banners
+- [ ] Push notifications (VAPID registration exists; needs a web push backend)
+- [x] Background sync wake (Periodic Background Sync, best-effort)
 - [ ] Background sync improvements
 - [ ] Conflict resolution UI
 - [x] Signature capture
@@ -263,4 +272,3 @@ Users can install the PWA:
 - [x] ZIP colonia lookup
 - [x] Corregir respuesta from failed sync
 - [x] Profile / password / avatar
-- [x] In-app notifications inbox

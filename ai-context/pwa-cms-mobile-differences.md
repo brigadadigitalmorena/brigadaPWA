@@ -155,6 +155,9 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Notificaciones in-app: `/mobile/notifications*`
 - ZIP: `/mobile/zip-lookup/{code}`
 - Recorridos: `/mobile/field-sessions*`
+- Métricas: `GET /mobile/daily-metrics` (`/home`)
+- Redes: `GET /public/app-config` → `social_links` (`/networks`)
+- Reporte: `/report` abre el cliente de correo (el móvil usa el compositor nativo)
 
 ### 4.2 Endpoints de campo que el PWA **aún no** consume (móvil sí o backend ya existe)
 
@@ -163,11 +166,9 @@ Priorizar contra el heatmap, no implementar “porque existe”:
 | Endpoint | Uso en móvil | PWA |
 |----------|--------------|-----|
 | `GET /mobile/score/latest` | `score-details.tsx` | No hay pantalla de score |
-| `GET /mobile/daily-metrics` | Home / métricas | No |
-| `POST /mobile/push-token` | Expo push | Stub Web Push; VAPID y payload distintos a Expo |
-| `GET /mobile/responses/me` | Historial servidor | Envíos son cola local `/sync` |
+| `POST /mobile/push-token` | Expo push | Registro Web Push si hay `NEXT_PUBLIC_VAPID_PUBLIC_KEY`; el envío lo hace el backend |
+| `GET /mobile/responses/me` | Historial servidor | Envíos son cola local `/sync` e historial local `/sync/history` |
 | `POST /mobile/sync/validate`, reconcile, restore | Recuperación de dispositivo | Parcial / no |
-| Issue reporting | `report-issue.tsx` + mail | No |
 
 ### 4.3 Lo que el CMS llama y el PWA no debe llamar
 

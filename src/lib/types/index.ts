@@ -107,6 +107,7 @@ export interface Question {
   appearance?: string;
   dataset_ref?: string;
   ui?: QuestionUI;
+  metadata?: Record<string, unknown> | null;
 }
 
 export type QuestionType =

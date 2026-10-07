@@ -154,7 +154,8 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
       };
 
       const existingFile = await db.local_files
-        .where({ response_id: input.responseId, question_id: preview.questionId })
+        .where('file_id')
+        .equals(fileId)
         .first();
 
       if (existingFile?.id !== undefined) {

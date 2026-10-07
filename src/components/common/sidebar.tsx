@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   ClipboardList,
+  House,
   RefreshCw,
   LogOut,
   FileEdit,
@@ -14,6 +15,7 @@ import {
   Workflow,
   Map,
   Navigation,
+  Share2,
 } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
 import { toast } from 'sonner';
@@ -38,6 +40,13 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
     module: ModuleKey;
     isActive: (path: string) => boolean;
   }> = [
+    {
+      label: 'Inicio',
+      href: '/home',
+      icon: House,
+      module: 'home',
+      isActive: (path: string) => path === '/home' || path.startsWith('/home/'),
+    },
     {
       label: 'Encuestas',
       href: '/surveys',
@@ -79,6 +88,13 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       icon: Navigation,
       module: 'recorridos',
       isActive: (path: string) => path.startsWith('/recorridos'),
+    },
+    {
+      label: 'Redes',
+      href: '/networks',
+      icon: Share2,
+      module: 'networks',
+      isActive: (path: string) => path.startsWith('/networks'),
     },
     {
       label: 'Mis envíos',

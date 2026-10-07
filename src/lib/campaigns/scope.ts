@@ -1,18 +1,33 @@
 /** Campaign/entitlement scope helpers for PWA. */
 
+/**
+ * Query/JSON ids. `Number(null) === 0`, so missing search params must not
+ * become campaignId/entitlementId 0 (that breaks resume + Dexie fallback).
+ */
+export function parseOptionalScopeId(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
 export function entitlementIdOf(row: {
   entitlement_id?: number | null;
 }): number | null {
-  const id = row.entitlement_id ?? null;
-  return typeof id === "number" && Number.isFinite(id) ? id : null;
+  return parseOptionalScopeId(row.entitlement_id);
 }
 
 export function campaignIdOf(row: {
   campaign_id?: number | null;
 }): number | null {
-  return typeof row.campaign_id === "number" && Number.isFinite(row.campaign_id)
-    ? row.campaign_id
-    : null;
+  return parseOptionalScopeId(row.campaign_id);
 }
 
 export function campaignLabel(row: {
@@ -81,12 +96,12 @@ export function matchEntitlement<T extends {
   surveyId: number,
   options?: { campaignId?: number | null; entitlementId?: number | null },
 ): T | undefined {
-  const entitlementId = options?.entitlementId;
+  const entitlementId = parseOptionalScopeId(options?.entitlementId);
   if (entitlementId != null) {
     return entitlements.find((row) => row.entitlement_id === entitlementId);
   }
 
-  const campaignId = options?.campaignId;
+  const campaignId = parseOptionalScopeId(options?.campaignId);
   if (campaignId != null) {
     return entitlements.find(
       (row) => row.survey_id === surveyId && row.campaign_id === campaignId,
@@ -107,8 +122,38 @@ export function surveyFillHref(row: {
     title: row.survey_title,
     entitlementId: String(row.entitlement_id),
   });
-  if (row.campaign_id != null) {
-    params.set("campaignId", String(row.campaign_id));
+  const campaignId = parseOptionalScopeId(row.campaign_id);
+  if (campaignId != null) {
+    params.set("campaignId", String(campaignId));
+  }
+  const campaign = campaignLabel(row);
+  if (campaign) {
+    params.set("campaign", campaign);
+  }
+  return `/surveys/${row.survey_id}/fill?${params.toString()}`;
+}
+
+export function surveyResumeHref(row: {
+  survey_id: string | number;
+  response_id: string;
+  survey_title?: string | null;
+  entitlement_id?: number | null;
+  campaign_id?: number | null;
+  campaign_name?: string | null;
+}): string {
+  const params = new URLSearchParams({
+    resumeDraftId: row.response_id,
+  });
+  const title = (row.survey_title || "").trim();
+  if (title) params.set("title", title);
+
+  const entitlementId = parseOptionalScopeId(row.entitlement_id);
+  if (entitlementId != null) {
+    params.set("entitlementId", String(entitlementId));
+  }
+  const campaignId = parseOptionalScopeId(row.campaign_id);
+  if (campaignId != null) {
+    params.set("campaignId", String(campaignId));
   }
   const campaign = campaignLabel(row);
   if (campaign) {

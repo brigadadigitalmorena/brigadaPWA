@@ -19,9 +19,13 @@ import { useFieldSession } from '@/hooks/use-field-session';
 import { isAutoAdvanceType } from '@/lib/survey/field-types';
 import { useSurveyFormEngine } from '@/lib/forms/use-survey-form-engine';
 import {
+  coerceYesNoValue,
   questionKeyOf,
   validateAnswer,
 } from '@/lib/forms/validate-answer';
+import { applyOcrAutofill, isIneQuestionType } from '@/lib/forms/ine-answer';
+import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
+import { parseOptionalScopeId } from '@/lib/campaigns/scope';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
 import { SurveyFillHeader } from '@/components/survey/survey-fill-header';
 import { Button } from '@/components/ui/button';
@@ -37,20 +41,21 @@ export default function SurveyFillPage() {
   );
 }
 
+let pendingFillReset: ReturnType<typeof setTimeout> | null = null;
+
 function SurveyFillPageContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const surveyId = params.id as string;
   const titleFromUrl = searchParams.get('title');
-  const campaignIdParam = Number(searchParams.get('campaignId'));
-  const entitlementIdParam = Number(searchParams.get('entitlementId'));
-  const campaignId = Number.isFinite(campaignIdParam) ? campaignIdParam : null;
-  const entitlementId = Number.isFinite(entitlementIdParam)
-    ? entitlementIdParam
-    : null;
+  const campaignId = parseOptionalScopeId(searchParams.get('campaignId'));
+  const entitlementId = parseOptionalScopeId(searchParams.get('entitlementId'));
   const campaignNameFromUrl = searchParams.get('campaign');
+  const resumeDraftId = searchParams.get('resumeDraftId');
   const [surveyTitle, setSurveyTitle] = useState<string>(titleFromUrl ?? 'Encuesta');
+  const [isOpening, setIsOpening] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -108,6 +113,7 @@ function SurveyFillPageContent() {
     reset: resetForm,
     trigger,
     getValues,
+    setValue,
     setError,
     formState: { errors, isDirty },
   } = useForm({
@@ -116,18 +122,28 @@ function SurveyFillPageContent() {
   });
 
   useEffect(() => {
+    if (pendingFillReset) {
+      clearTimeout(pendingFillReset);
+      pendingFillReset = null;
+    }
+
     return () => {
       if (autoAdvanceTimeoutRef.current) {
         clearTimeout(autoAdvanceTimeoutRef.current);
       }
-      reset();
+      pendingFillReset = setTimeout(() => {
+        reset();
+        pendingFillReset = null;
+      }, 0);
     };
-  }, [reset]);
+  }, [surveyId, reset]);
 
   useEffect(() => {
     let mounted = true;
 
     const load = async () => {
+      setIsOpening(true);
+      setLoadError(null);
       try {
         const { title, version } = await loadSurveyForFill(
           Number(surveyId),
@@ -137,7 +153,7 @@ function SurveyFillPageContent() {
 
         if (mounted) {
           setSurveyTitle(title);
-          await init(surveyId, version);
+          await init(surveyId, version, { resumeDraftId });
         }
       } catch (err) {
         if (mounted) {
@@ -149,8 +165,11 @@ function SurveyFillPageContent() {
                 ? 'No hay una versión publicada disponible para esta encuesta.'
                 : 'Error al cargar la encuesta'
             : 'Error al cargar la encuesta';
+          setLoadError(message);
           toast.error(message);
         }
+      } finally {
+        if (mounted) setIsOpening(false);
       }
     };
 
@@ -159,7 +178,7 @@ function SurveyFillPageContent() {
     return () => {
       mounted = false;
     };
-  }, [surveyId, init, titleFromUrl, campaignId, entitlementId]);
+  }, [surveyId, init, titleFromUrl, campaignId, entitlementId, resumeDraftId]);
 
   // FIELD-TRACK-1 — surveys tied to a route activity may require an open
   // recorrido before any data is captured.
@@ -209,12 +228,25 @@ function SurveyFillPageContent() {
       return;
     }
 
+    const snapshot = useSurveyFillStore.getState();
     const formValues = getValues();
+    const mergedAnswers: Record<string, unknown> = { ...snapshot.answers };
+    for (const [key, value] of Object.entries(formValues)) {
+      if (value !== undefined) mergedAnswers[key] = value;
+    }
+    for (const entry of fillableQuestions) {
+      const key = questionKeyOf(entry.question);
+      if (normalizeQuestionType(entry.question.question_type) !== 'yes_no') {
+        continue;
+      }
+      const coerced = coerceYesNoValue(mergedAnswers[key]);
+      if (coerced !== undefined) mergedAnswers[key] = coerced;
+    }
+
     for (let index = 0; index < fillableQuestions.length; index += 1) {
       const entry = fillableQuestions[index];
       const key = questionKeyOf(entry.question);
-      const value =
-        formValues[key] !== undefined ? formValues[key] : answers[key];
+      const value = mergedAnswers[key];
       const message = getFieldValidationMessage(entry.question, value);
       if (message) {
         goToQuestion(index);
@@ -232,9 +264,9 @@ function SurveyFillPageContent() {
         responseId,
         surveyId,
         version,
-        answers,
-        files,
-        location,
+        answers: mergedAnswers,
+        files: snapshot.files,
+        location: snapshot.location,
         startedAt,
         deviceInfo: buildDeviceInfo(),
         campaignId,
@@ -345,17 +377,19 @@ function SurveyFillPageContent() {
     router.push('/surveys');
   };
 
-  if (isLoading) {
+  if (isOpening || isLoading) {
     return <LoadingState message="Cargando encuesta..." />;
   }
 
-  if (error) {
+  if (loadError || error) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-lg rounded-2xl">
           <CardHeader>
             <CardTitle className="text-xl text-destructive">Error</CardTitle>
-            <CardDescription className="text-base">{error}</CardDescription>
+            <CardDescription className="text-base">
+              {loadError || error}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Button
@@ -382,6 +416,16 @@ function SurveyFillPageContent() {
               No se encontró la versión activa de esta encuesta.
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => router.push('/surveys')}
+              variant="outline"
+              size="mobile"
+              className="w-full"
+            >
+              Volver a encuestas
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
@@ -497,9 +541,13 @@ function SurveyFillPageContent() {
               name={questionKeyOf(currentQuestion)}
               control={control}
               rules={{
-                required: currentQuestion.is_required
-                  ? 'Este campo es obligatorio'
-                  : false,
+                required:
+                  currentQuestion.is_required &&
+                  normalizeQuestionType(currentQuestion.question_type) !==
+                    'yes_no' &&
+                  !isIneQuestionType(currentQuestion.question_type)
+                    ? 'Este campo es obligatorio'
+                    : false,
                 validate: (value) =>
                   getFieldValidationMessage(currentQuestion, value) ?? true,
               }}
@@ -515,7 +563,33 @@ function SurveyFillPageContent() {
                       setAnswer(questionKey, value);
                       formEngine?.setAnswer(questionKey, value);
 
+                      if (isIneQuestionType(currentQuestion.question_type)) {
+                        const allQuestions =
+                          version?.sections?.flatMap(
+                            (section) => section.questions ?? []
+                          ) ?? [];
+                        const autofillUpdates = applyOcrAutofill({
+                          sourceQuestionKey: questionKey,
+                          sourceValue: value,
+                          fields: allQuestions,
+                          answers: {
+                            ...useSurveyFillStore.getState().answers,
+                            [questionKey]: value,
+                          },
+                        });
+                        for (const [targetKey, targetValue] of Object.entries(
+                          autofillUpdates
+                        )) {
+                          setAnswer(targetKey, targetValue);
+                          formEngine?.setAnswer(targetKey, targetValue);
+                          setValue(targetKey, targetValue, {
+                            shouldDirty: true,
+                          });
+                        }
+                      }
+
                       if (
+                        !isLastQuestion &&
                         isAutoAdvanceType(currentQuestion.question_type) &&
                         value !== null &&
                         value !== undefined &&
@@ -536,14 +610,14 @@ function SurveyFillPageContent() {
       </form>
 
       <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur border-t px-4 py-3 safe-area-bottom">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="lg"
             onClick={handleExit}
             disabled={isSubmitting}
-            className="gap-2 h-14 px-4 text-base"
+            className="h-14 shrink-0 gap-2 px-4 text-base"
           >
             <ChevronLeft className="h-5 w-5" />
             {isFirstQuestion ? 'Salir' : 'Anterior'}
@@ -551,20 +625,20 @@ function SurveyFillPageContent() {
 
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             onClick={handleSaveDraft}
             disabled={!isDirty || isSubmitting}
             aria-label="Guardar borrador"
-            className="h-14 w-14 flex flex-col items-center justify-center gap-0.5 touch-target p-0"
+            title="Guardar borrador"
+            className="h-14 w-14 shrink-0 rounded-xl p-0 text-foreground disabled:opacity-70"
           >
-            <Save className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Guardar</span>
+            <Save className="size-6" strokeWidth={2} />
           </Button>
 
           <Button
             type="button"
             size="lg"
-            className="flex-1 gap-2 h-14 px-4 text-base"
+            className="ml-auto h-14 w-auto shrink-0 gap-2 px-5 text-base"
             onClick={handleNext}
             disabled={isSubmitting}
           >

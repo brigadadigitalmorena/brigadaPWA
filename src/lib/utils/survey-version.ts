@@ -118,7 +118,7 @@ function entitlementStorageKeys(
   campaignId?: number | null,
 ): string[] {
   const keys = [`${ENTITLEMENT_CACHE_PREFIX}${surveyId}`];
-  if (campaignId != null) {
+  if (campaignId != null && campaignId > 0) {
     keys.unshift(`${ENTITLEMENT_CACHE_PREFIX}c${campaignId}`);
   }
   return keys;
@@ -129,7 +129,7 @@ function legacyAssignmentStorageKeys(
   campaignId?: number | null,
 ): string[] {
   const keys = [`${LEGACY_ASSIGNMENT_CACHE_PREFIX}${surveyId}`];
-  if (campaignId != null) {
+  if (campaignId != null && campaignId > 0) {
     keys.unshift(`${LEGACY_ASSIGNMENT_CACHE_PREFIX}c${campaignId}`);
   }
   return keys;

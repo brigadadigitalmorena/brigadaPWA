@@ -1,10 +1,11 @@
 import Tesseract from 'tesseract.js';
-import { parseIneOcrText, loadCorrections } from '@/lib/ocr';
+import { parseIneOcrText, loadCorrections, type IneOcrResult as ParsedIneOcr } from '@/lib/ocr';
 
 export interface IneOcrResult {
   text: string;
   confidence: number;
   data: Record<string, string>;
+  parsed: ParsedIneOcr;
   lowConfidence: boolean;
   side: 'front' | 'back';
   validationWarnings: string[];
@@ -101,6 +102,7 @@ export async function recognizeIne(
     text: rawText,
     confidence,
     data,
+    parsed,
     lowConfidence,
     side,
     validationWarnings,

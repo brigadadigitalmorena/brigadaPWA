@@ -7,11 +7,12 @@ import {
   Question,
   LocationData,
 } from '@/lib/types';
-import { db, Response } from '@/lib/db/database';
+import { db, Response, LocalFile } from '@/lib/db/database';
 import { getCurrentUser } from '@/lib/api/auth.service';
 import { generateResponseId } from '@/lib/utils/uuid';
 import { isRelevant } from '@/lib/utils/json-logic';
 import { isFillableQuestion } from '@/lib/survey/field-types';
+import { loadFileBlob } from '@/lib/services/file-blob.service';
 
 export interface LocalFilePreview {
   id: string;
@@ -44,7 +45,11 @@ interface SurveyFillState {
   error: string | null;
   isHydrated: boolean;
 
-  init: (surveyId: string, version: SurveyVersion) => Promise<void>;
+  init: (
+    surveyId: string,
+    version: SurveyVersion,
+    options?: { resumeDraftId?: string | null }
+  ) => Promise<void>;
   saveDraft: () => Promise<void>;
   setAnswer: (questionKey: string, value: unknown) => void;
   setFiles: (questionKey: string, files: LocalFilePreview[]) => void;
@@ -92,8 +97,83 @@ const initialState: Omit<
   isHydrated: false,
 };
 
-function getAppVersion(): string {
-  return process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0';
+function questionKeyForId(
+  version: SurveyVersion,
+  questionId: string
+): string {
+  for (const section of version.sections ?? []) {
+    for (const question of section.questions ?? []) {
+      if (String(question.id) === questionId) {
+        return question.question_key || question.id.toString();
+      }
+    }
+  }
+  return questionId;
+}
+
+async function rehydrateFiles(
+  responseId: string,
+  version: SurveyVersion
+): Promise<Record<string, LocalFilePreview[]>> {
+  const localFiles = await db.local_files
+    .where('response_id')
+    .equals(responseId)
+    .toArray();
+  const grouped: Record<string, LocalFilePreview[]> = {};
+
+  for (const row of localFiles) {
+    const blob = await loadFileBlob(row.file_id);
+    if (!blob) continue;
+    const file = new File([blob], row.file_name, {
+      type: row.mime_type || 'application/octet-stream',
+    });
+    const questionKey = questionKeyForId(version, row.question_id);
+    const preview: LocalFilePreview = {
+      id: row.file_id,
+      fileId: row.file_id,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      fileType: row.file_type,
+      questionId: row.question_id,
+      ineOcrData: row.ine_ocr_data,
+    };
+    grouped[questionKey] = [...(grouped[questionKey] ?? []), preview];
+  }
+
+  return grouped;
+}
+
+async function persistDraftFiles(
+  responseId: string,
+  files: Record<string, LocalFilePreview[]>
+): Promise<void> {
+  const now = new Date().toISOString();
+  const previews = Object.values(files).flat();
+
+  await db.transaction('rw', db.local_files, async () => {
+    for (const preview of previews) {
+      const row: LocalFile = {
+        file_id: preview.fileId,
+        response_id: responseId,
+        file_type: preview.fileType as LocalFile['file_type'],
+        question_id: preview.questionId,
+        file_name: preview.file.name,
+        file_size: preview.file.size,
+        mime_type: preview.file.type || 'application/octet-stream',
+        ine_ocr_data: preview.ineOcrData,
+        sync_status: 'pending',
+        created_at: now,
+      };
+      const existing = await db.local_files
+        .where('file_id')
+        .equals(preview.fileId)
+        .first();
+      if (existing?.id !== undefined) {
+        row.id = existing.id;
+      }
+      await db.local_files.put(row);
+    }
+  });
 }
 
 function buildFillableQuestions(
@@ -124,6 +204,10 @@ function buildFillableQuestions(
   });
 
   return entries;
+}
+
+function getAppVersion(): string {
+  return process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0';
 }
 
 function buildDraftResponse(
@@ -163,25 +247,41 @@ function buildDraftResponse(
 export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
   ...initialState,
 
-  init: async (surveyId, version) => {
+  init: async (surveyId, version, options) => {
     set({ isLoading: true, error: null });
 
     try {
       const surveyVersion = version.version_number.toString();
+      const resumeDraftId = options?.resumeDraftId?.trim() || null;
+      const surveyIdKey = String(surveyId);
 
-      const existingDrafts = await db.responses
-        .where('survey_id')
-        .equals(surveyId)
-        .and(
-          (r) => r.survey_version === surveyVersion && r.status === 'draft'
-        )
-        .toArray();
-
-      const existingDraft = existingDrafts[0];
+      let existingDraft: Response | undefined;
+      if (resumeDraftId) {
+        const resumed = await db.responses
+          .where('response_id')
+          .equals(resumeDraftId)
+          .first();
+        if (resumed && String(resumed.survey_id) === surveyIdKey) {
+          existingDraft = resumed;
+        }
+      } else {
+        const existingDrafts = await db.responses
+          .where('survey_id')
+          .equals(surveyIdKey)
+          .and(
+            (row) =>
+              row.survey_version === surveyVersion && row.status === 'draft'
+          )
+          .toArray();
+        existingDraft = existingDrafts[0];
+      }
       const responseId = existingDraft?.response_id || generateResponseId();
       const startedAt = existingDraft?.started_at || new Date().toISOString();
       const answers = existingDraft
         ? JSON.parse(existingDraft.answers_json || '{}')
+        : {};
+      const files = existingDraft
+        ? await rehydrateFiles(existingDraft.response_id, version)
         : {};
 
       set({
@@ -190,7 +290,7 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
         responseId,
         currentQuestionIndex: 0,
         answers,
-        files: {},
+        files,
         location:
           existingDraft?.latitude !== undefined &&
           existingDraft?.longitude !== undefined
@@ -237,6 +337,7 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
       }
 
       await db.responses.put(response);
+      await persistDraftFiles(state.responseId, state.files);
     } catch (error) {
       console.error('Failed to save draft:', error);
     }

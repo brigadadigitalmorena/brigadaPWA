@@ -3,6 +3,7 @@
  */
 
 export type ModuleKey =
+  | 'home'
   | 'surveys'
   | 'sync'
   | 'tracking'
@@ -20,6 +21,7 @@ export interface AppConfigModules {
 
 const DEFAULT_CONFIG: AppConfigModules = {
   onlineEnabledModules: [
+    'home',
     'surveys',
     'sync',
     'tracking',
@@ -28,14 +30,17 @@ const DEFAULT_CONFIG: AppConfigModules = {
     'maps',
     'recorridos',
     'notifications',
+    'networks',
   ],
   offlineEnabledModules: [
+    'home',
     'surveys',
     'sync',
     'drafts',
     'extras',
     'maps',
     'recorridos',
+    'networks',
   ],
 };
 

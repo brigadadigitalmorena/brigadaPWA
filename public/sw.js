@@ -3458,6 +3458,17 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       );
     }
   });
+  self.addEventListener("periodicsync", (event) => {
+    if (event.tag === "brigada-dexie-sync") {
+      event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: "BRIGADA_SYNC_WAKE" });
+          });
+        })
+      );
+    }
+  });
   self.addEventListener("message", (event) => {
     var _a, _b;
     if (((_a = event.data) == null ? void 0 : _a.type) === "SKIP_WAITING") {

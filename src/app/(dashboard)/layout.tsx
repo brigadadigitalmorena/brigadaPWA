@@ -6,11 +6,15 @@ import { useAuth } from '@/contexts/auth.context';
 import { Sidebar } from '@/components/common/sidebar';
 import { BottomNav } from '@/components/common/bottom-nav';
 import { SyncIndicator } from '@/components/sync/sync-indicator';
+import { NotificationBell } from '@/components/common/notification-bell';
 import { UserMenu } from '@/components/common/user-menu';
 import { InstallPrompt } from '@/components/common/install-prompt';
 import { LoadingState } from '@/components/common/loading-state';
 import { FieldStatusBanners } from '@/components/banners/field-status-banners';
+import { ObservabilityBootstrap } from '@/components/common/observability-bootstrap';
 import { ClipboardList } from 'lucide-react';
+import { registerWebPush } from '@/lib/services/web-push.service';
+import { registerPeriodicSync } from '@/lib/services/periodic-sync';
 
 export default function DashboardLayout({
   children,
@@ -29,6 +33,12 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, isLoading, router]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void registerWebPush(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+    void registerPeriodicSync();
+  }, [isAuthenticated]);
+
   if (isLoading) {
     return <LoadingState message="Cargando..." minHeight="min-h-screen" />;
   }
@@ -42,6 +52,7 @@ export default function DashboardLayout({
       <div className="flex h-screen overflow-hidden bg-background">
         <main className="flex-1 overflow-hidden">{children}</main>
         <InstallPrompt />
+        <ObservabilityBootstrap />
       </div>
     );
   }
@@ -63,6 +74,7 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <SyncIndicator />
             <UserMenu user={user} />
           </div>
@@ -81,6 +93,7 @@ export default function DashboardLayout({
       </div>
 
       <InstallPrompt />
+      <ObservabilityBootstrap />
     </div>
   );
 }

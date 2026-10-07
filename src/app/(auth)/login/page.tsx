@@ -53,7 +53,7 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace('/surveys');
+      router.replace('/home');
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -76,7 +76,7 @@ function LoginPageContent() {
     try {
       await login(data.username, data.password);
       toast.success('Inicio de sesión exitoso');
-      router.replace('/surveys');
+      router.replace('/home');
     } catch (error) {
       console.error('Login error:', error);
       const message = getLoginErrorMessage(error);

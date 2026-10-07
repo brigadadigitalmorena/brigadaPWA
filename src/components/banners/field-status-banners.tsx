@@ -7,6 +7,7 @@ import { db } from '@/lib/db/database';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import { Button } from '@/components/ui/button';
 import { RecorridoBanner } from '@/components/banners/recorrido-banner';
+import { FieldAlertBanners } from '@/components/banners/field-alert-banners';
 
 function goTo(path: string) {
   // Hard navigation so SW / offline soft-nav does not strand the user.
@@ -30,6 +31,7 @@ export function FieldStatusBanners() {
       {/* FIELD-TRACK-1 — first, because an active route is the one thing the
           brigadista must not lose track of. */}
       <RecorridoBanner />
+      <FieldAlertBanners />
 
       {!isOnline && (
         <InlineBanner

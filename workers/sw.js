@@ -274,6 +274,20 @@ self.addEventListener('sync', (event) => {
   }
 });
 
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'brigada-dexie-sync') {
+    event.waitUntil(
+      self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: 'BRIGADA_SYNC_WAKE' });
+          });
+        })
+    );
+  }
+});
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
