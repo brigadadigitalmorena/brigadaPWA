@@ -17,6 +17,7 @@ import {
   type FieldTrackingConfig,
 } from '@/lib/api/field-session.service';
 import { SYNC_PRIORITY } from '@/lib/sync';
+import { planFieldQueueWrite } from '@/lib/sync/field-session-replay-utils';
 
 const EARTH_RADIUS_M = 6_371_000;
 /** Ignore jumps this large: one bad fix must not invent kilometres. */
@@ -627,6 +628,9 @@ class FieldSessionService {
         campaign_id: session.campaign_id ?? null,
         entitlement_id: session.entitlement_id ?? null,
         started_at: session.started_at,
+        status: session.status,
+        ended_at: session.ended_at ?? null,
+        end_reason: session.end_reason ?? null,
         config_snapshot: parseConfig(session.config_json),
         source: 'pwa',
         degraded_reason: session.degraded_reason ?? null,
@@ -651,20 +655,24 @@ class FieldSessionService {
       'UPLOAD_FIELD_SESSION_SAMPLES',
       clientId,
       { client_id: clientId },
-      SYNC_PRIORITY.DEFAULT
+      SYNC_PRIORITY.DEFAULT,
+      { reopenCompleted: true }
     );
   }
 
   /**
-   * One live queue row per (operation, session). Route operations are
-   * "drain whatever is pending now", so re-enqueueing must refresh the
-   * existing row instead of piling up duplicates.
+   * One queue row per (operation, session).
+   *
+   * A completed upsert stays completed when the session snapshot is unchanged,
+   * and a failed row keeps its retry count. New GPS points reopen a completed
+   * sample upload; a live row only refreshes its payload.
    */
   private async enqueue(
     operationType: string,
     entityId: string,
     payload: Record<string, unknown>,
-    priority: number
+    priority: number,
+    options?: { reopenCompleted?: boolean }
   ): Promise<void> {
     const now = new Date().toISOString();
     const payloadJson = JSON.stringify(payload);
@@ -674,11 +682,29 @@ class FieldSessionService {
         (item) =>
           item.operation_type === operationType &&
           item.entity_id === entityId &&
-          ['pending', 'leased', 'retry_wait', 'completed'].includes(item.status)
+          item.status !== 'discarded' &&
+          item.status !== 'cancelled'
       )
       .first();
 
-    if (existing?.id !== undefined) {
+    const plan = planFieldQueueWrite({
+      existingStatus: existing?.status,
+      existingPayload: existing?.payload_json,
+      nextPayload: payloadJson,
+      reopenCompleted: Boolean(options?.reopenCompleted),
+    });
+
+    if (plan === 'skip') return;
+
+    if (plan === 'touch' && existing?.id !== undefined) {
+      await db.sync_queue.update(existing.id, {
+        payload_json: payloadJson,
+        updated_at: now,
+      });
+      return;
+    }
+
+    if (plan === 'reopen' && existing?.id !== undefined) {
       await db.sync_queue.update(existing.id, {
         payload_json: payloadJson,
         status: 'pending',

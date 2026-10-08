@@ -48,6 +48,13 @@ export default function RootLayout({
             __html: `(function(){try{var k=${JSON.stringify(COLOR_SCHEME_STORAGE_KEY)};var v=localStorage.getItem(k);var ids=['pink','blue','purple','green','orange','red','darkElegant','indigo','teal'];if(v&&ids.indexOf(v)!==-1){document.documentElement.setAttribute('data-color-scheme',v);}}catch(e){}})();`,
           }}
         />
+        <Script
+          id="brigada-boot-redirect"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=location.pathname;if(p!=='/'&&p!=='')return;var token=localStorage.getItem('brigada_access_token');var seen=localStorage.getItem('brigada_welcome_seen')==='1';location.replace(token?'/home':(seen?'/login':'/welcome'));}catch(e){}})();`,
+          }}
+        />
         <ThemeProvider>
           <AuthProvider>
             <SyncProvider>

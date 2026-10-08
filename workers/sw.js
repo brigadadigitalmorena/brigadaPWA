@@ -1,5 +1,10 @@
 import { precacheAndRoute } from 'workbox-precaching';
-import { registerRoute, NavigationRoute, setDefaultHandler } from 'workbox-routing';
+import {
+  registerRoute,
+  NavigationRoute,
+  setDefaultHandler,
+  setCatchHandler,
+} from 'workbox-routing';
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
@@ -12,24 +17,21 @@ const API_CACHE = 'api-cache-v4';
 const OFFLINE_TILE_CACHE = 'brigada-offline-tiles-v1';
 const TILE_MANIFEST_CACHE = 'tile-manifest-cache-v1';
 
-// Injected at build time; also seed critical shell URLs for first-visit offline.
-const shellUrls = [
-  '/',
-  '/offline.html',
-  '/manifest.json',
-  '/surveys',
-  '/sync',
-  '/maps',
-  '/recorridos',
-  '/drafts',
-  '/extras',
-];
+// Only immutable files belong in the precache. App HTML (`/`, `/surveys`, …)
+// used to be precached with revision:null, which intercepted navigations before
+// the handler below and, on a cache miss, rejected the fetch. Chrome then shows
+// "Esta página no está disponible" with Recargar; a second load works.
+const precacheUrls = ['/offline.html', '/manifest.json'];
 const injected = self.__WB_MANIFEST || [];
 const precacheEntries = [
   ...injected,
-  ...shellUrls.map((url) => ({ url, revision: null })),
+  ...precacheUrls.map((url) => ({ url, revision: null })),
 ];
 precacheAndRoute(precacheEntries);
+
+// Cap a cold document fetch so a slow phone/network cannot hang until Chrome
+// kills the navigation. Repeat visits return the cached shell immediately.
+const NAV_NETWORK_TIMEOUT_MS = 8000;
 
 /**
  * Always return a real Response for navigations.
@@ -72,64 +74,9 @@ function authOfflineResponse() {
   );
 }
 
-async function navigationHandler({ request }) {
-  const cache = await caches.open(PAGES_CACHE);
-  const url = new URL(request.url);
-  const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
-  const authRoute = isAuthRoute(url.pathname);
-
-  try {
-    const networkResponse = await fetch(request);
-    if (networkResponse && networkResponse.ok) {
-      // Never cache auth pages as shell — wrong HTML on /login causes redirect loops.
-      if (!authRoute) {
-        cache.put(request, networkResponse.clone()).catch(() => {});
-        if (isFillRoute) {
-          cache.put('/surveys/__fill_shell__', networkResponse.clone()).catch(() => {});
-        }
-      }
-      return networkResponse;
-    }
-  } catch {
-    /* offline or network error — fall through to cache */
-  }
-
-  // Auth routes: network-only (+ optional exact /login cache). Never serve / or offline.html.
-  if (authRoute) {
-    const exact =
-      (await cache.match(request)) ||
-      (await cache.match(`${url.origin}${url.pathname}`)) ||
-      (await caches.match(request.url, { ignoreSearch: true }));
-    if (exact) return exact;
-    return authOfflineResponse();
-  }
-
-  const withoutQuery = `${url.origin}${url.pathname}`;
-
-  if (isFillRoute) {
-    const fillShell =
-      (await cache.match(request)) ||
-      (await cache.match(withoutQuery)) ||
-      (await caches.match(request.url, { ignoreSearch: true })) ||
-      (await findCachedFillShell(cache));
-
-    if (fillShell) return fillShell;
-  }
-
-  const cached =
-    (await cache.match(request)) ||
-    (await cache.match(withoutQuery)) ||
-    (await caches.match(request.url, { ignoreSearch: true }));
-
-  if (cached) return cached;
-
-  // Never serve a different app page (especially "/") — wrong HTML at /surveys|/login
-  // remounts Home ("Cargando...") in a redirect loop when prod has warm caches.
-  const offline = await caches.match('/offline.html');
-  if (offline) return offline;
-
+function offlineFallbackResponse() {
   return new Response(
-    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexión</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexión</h1><p>Abre Brigada en línea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
+    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexión</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexión</h1><p>Abre Brigada en línea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><button onclick="location.reload()" style="font-size:1rem;padding:.75rem 1.25rem;border-radius:12px;border:0;background:#FF1B8D;color:#fff;cursor:pointer">Reintentar</button></p></body></html>',
     {
       status: 503,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -137,14 +84,171 @@ async function navigationHandler({ request }) {
   );
 }
 
+async function matchPage(cache, request, url) {
+  const withoutQuery = `${url.origin}${url.pathname}`;
+  return (
+    (await cache.match(request)) ||
+    (await cache.match(withoutQuery)) ||
+    (await cache.match(url.pathname))
+  );
+}
+
+async function matchOfflineShell() {
+  const names = await caches.keys();
+  for (const name of names) {
+    if (name === OFFLINE_TILE_CACHE || name === IMAGES_CACHE) continue;
+    const cache = await caches.open(name);
+    const hit = await cache.match('/offline.html');
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+async function storePage(cache, request, response, isFillRoute) {
+  try {
+    await cache.put(request.url, response.clone());
+    if (isFillRoute) {
+      await cache.put('/surveys/__fill_shell__', response.clone());
+    }
+  } catch {
+    /* quota, opaque response, or a body already in use */
+  }
+}
+
+async function preloadOrFetch(request, event) {
+  if (event && event.preloadResponse) {
+    try {
+      const preloaded = await event.preloadResponse;
+      if (preloaded) return preloaded;
+    } catch {
+      /* preload unavailable */
+    }
+  }
+
+  let timer;
+  try {
+    return await Promise.race([
+      fetch(request),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('nav-timeout')), NAV_NETWORK_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function refreshPageCache(cache, request, event, isFillRoute) {
+  try {
+    let response;
+    if (event && event.preloadResponse) {
+      try {
+        response = await event.preloadResponse;
+      } catch {
+        response = undefined;
+      }
+    }
+    if (!response) {
+      response = await fetch(request.url, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+    }
+    if (response && response.ok) {
+      await storePage(cache, request, response, isFillRoute);
+    }
+  } catch {
+    /* keep the shell already shown */
+  }
+}
+
+async function handleNavigation({ request, event }) {
+  const cache = await caches.open(PAGES_CACHE);
+  const url = new URL(request.url);
+  const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
+  const authRoute = isAuthRoute(url.pathname);
+
+  // Repeat opens (installed app included) paint from the last good document
+  // instead of waiting on the network until Chrome shows an error page.
+  if (!authRoute) {
+    const cached =
+      (await matchPage(cache, request, url)) ||
+      (isFillRoute ? await findCachedFillShell(cache) : undefined);
+    if (cached) {
+      if (event && event.waitUntil) {
+        event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
+      }
+      return cached;
+    }
+  }
+
+  try {
+    const networkResponse = await preloadOrFetch(request, event);
+    if (networkResponse && networkResponse.ok) {
+      // Never cache auth pages as shell — wrong HTML on /login causes redirect loops.
+      if (!authRoute && event && event.waitUntil) {
+        event.waitUntil(storePage(cache, request, networkResponse.clone(), isFillRoute));
+      } else if (!authRoute) {
+        storePage(cache, request, networkResponse.clone(), isFillRoute).catch(() => {});
+      }
+      return networkResponse;
+    }
+  } catch {
+    /* offline, timeout, or network error — fall through to cache */
+  }
+
+  // Auth routes: network-only (+ optional exact cache). Never serve / or offline.html.
+  if (authRoute) {
+    const exact = await matchPage(cache, request, url);
+    if (exact) return exact;
+    return authOfflineResponse();
+  }
+
+  const cached =
+    (await matchPage(cache, request, url)) ||
+    (isFillRoute ? await findCachedFillShell(cache) : undefined);
+  if (cached) return cached;
+
+  // Never serve a different app page (especially "/") — wrong HTML at /surveys|/login
+  // remounts Home ("Cargando...") in a redirect loop when prod has warm caches.
+  const offline = await matchOfflineShell();
+  if (offline) return offline;
+  return offlineFallbackResponse();
+}
+
+async function navigationHandler(args) {
+  try {
+    return await handleNavigation(args);
+  } catch {
+    return offlineFallbackResponse();
+  }
+}
+
 // Single navigation strategy — do NOT also add a raw fetch listener (double respondWith → ERR_FAILED).
 registerRoute(new NavigationRoute(navigationHandler));
 
+// Hashed Next chunks are immutable. CacheFirst keeps the installed app from
+// sitting on "Cargando..." while every script revalidates on a slow network.
 registerRoute(
-  ({ request }) =>
-    request.destination === 'style' ||
-    request.destination === 'script' ||
-    request.destination === 'worker',
+  ({ url, request }) =>
+    request.method === 'GET' && url.pathname.startsWith('/_next/static/'),
+  new CacheFirst({
+    cacheName: STATIC_CACHE,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 300,
+        maxAgeSeconds: 365 * 24 * 60 * 60,
+      }),
+    ],
+  })
+);
+
+registerRoute(
+  ({ url, request }) =>
+    !url.pathname.startsWith('/_next/static/') &&
+    (request.destination === 'style' ||
+      request.destination === 'script' ||
+      request.destination === 'worker'),
   new StaleWhileRevalidate({
     cacheName: STATIC_CACHE,
     plugins: [
@@ -207,6 +311,7 @@ registerRoute(
 registerRoute(
   ({ url, request }) =>
     request.method === 'GET' &&
+    !url.pathname.startsWith('/_next/static/') &&
     (url.pathname.startsWith('/_next/') ||
       request.headers.get('RSC') === '1' ||
       request.headers.get('Next-Router-Prefetch') === '1' ||
@@ -259,6 +364,15 @@ setDefaultHandler(
     networkTimeoutSeconds: 3,
   })
 );
+
+// A thrown strategy (precache miss, NetworkFirst with an empty cache) must not
+// reject the document fetch — that is the Chrome "página no disponible" screen.
+setCatchHandler(async ({ request, event }) => {
+  if (request.mode === 'navigate') {
+    return navigationHandler({ request, event });
+  }
+  return Response.error();
+});
 
 self.addEventListener('sync', (event) => {
   if (event.tag === 'brigada-dexie-sync') {
@@ -334,6 +448,9 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      if (self.registration.navigationPreload) {
+        await self.registration.navigationPreload.enable();
+      }
       const keep = new Set([
         PAGES_CACHE,
         STATIC_CACHE,

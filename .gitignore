@@ -47,3 +47,4 @@ Thumbs.db
 # PWA
 .sw.js
 .service-worker.js
+.env*

@@ -8,6 +8,7 @@ import {
   MAX_SAMPLE_BATCHES_PER_RUN,
   operationRank,
   parseSessionConfig,
+  planFieldQueueWrite,
   toSampleUpload,
 } from '../../src/lib/sync/field-session-replay-utils';
 
@@ -120,6 +121,58 @@ test('a corrupt payload does not cost us the position', () => {
 
   assert.equal(upload.payload, null);
   assert.equal(upload.latitude, 19.4326);
+});
+
+test('a reload does not revive a finished session or reset a failed retry', () => {
+  const payload = '{"status":"active"}';
+  assert.equal(
+    planFieldQueueWrite({
+      existingStatus: 'completed',
+      existingPayload: payload,
+      nextPayload: payload,
+      reopenCompleted: false,
+    }),
+    'skip'
+  );
+  assert.equal(
+    planFieldQueueWrite({
+      existingStatus: 'retry_wait',
+      existingPayload: payload,
+      nextPayload: payload,
+      reopenCompleted: false,
+    }),
+    'touch'
+  );
+  assert.equal(
+    planFieldQueueWrite({
+      existingStatus: 'dead_letter',
+      existingPayload: payload,
+      nextPayload: payload,
+      reopenCompleted: true,
+    }),
+    'skip'
+  );
+});
+
+test('new points or a closed session reopen a completed row', () => {
+  assert.equal(
+    planFieldQueueWrite({
+      existingStatus: 'completed',
+      existingPayload: '{"client_id":"a"}',
+      nextPayload: '{"client_id":"a"}',
+      reopenCompleted: true,
+    }),
+    'reopen'
+  );
+  assert.equal(
+    planFieldQueueWrite({
+      existingStatus: 'completed',
+      existingPayload: '{"status":"active"}',
+      nextPayload: '{"status":"completed"}',
+      reopenCompleted: false,
+    }),
+    'reopen'
+  );
 });
 
 test('a run drains at most the batch window', () => {

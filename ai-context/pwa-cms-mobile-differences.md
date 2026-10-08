@@ -154,7 +154,7 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Mapas: `/mobile/maps`, tiles OSM manifest (proxy Next dedicado)
 - Notificaciones in-app: `/mobile/notifications*`
 - ZIP: `/mobile/zip-lookup/{code}`
-- Recorridos: `/mobile/field-sessions*`
+- Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
 - Redes: `GET /public/app-config` → `social_links` (`/networks`)
 - Reporte: `/report` abre el cliente de correo (el móvil usa el compositor nativo)
@@ -215,7 +215,7 @@ Invariantes del backend (romperlas es pérdida de datos):
 | GPS con pantalla bloqueada | Foreground service | Imposible | Recorridos PWA solo con pestaña visible + WakeLock |
 | Background sync 15 min | `expo-background-task` | Solo con SW / pestaña | Usuario debe abrir la PWA para drenar cola |
 
-Service Worker PWA (`workers/sw.js`): precache de shell (`/surveys`, `/drafts`, `/sync`, …), NetworkFirst para RSC (`next-rsc-cache`, timeout 3 s), fill shell `/surveys/__fill_shell__`. El CMS **no** es PWA.
+Service Worker PWA (`workers/sw.js`): precache solo de `/offline.html` y el manifest (el HTML de la app no se precachea: un miss rechazaba la navegación y Chrome mostraba “página no disponible” hasta Recargar). Navegaciones: shell en caché al instante y revalidación en segundo plano; si no hay caché, red con tope de 8 s y luego offline. `/_next/static` es CacheFirst. RSC sigue en NetworkFirst (`next-rsc-cache`, timeout 3 s). Fill shell `/surveys/__fill_shell__`. `/` redirige a `/home`, `/login` o `/welcome` con un script previo a React para no quedarse en “Cargando...”. El CMS **no** es PWA.
 
 ---
 

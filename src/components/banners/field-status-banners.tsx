@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname, useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, FileEdit, CloudOff } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
@@ -18,7 +19,27 @@ function goTo(path: string) {
  * Field-critical banners: dead-letter, drafts, offline — mobile parity.
  */
 export function FieldStatusBanners() {
-  const { isOnline, deadLetterCount, pendingCount, retryFailed, clearDeadLetter } = useSync();
+  const pathname = usePathname();
+  const router = useRouter();
+  const {
+    isOnline,
+    isSyncing,
+    deadLetterCount,
+    pendingCount,
+    retryFailed,
+    clearDeadLetter,
+    syncNow,
+  } = useSync();
+  const onSyncPage = pathname === '/sync';
+
+  const openSync = () => {
+    if (onSyncPage) return;
+    if (!isOnline) {
+      window.location.assign('/sync');
+      return;
+    }
+    router.push('/sync');
+  };
 
   const draftCount =
     useLiveQuery(
@@ -60,7 +81,7 @@ export function FieldStatusBanners() {
             <Button size="sm" variant="ghost" onClick={clearDeadLetter}>
               Descartar
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => goTo('/sync')}>
+            <Button size="sm" variant="secondary" type="button" onClick={openSync}>
               Ver
             </Button>
           </div>
@@ -91,8 +112,20 @@ export function FieldStatusBanners() {
               {pendingCount !== 1 ? 's' : ''} de sincronizar
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => goTo('/sync')}>
-            Envíos
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            disabled={onSyncPage && isSyncing}
+            onClick={() => {
+              if (onSyncPage) {
+                void syncNow();
+                return;
+              }
+              openSync();
+            }}
+          >
+            {onSyncPage ? (isSyncing ? 'Enviando…' : 'Enviar') : 'Envíos'}
           </Button>
         </div>
       )}
