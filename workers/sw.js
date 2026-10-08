@@ -170,26 +170,39 @@ async function handleNavigation({ request, event }) {
 
   // Repeat opens (installed app included) paint from the last good document
   // instead of waiting on the network until Chrome shows an error page.
-  if (!authRoute) {
-    const cached =
-      (await matchPage(cache, request, url)) ||
-      (isFillRoute ? await findCachedFillShell(cache) : undefined);
-    if (cached) {
-      if (event && event.waitUntil) {
-        event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
-      }
-      return cached;
+  const cachedFirst =
+    (await matchPage(cache, request, url)) ||
+    (!authRoute && isFillRoute ? await findCachedFillShell(cache) : undefined);
+  if (cachedFirst) {
+    if (event && event.waitUntil) {
+      event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
     }
+    return cachedFirst;
   }
 
   try {
     const networkResponse = await preloadOrFetch(request, event);
     if (networkResponse && networkResponse.ok) {
-      // Never cache auth pages as shell — wrong HTML on /login causes redirect loops.
-      if (!authRoute && event && event.waitUntil) {
-        event.waitUntil(storePage(cache, request, networkResponse.clone(), isFillRoute));
-      } else if (!authRoute) {
-        storePage(cache, request, networkResponse.clone(), isFillRoute).catch(() => {});
+      // Cache with a second request. Cloning this response blocks the phone
+      // from painting until the whole HTML body has been copied into Cache Storage.
+      if (event && event.waitUntil) {
+        const pageUrl = request.url;
+        event.waitUntil(
+          (async () => {
+            if (authRoute) return;
+            try {
+              const again = await fetch(pageUrl, {
+                credentials: 'same-origin',
+                cache: 'no-store',
+              });
+              if (again && again.ok) {
+                await storePage(cache, request, again, isFillRoute);
+              }
+            } catch {
+              /* keep the response already shown */
+            }
+          })()
+        );
       }
       return networkResponse;
     }
@@ -438,11 +451,29 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// First install: activate ASAP. Updates wait for SKIP_WAITING from the app toast.
-self.addEventListener('install', () => {
-  if (!self.registration.active) {
-    self.skipWaiting();
-  }
+const INSTALL_SHELLS = ['/home', '/login', '/welcome', '/'];
+
+// First install: warm the screens the home-screen icon opens, then activate.
+// Updates wait for SKIP_WAITING from the app toast.
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(PAGES_CACHE);
+      await Promise.all(
+        INSTALL_SHELLS.map(async (path) => {
+          try {
+            const response = await fetch(path, { credentials: 'same-origin' });
+            if (response.ok) await cache.put(path, response);
+          } catch {
+            /* the next online visit fills this in */
+          }
+        })
+      );
+      if (!self.registration.active) {
+        await self.skipWaiting();
+      }
+    })()
+  );
 });
 
 self.addEventListener('activate', (event) => {

@@ -215,7 +215,7 @@ Invariantes del backend (romperlas es pérdida de datos):
 | GPS con pantalla bloqueada | Foreground service | Imposible | Recorridos PWA solo con pestaña visible + WakeLock |
 | Background sync 15 min | `expo-background-task` | Solo con SW / pestaña | Usuario debe abrir la PWA para drenar cola |
 
-Service Worker PWA (`workers/sw.js`): precache solo de `/offline.html` y el manifest (el HTML de la app no se precachea: un miss rechazaba la navegación y Chrome mostraba “página no disponible” hasta Recargar). Navegaciones: shell en caché al instante y revalidación en segundo plano; si no hay caché, red con tope de 8 s y luego offline. `/_next/static` es CacheFirst. RSC sigue en NetworkFirst (`next-rsc-cache`, timeout 3 s). Fill shell `/surveys/__fill_shell__`. `/` redirige a `/home`, `/login` o `/welcome` con un script previo a React para no quedarse en “Cargando...”. El CMS **no** es PWA.
+Service Worker PWA (`workers/sw.js`): precache solo de `/offline.html` y el manifest (el HTML de la app no se precachea: un miss rechazaba la navegación y Chrome mostraba “página no disponible” hasta Recargar). Navegaciones: shell en caché al instante y revalidación en segundo plano; si no hay caché, red con tope de 8 s y luego offline. `/_next/static` es CacheFirst. RSC sigue en NetworkFirst (`next-rsc-cache`, timeout 3 s). Fill shell `/surveys/__fill_shell__`. El ícono instalado abre `/home` (`start_url`). `/` y un `/home` sin sesión redirigen con un script previo a React para no quedarse en “Cargando...”. El CMS **no** es PWA.
 
 ---
 

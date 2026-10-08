@@ -52,7 +52,7 @@ export default function RootLayout({
           id="brigada-boot-redirect"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=location.pathname;if(p!=='/'&&p!=='')return;var token=localStorage.getItem('brigada_access_token');var seen=localStorage.getItem('brigada_welcome_seen')==='1';location.replace(token?'/home':(seen?'/login':'/welcome'));}catch(e){}})();`,
+            __html: `(function(){try{var p=location.pathname;var token=localStorage.getItem('brigada_access_token');var seen=localStorage.getItem('brigada_welcome_seen')==='1';var guest=seen?'/login':'/welcome';if(p==='/'||p===''){location.replace(token?'/home':guest);return;}if(p==='/home'&&!token)location.replace(guest);}catch(e){}})();`,
           }}
         />
         <ThemeProvider>

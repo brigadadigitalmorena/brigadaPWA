@@ -3388,23 +3388,33 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     const url = new URL(request.url);
     const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
     const authRoute = isAuthRoute(url.pathname);
-    if (!authRoute) {
-      const cached2 = await matchPage(cache, request, url) || (isFillRoute ? await findCachedFillShell(cache) : void 0);
-      if (cached2) {
-        if (event && event.waitUntil) {
-          event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
-        }
-        return cached2;
+    const cachedFirst = await matchPage(cache, request, url) || (!authRoute && isFillRoute ? await findCachedFillShell(cache) : void 0);
+    if (cachedFirst) {
+      if (event && event.waitUntil) {
+        event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
       }
+      return cachedFirst;
     }
     try {
       const networkResponse = await preloadOrFetch(request, event);
       if (networkResponse && networkResponse.ok) {
-        if (!authRoute && event && event.waitUntil) {
-          event.waitUntil(storePage(cache, request, networkResponse.clone(), isFillRoute));
-        } else if (!authRoute) {
-          storePage(cache, request, networkResponse.clone(), isFillRoute).catch(() => {
-          });
+        if (event && event.waitUntil) {
+          const pageUrl = request.url;
+          event.waitUntil(
+            (async () => {
+              if (authRoute) return;
+              try {
+                const again = await fetch(pageUrl, {
+                  credentials: "same-origin",
+                  cache: "no-store"
+                });
+                if (again && again.ok) {
+                  await storePage(cache, request, again, isFillRoute);
+                }
+              } catch {
+              }
+            })()
+          );
         }
         return networkResponse;
       }
@@ -3594,10 +3604,25 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       );
     }
   });
-  self.addEventListener("install", () => {
-    if (!self.registration.active) {
-      self.skipWaiting();
-    }
+  var INSTALL_SHELLS = ["/home", "/login", "/welcome", "/"];
+  self.addEventListener("install", (event) => {
+    event.waitUntil(
+      (async () => {
+        const cache = await caches.open(PAGES_CACHE);
+        await Promise.all(
+          INSTALL_SHELLS.map(async (path) => {
+            try {
+              const response = await fetch(path, { credentials: "same-origin" });
+              if (response.ok) await cache.put(path, response);
+            } catch {
+            }
+          })
+        );
+        if (!self.registration.active) {
+          await self.skipWaiting();
+        }
+      })()
+    );
   });
   self.addEventListener("activate", (event) => {
     event.waitUntil(
