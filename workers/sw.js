@@ -8,7 +8,7 @@ import {
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 
-const PAGES_CACHE = 'pages-cache-v4';
+const PAGES_CACHE = 'pages-cache-v5';
 const STATIC_CACHE = 'static-resources-cache-v4';
 const IMAGES_CACHE = 'images-cache-v4';
 const API_CACHE = 'api-cache-v4';
@@ -29,9 +29,12 @@ const precacheEntries = [
 ];
 precacheAndRoute(precacheEntries);
 
-// Cap a cold document fetch so a slow phone/network cannot hang until Chrome
-// kills the navigation. Repeat visits return the cached shell immediately.
-const NAV_NETWORK_TIMEOUT_MS = 8000;
+// Cap every document fetch, including navigation preload. Awaiting preload
+// without a limit left the installed app on the splash / "Cargando..." until
+// Chrome gave up. Online navigations prefer a fresh document so the HTML and
+// the /_next/static chunks stay a pair; a stale shell hydrates into a spinner
+// that never finishes after a deploy.
+const NAV_NETWORK_TIMEOUT_MS = 4000;
 
 /**
  * Always return a real Response for navigations.
@@ -115,27 +118,36 @@ async function storePage(cache, request, response, isFillRoute) {
   }
 }
 
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('nav-timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 async function preloadOrFetch(request, event) {
   if (event && event.preloadResponse) {
     try {
-      const preloaded = await event.preloadResponse;
+      const preloaded = await withTimeout(
+        event.preloadResponse,
+        NAV_NETWORK_TIMEOUT_MS
+      );
       if (preloaded) return preloaded;
     } catch {
-      /* preload unavailable */
+      /* preload missing, failed, or slower than the cap */
     }
   }
 
-  let timer;
-  try {
-    return await Promise.race([
-      fetch(request),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('nav-timeout')), NAV_NETWORK_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  return withTimeout(fetch(request), NAV_NETWORK_TIMEOUT_MS);
 }
 
 async function refreshPageCache(cache, request, event, isFillRoute) {
@@ -167,47 +179,44 @@ async function handleNavigation({ request, event }) {
   const url = new URL(request.url);
   const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
   const authRoute = isAuthRoute(url.pathname);
+  const browserOffline =
+    typeof self.navigator !== 'undefined' && self.navigator.onLine === false;
 
-  // Repeat opens (installed app included) paint from the last good document
-  // instead of waiting on the network until Chrome shows an error page.
-  const cachedFirst =
-    (await matchPage(cache, request, url)) ||
-    (!authRoute && isFillRoute ? await findCachedFillShell(cache) : undefined);
-  if (cachedFirst) {
-    if (event && event.waitUntil) {
-      event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
-    }
-    return cachedFirst;
-  }
-
-  try {
-    const networkResponse = await preloadOrFetch(request, event);
-    if (networkResponse && networkResponse.ok) {
-      // Cache with a second request. Cloning this response blocks the phone
-      // from painting until the whole HTML body has been copied into Cache Storage.
-      if (event && event.waitUntil) {
-        const pageUrl = request.url;
-        event.waitUntil(
-          (async () => {
-            if (authRoute) return;
-            try {
-              const again = await fetch(pageUrl, {
-                credentials: 'same-origin',
-                cache: 'no-store',
-              });
-              if (again && again.ok) {
-                await storePage(cache, request, again, isFillRoute);
+  // Fresh HTML while online. Serving the cached document first kept the
+  // installed icon on "Cargando...": that shell pointed at chunk URLs the new
+  // deploy no longer has, and the update toast never ran because JS never
+  // hydrated. Offline skips the wait and uses the last good copy.
+  if (!browserOffline) {
+    try {
+      const networkResponse = await preloadOrFetch(request, event);
+      const redirect =
+        networkResponse &&
+        networkResponse.status >= 300 &&
+        networkResponse.status < 400;
+      if (networkResponse && (networkResponse.ok || redirect)) {
+        if (networkResponse.ok && event && event.waitUntil && !authRoute) {
+          const pageUrl = request.url;
+          event.waitUntil(
+            (async () => {
+              try {
+                const again = await fetch(pageUrl, {
+                  credentials: 'same-origin',
+                  cache: 'no-store',
+                });
+                if (again && again.ok) {
+                  await storePage(cache, request, again, isFillRoute);
+                }
+              } catch {
+                /* keep the response already shown */
               }
-            } catch {
-              /* keep the response already shown */
-            }
-          })()
-        );
+            })()
+          );
+        }
+        return networkResponse;
       }
-      return networkResponse;
+    } catch {
+      /* offline, timeout, or network error — fall through to cache */
     }
-  } catch {
-    /* offline, timeout, or network error — fall through to cache */
   }
 
   // Auth routes: network-only (+ optional exact cache). Never serve / or offline.html.
@@ -453,25 +462,35 @@ self.addEventListener('message', (event) => {
 
 const INSTALL_SHELLS = ['/home', '/login', '/welcome', '/'];
 
-// First install: warm the screens the home-screen icon opens, then activate.
-// Updates wait for SKIP_WAITING from the app toast.
+async function warmInstallShells() {
+  const cache = await caches.open(PAGES_CACHE);
+  await Promise.all(
+    INSTALL_SHELLS.map(async (path) => {
+      try {
+        const response = await withTimeout(
+          fetch(path, { credentials: 'same-origin' }),
+          NAV_NETWORK_TIMEOUT_MS
+        );
+        if (response && response.ok) await cache.put(path, response);
+      } catch {
+        /* the next online visit fills this in */
+      }
+    })
+  );
+}
+
+// Do not wait on four document downloads: that kept the home-screen icon on
+// the splash until Chrome killed the navigation. skipWaiting runs even on
+// updates so a phone stuck on the old worker picks this up without the toast
+// (that toast only exists after JavaScript hydrates).
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(PAGES_CACHE);
-      await Promise.all(
-        INSTALL_SHELLS.map(async (path) => {
-          try {
-            const response = await fetch(path, { credentials: 'same-origin' });
-            if (response.ok) await cache.put(path, response);
-          } catch {
-            /* the next online visit fills this in */
-          }
-        })
-      );
-      if (!self.registration.active) {
-        await self.skipWaiting();
-      }
+      await Promise.race([
+        warmInstallShells(),
+        new Promise((resolve) => setTimeout(resolve, NAV_NETWORK_TIMEOUT_MS)),
+      ]);
+      await self.skipWaiting();
     })()
   );
 });
