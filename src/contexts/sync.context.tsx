@@ -18,12 +18,17 @@ import {
   getQueueStats,
 } from '@/lib/services/sync-engine.service';
 import { configureOnlineModeKv } from '@/lib/sync';
+import { describeSyncRun, type SyncRunNotice } from '@/lib/sync/sync-run';
 import { fieldSessionService } from '@/lib/services/field-session.service';
+import { toast } from 'sonner';
+
+const LAST_SYNC_KEY = 'brigada_last_confirmed_sync_at';
 
 interface SyncContextType extends SyncStatus {
   deadLetterCount: number;
   retryWaitCount: number;
-  syncNow: () => Promise<void>;
+  syncNotice: SyncRunNotice | null;
+  syncNow: (source?: 'user') => Promise<void>;
   retryFailed: () => Promise<void>;
   clearDeadLetter: () => Promise<void>;
 }
@@ -41,6 +46,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
+  const [syncNotice, setSyncNotice] = useState<SyncRunNotice | null>(null);
   const [extraStats, setExtraStats] = useState({ deadLetter: 0, retryWait: 0 });
   const isSyncingRef = useRef(false);
 
@@ -76,24 +82,84 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       return dl + fp + failed;
     }, []) ?? 0;
 
-  const syncNow = useCallback(async () => {
-    if (!navigator.onLine || isSyncingRef.current) return;
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LAST_SYNC_KEY);
+      if (stored) setLastSyncedAt(stored);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  const syncNow = useCallback(async (source?: 'user') => {
+    const manual = source === 'user';
+
+    if (!navigator.onLine) {
+      const notice: SyncRunNotice = {
+        tone: 'warning',
+        confirmed: false,
+        message: 'Sin conexión. Los envíos saldrán cuando recuperes red.',
+      };
+      setSyncNotice(notice);
+      setError(notice.message);
+      if (manual) toast.warning(notice.message);
+      return;
+    }
+
+    if (isSyncingRef.current) {
+      if (manual) {
+        toast.message('Ya se está enviando. Espera a que termine.');
+      }
+      return;
+    }
 
     isSyncingRef.current = true;
     setIsSyncing(true);
-    setError(undefined);
+    if (manual) {
+      setSyncNotice(null);
+      setError(undefined);
+    }
 
     try {
       await makeRetryWaitDueNow();
-      await processSyncQueue({
+      const result = await processSyncQueue({
         onProgress: (message) => console.log('Sync progress:', message),
       });
-      setLastSyncedAt(new Date().toISOString());
+      const notice = describeSyncRun(result);
+      const quietIdle = result.attempted === 0 && !result.skippedReason && !manual;
+
+      if (notice.confirmed) {
+        const stamped = new Date().toISOString();
+        setLastSyncedAt(stamped);
+        try {
+          localStorage.setItem(LAST_SYNC_KEY, stamped);
+        } catch {
+          /* private mode */
+        }
+        setSyncNotice(notice);
+        setError(undefined);
+      } else if (!quietIdle) {
+        setSyncNotice(notice);
+        setError(notice.message);
+      }
+
+      if (manual && !quietIdle) {
+        if (notice.tone === 'success') toast.success(notice.message);
+        else if (notice.tone === 'warning') toast.warning(notice.message);
+        else toast.error(notice.message);
+      } else if (manual && quietIdle) {
+        toast.message('No hay envíos pendientes.');
+      }
+
       const stats = await getQueueStats();
       setExtraStats({ deadLetter: stats.deadLetter, retryWait: stats.retryWait });
     } catch (err) {
       console.error('Sync failed:', err);
-      setError(err instanceof Error ? err.message : 'Sync failed');
+      const message = err instanceof Error ? err.message : 'No se pudo sincronizar';
+      const notice: SyncRunNotice = { tone: 'error', confirmed: false, message };
+      setSyncNotice(notice);
+      setError(message);
+      toast.error(message);
     } finally {
       isSyncingRef.current = false;
       setIsSyncing(false);
@@ -116,7 +182,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           lease_until: undefined,
           updated_at: now,
         });
-      await syncNow();
+      await syncNow('user');
     } catch (err) {
       console.error('Retry failed:', err);
     }
@@ -226,6 +292,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         retryWaitCount: extraStats.retryWait,
         lastSyncedAt,
         error,
+        syncNotice,
         syncNow,
         retryFailed,
         clearDeadLetter,

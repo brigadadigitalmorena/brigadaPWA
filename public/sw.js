@@ -3267,7 +3267,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   };
 
   // workers/sw.js
-  var PAGES_CACHE = "pages-cache-v4";
+  var PAGES_CACHE = "pages-cache-v5";
   var STATIC_CACHE = "static-resources-cache-v4";
   var IMAGES_CACHE = "images-cache-v4";
   var API_CACHE = "api-cache-v4";
@@ -3280,7 +3280,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     ...precacheUrls.map((url) => ({ url, revision: null }))
   ];
   precacheAndRoute(precacheEntries);
-  var NAV_NETWORK_TIMEOUT_MS = 8e3;
+  var NAV_NETWORK_TIMEOUT_MS = 4e3;
   async function findCachedFillShell(cache) {
     const shell = await cache.match("/surveys/__fill_shell__");
     if (shell) return shell;
@@ -3341,84 +3341,66 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     } catch {
     }
   }
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("nav-timeout")), ms);
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        }
+      );
+    });
+  }
   async function preloadOrFetch(request, event) {
     if (event && event.preloadResponse) {
       try {
-        const preloaded = await event.preloadResponse;
+        const preloaded = await withTimeout(
+          event.preloadResponse,
+          NAV_NETWORK_TIMEOUT_MS
+        );
         if (preloaded) return preloaded;
       } catch {
       }
     }
-    let timer;
-    try {
-      return await Promise.race([
-        fetch(request),
-        new Promise((_2, reject) => {
-          timer = setTimeout(() => reject(new Error("nav-timeout")), NAV_NETWORK_TIMEOUT_MS);
-        })
-      ]);
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
-  async function refreshPageCache(cache, request, event, isFillRoute) {
-    try {
-      let response;
-      if (event && event.preloadResponse) {
-        try {
-          response = await event.preloadResponse;
-        } catch {
-          response = void 0;
-        }
-      }
-      if (!response) {
-        response = await fetch(request.url, {
-          credentials: "same-origin",
-          cache: "no-store"
-        });
-      }
-      if (response && response.ok) {
-        await storePage(cache, request, response, isFillRoute);
-      }
-    } catch {
-    }
+    return withTimeout(fetch(request), NAV_NETWORK_TIMEOUT_MS);
   }
   async function handleNavigation({ request, event }) {
     const cache = await caches.open(PAGES_CACHE);
     const url = new URL(request.url);
     const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
     const authRoute = isAuthRoute(url.pathname);
-    const cachedFirst = await matchPage(cache, request, url) || (!authRoute && isFillRoute ? await findCachedFillShell(cache) : void 0);
-    if (cachedFirst) {
-      if (event && event.waitUntil) {
-        event.waitUntil(refreshPageCache(cache, request, event, isFillRoute));
-      }
-      return cachedFirst;
-    }
-    try {
-      const networkResponse = await preloadOrFetch(request, event);
-      if (networkResponse && networkResponse.ok) {
-        if (event && event.waitUntil) {
-          const pageUrl = request.url;
-          event.waitUntil(
-            (async () => {
-              if (authRoute) return;
-              try {
-                const again = await fetch(pageUrl, {
-                  credentials: "same-origin",
-                  cache: "no-store"
-                });
-                if (again && again.ok) {
-                  await storePage(cache, request, again, isFillRoute);
+    const browserOffline = typeof self.navigator !== "undefined" && self.navigator.onLine === false;
+    if (!browserOffline) {
+      try {
+        const networkResponse = await preloadOrFetch(request, event);
+        const redirect = networkResponse && networkResponse.status >= 300 && networkResponse.status < 400;
+        if (networkResponse && (networkResponse.ok || redirect)) {
+          if (networkResponse.ok && event && event.waitUntil && !authRoute) {
+            const pageUrl = request.url;
+            event.waitUntil(
+              (async () => {
+                try {
+                  const again = await fetch(pageUrl, {
+                    credentials: "same-origin",
+                    cache: "no-store"
+                  });
+                  if (again && again.ok) {
+                    await storePage(cache, request, again, isFillRoute);
+                  }
+                } catch {
                 }
-              } catch {
-              }
-            })()
-          );
+              })()
+            );
+          }
+          return networkResponse;
         }
-        return networkResponse;
+      } catch {
       }
-    } catch {
     }
     if (authRoute) {
       const exact = await matchPage(cache, request, url);
@@ -3605,22 +3587,29 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
   });
   var INSTALL_SHELLS = ["/home", "/login", "/welcome", "/"];
+  async function warmInstallShells() {
+    const cache = await caches.open(PAGES_CACHE);
+    await Promise.all(
+      INSTALL_SHELLS.map(async (path) => {
+        try {
+          const response = await withTimeout(
+            fetch(path, { credentials: "same-origin" }),
+            NAV_NETWORK_TIMEOUT_MS
+          );
+          if (response && response.ok) await cache.put(path, response);
+        } catch {
+        }
+      })
+    );
+  }
   self.addEventListener("install", (event) => {
     event.waitUntil(
       (async () => {
-        const cache = await caches.open(PAGES_CACHE);
-        await Promise.all(
-          INSTALL_SHELLS.map(async (path) => {
-            try {
-              const response = await fetch(path, { credentials: "same-origin" });
-              if (response.ok) await cache.put(path, response);
-            } catch {
-            }
-          })
-        );
-        if (!self.registration.active) {
-          await self.skipWaiting();
-        }
+        await Promise.race([
+          warmInstallShells(),
+          new Promise((resolve) => setTimeout(resolve, NAV_NETWORK_TIMEOUT_MS))
+        ]);
+        await self.skipWaiting();
       })()
     );
   });

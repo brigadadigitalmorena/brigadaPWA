@@ -8,7 +8,6 @@ import { BottomNav } from '@/components/common/bottom-nav';
 import { SyncIndicator } from '@/components/sync/sync-indicator';
 import { NotificationBell } from '@/components/common/notification-bell';
 import { UserMenu } from '@/components/common/user-menu';
-import { InstallPrompt } from '@/components/common/install-prompt';
 import { LoadingState } from '@/components/common/loading-state';
 import { FieldStatusBanners } from '@/components/banners/field-status-banners';
 import { ObservabilityBootstrap } from '@/components/common/observability-bootstrap';
@@ -51,7 +50,6 @@ export default function DashboardLayout({
     return (
       <div className="flex h-screen overflow-hidden bg-background">
         <main className="flex-1 overflow-hidden">{children}</main>
-        <InstallPrompt />
         <ObservabilityBootstrap />
       </div>
     );
@@ -92,7 +90,6 @@ export default function DashboardLayout({
         <BottomNav />
       </div>
 
-      <InstallPrompt />
       <ObservabilityBootstrap />
     </div>
   );

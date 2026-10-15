@@ -6,6 +6,7 @@ import {
   acquireProcessLock,
   releaseProcessLock,
   forceReleaseStaleLocks,
+  reclaimInFlightQueueItems,
   getLeaseOwner,
   getLeaseDurationMs,
 } from '@/lib/db/database';
@@ -41,6 +42,7 @@ import {
 } from '@/lib/sync/field-session-replay-utils';
 import { getApiErrorMessage } from '@/lib/utils/api-errors';
 import { getAccessToken, loadTokensFromStorage } from '@/lib/api/client';
+import type { SyncRunResult } from '@/lib/sync/sync-run';
 
 interface SyncResult {
   success: boolean;
@@ -93,27 +95,66 @@ function resolveNumericQuestionId(
 /**
  * Process due items in the sync queue (pending + retry_wait).
  */
-export async function processSyncQueue(options?: SyncEngineOptions): Promise<void> {
+function emptyRun(
+  skippedReason?: SyncRunResult['skippedReason']
+): SyncRunResult {
+  return { attempted: 0, succeeded: 0, failed: 0, skippedReason, errors: [] };
+}
+
+const SYNC_LOCK_NAME = 'brigada-sync-queue';
+
+/**
+ * One sender at a time. Web Locks drop when the page dies, so a reload can
+ * send immediately. The IndexedDB lock covers browsers without that API.
+ */
+async function withSyncLock<T>(fn: () => Promise<T>): Promise<T | 'busy'> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (locks?.request) {
+    let ran = false;
+    let value = undefined as T;
+    await locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock) => {
+      if (!lock) return;
+      ran = true;
+      value = await fn();
+    });
+    return ran ? value : 'busy';
+  }
+
+  await forceReleaseStaleLocks();
+  const locked = await acquireProcessLock();
+  if (!locked) return 'busy';
+  try {
+    return await fn();
+  } finally {
+    await releaseProcessLock();
+  }
+}
+
+export async function processSyncQueue(options?: SyncEngineOptions): Promise<SyncRunResult> {
   // Without a token every request is rejected by the BFF proxy before it even
   // reaches the API. Draining the queue then would only burn retries and push
   // rows into a long backoff, so wait for the session instead of failing.
   loadTokensFromStorage();
   if (!getAccessToken()) {
     options?.onProgress?.('Sesión no disponible; se reintentará al iniciar sesión');
-    return;
+    return emptyRun('no_session');
   }
 
-  await forceReleaseStaleLocks();
-
-  const locked = await acquireProcessLock();
-  if (!locked) {
+  const outcome = await withSyncLock(() => drainSyncQueue(options));
+  if (outcome === 'busy') {
     options?.onProgress?.('Otra sincronización está en curso');
-    return;
+    return emptyRun('busy');
   }
+  return outcome;
+}
 
-  try {
-    const now = new Date().toISOString();
-    const candidates = await db.sync_queue
+async function drainSyncQueue(options?: SyncEngineOptions): Promise<SyncRunResult> {
+  await forceReleaseStaleLocks();
+  await reclaimInFlightQueueItems();
+
+  const summary = emptyRun();
+  const now = new Date().toISOString();
+  const candidates = await db.sync_queue
       .filter(
         (item) =>
           (item.status === 'pending' || item.status === 'retry_wait') &&
@@ -133,6 +174,8 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
 
       const leased = await leaseItem(item);
       if (!leased) continue;
+
+      summary.attempted += 1;
 
       let result: SyncResult;
       try {
@@ -167,12 +210,20 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
       }
 
       await handleSyncResult(item.id, item, result, options);
+      if (result.success) {
+        summary.succeeded += 1;
+      } else if (result.errorCode === 'IN_FLIGHT') {
+        summary.attempted -= 1;
+      } else {
+        summary.failed += 1;
+        if (result.error && summary.errors.length < 3) {
+          summary.errors.push(result.error);
+        }
+      }
     }
 
-    await recoverOrphanUploads(options);
-  } finally {
-    await releaseProcessLock();
-  }
+  await recoverOrphanUploads(options);
+  return summary;
 }
 
 async function leaseItem(item: SyncQueue): Promise<boolean> {
@@ -340,6 +391,17 @@ async function processResponseItem(
         error: 'Sesión expirada. Inicia sesión e intenta de nuevo.',
         errorCode: 'AUTH_REQUIRED',
         permanent: false,
+      };
+    }
+    if (axiosErr.response?.status === 403) {
+      return {
+        success: false,
+        error: getApiErrorMessage(
+          err,
+          'No tienes permiso para enviar esta encuesta.'
+        ),
+        errorCode: 'FORBIDDEN',
+        permanent: true,
       };
     }
     if (axiosErr.response?.status === 422 || axiosErr.response?.status === 400) {
@@ -905,12 +967,12 @@ async function loadLocalFileBlob(localFile: LocalFile): Promise<Blob> {
   throw new Error('No se encontró el contenido del archivo');
 }
 
-/** Make all retry_wait items due immediately (reconnect / manual). */
+/** Make queued items due immediately (reconnect / manual / retry_wait). */
 export async function makeRetryWaitDueNow(): Promise<void> {
   const now = new Date().toISOString();
   await db.sync_queue
     .where('status')
-    .equals('retry_wait')
+    .anyOf(['pending', 'retry_wait'])
     .modify({ next_retry_at: now, updated_at: now });
 }
 

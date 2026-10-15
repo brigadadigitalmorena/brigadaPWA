@@ -4,35 +4,35 @@
 
 ### 1. **Auto-Instalación de PWA**
 
-La PWA ahora se instala automáticamente usando un prompt personalizado que aparece después de 3 segundos de que el usuario ingrese al dashboard.
+Al entrar desde el navegador aparece un cartel corto. En Chrome y Edge, el botón Instalar abre el diálogo nativo; al confirmar, el navegador instala la app y la abre en `/home`. En iPhone y iPad el cartel indica Compartir → Agregar a inicio, porque Safari no permite instalar desde la página.
 
 #### Características:
-- ✅ **Prompt personalizado**: Modal atractivo con beneficios de la instalación
-- ✅ **Smart timing**: Aparece después de 3 segundos para no interrumpir
-- ✅ **No molestar**: Si el usuario lo descarta, no aparece de nuevo por 24 horas
-- ✅ **Límite de veces**: Después de 3 descartes, espera 7 días
-- ✅ **Detección automática**: No aparece si ya está instalada
+- ✅ **Cartel corto**: Barra fija, visible al entrar en el navegador
+- ✅ **Un toque**: Instalar lanza el diálogo del navegador y, si se acepta, abre la app
+- ✅ **No molestar**: Si el usuario lo cierra, no aparece de nuevo por 24 horas
+- ✅ **Límite de veces**: Después de 3 cierres, espera 7 días
+- ✅ **Detección automática**: No aparece si ya está instalada ni dentro de una encuesta
 
 #### Archivos creados:
 - `src/hooks/use-install-prompt.ts` - Hook para manejar el evento de instalación
-- `src/components/common/install-prompt.tsx` - Componente modal de instalación
+- `src/components/common/install-prompt.tsx` - Cartel de instalación
 
 #### Cómo funciona:
 
 1. **Captura del evento**: El hook captura el evento `beforeinstallprompt` del navegador
 2. **Detección de instalación**: Verifica si la app ya está instalada usando `display-mode: standalone`
-3. **Timing inteligente**: 
-   - Espera 3 segundos antes de mostrar el prompt
-   - No aparece si el usuario lo descartó en las últimas 24 horas
-   - Después de 3 descartes, espera 7 días
-4. **Instalación con un clic**: El usuario hace clic en "Instalar app" y el navegador muestra el prompt nativo
+3. **Timing**:
+   - El cartel aparece al entrar desde el navegador
+   - No aparece si el usuario lo cerró en las últimas 24 horas
+   - Después de 3 cierres, espera 7 días
+4. **Instalación con un toque**: Instalar abre el diálogo nativo. Si se acepta, el navegador instala la app y la abre
 
 #### Lógica de descartes:
 
 ```typescript
 // Guardado en localStorage
-- install_prompt_dismissed_at: timestamp del último descarte
-- install_prompt_dismissed_count: número de veces descartado
+- install_banner_dismissed_at: timestamp del último cierre
+- install_banner_dismissed_count: número de veces cerrado
 
 // Reglas:
 - Si descartó hace menos de 24 horas → no mostrar
@@ -89,19 +89,19 @@ POST /mobile/token/refresh
    - O: `encargado@brigada.com` / `encargado123`
    - O: `brigadista@brigada.com` / `brigadista123`
 
-4. **Esperar el prompt:**
-   - Después de 3 segundos en el dashboard, aparecerá el modal de instalación
-   - Haz clic en "Instalar app"
-   - El navegador mostrará el prompt nativo de instalación
+4. **Cartel de instalación:**
+   - Al entrar desde el navegador aparece el cartel
+   - Pulsa "Instalar"
+   - El navegador muestra su diálogo; al aceptar, instala la app y la abre
 
-5. **Probar descartes:**
-   - Haz clic en "Ahora no"
+5. **Probar el cierre:**
+   - Pulsa la X del cartel
    - Recarga la página
-   - El prompt NO debe aparecer de nuevo inmediatamente
+   - El cartel no debe volver de inmediato
    - Para probar de nuevo, limpia localStorage:
      ```javascript
-     localStorage.removeItem('install_prompt_dismissed_at');
-     localStorage.removeItem('install_prompt_dismissed_count');
+     localStorage.removeItem('install_banner_dismissed_at');
+     localStorage.removeItem('install_banner_dismissed_count');
      ```
 
 ### Prueba de Credenciales Mobile:
@@ -179,37 +179,15 @@ if (hoursSinceDismissed < 24 || (count >= 3 && hoursSinceDismissed < 168)) {
 Si quieres que el usuario instale manualmente:
 
 ```typescript
-// En src/app/(dashboard)/layout.tsx, comenta o elimina:
+// En src/app/layout.tsx, comenta o elimina:
 // <InstallPrompt />
 ```
 
 Y agrega un botón manual en el sidebar o en la página de configuración.
 
-## 🎨 Personalización del Modal
+## 🎨 Personalización del cartel
 
-El modal de instalación usa shadcn/ui y se puede personalizar fácilmente:
-
-### Cambiar el diseño:
-
-Edita `src/components/common/install-prompt.tsx`:
-
-```typescript
-<DialogContent className="sm:max-w-md">
-  {/* Cambia el contenido aquí */}
-  <DialogHeader>
-    <DialogTitle>...</DialogTitle>
-    <DialogDescription>...</DialogDescription>
-  </DialogHeader>
-  
-  <div className="py-4">
-    {/* Cambia los beneficios aquí */}
-  </div>
-  
-  <DialogFooter>
-    {/* Cambia los botones aquí */}
-  </DialogFooter>
-</DialogContent>
-```
+El cartel vive en `src/components/common/install-prompt.tsx`. El texto, el botón Instalar y la posición se editan ahí.
 
 ### Cambiar los iconos:
 

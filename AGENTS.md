@@ -97,6 +97,7 @@ await db.transaction('rw', db.responses, db.sync_queue, async () => {
 - Process queue when online
 - Exponential backoff for retries
 - Dead letter queue for permanent failures
+- “Último confirmado” advances only after the server accepts at least one item. A tap on Enviar / Sincronizar ahora reports that result in place; a lock or an empty attempt does not move the clock.
 
 ### Service Worker
 

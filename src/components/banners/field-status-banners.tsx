@@ -29,6 +29,8 @@ export function FieldStatusBanners() {
     retryFailed,
     clearDeadLetter,
     syncNow,
+    error: syncError,
+    syncNotice,
   } = useSync();
   const onSyncPage = pathname === '/sync';
 
@@ -103,6 +105,17 @@ export function FieldStatusBanners() {
         </div>
       )}
 
+      {syncNotice?.confirmed && (
+        <InlineBanner
+          variant={syncNotice.tone === 'warning' ? 'warning' : 'success'}
+          message={syncNotice.message}
+        />
+      )}
+
+      {syncError && (
+        <InlineBanner variant="error" message={syncError} />
+      )}
+
       {isOnline && pendingCount > 0 && (deadLetterCount ?? 0) === 0 && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3">
           <CloudOff className="h-5 w-5 text-primary shrink-0" />
@@ -119,7 +132,7 @@ export function FieldStatusBanners() {
             disabled={onSyncPage && isSyncing}
             onClick={() => {
               if (onSyncPage) {
-                void syncNow();
+                void syncNow('user');
                 return;
               }
               openSync();

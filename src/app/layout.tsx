@@ -7,6 +7,7 @@ import { SyncProvider } from '@/contexts/sync.context';
 import { ThemeProvider } from '@/contexts/theme-context';
 import { Toaster } from '@/components/ui/sonner';
 import { ServiceWorkerRegistrar } from '@/components/common/service-worker-registrar';
+import { InstallPrompt } from '@/components/common/install-prompt';
 import { COLOR_SCHEME_STORAGE_KEY } from '@/lib/color-schemes';
 
 const geistSans = Geist({
@@ -59,6 +60,7 @@ export default function RootLayout({
           <AuthProvider>
             <SyncProvider>
               {children}
+              <InstallPrompt />
               <Toaster />
               <ServiceWorkerRegistrar />
             </SyncProvider>

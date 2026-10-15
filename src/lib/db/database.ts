@@ -367,8 +367,23 @@ export const db = new BrigadaDatabase();
 export const DB_VERSION = 7;
 
 const PROCESS_LOCK_KEY = 'sync_process_lock';
-const LEASE_OWNER = `pwa-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : 'local'}`;
+const LEASE_OWNER_STORAGE_KEY = 'brigada_sync_owner';
 const LEASE_MS = 120_000;
+
+function resolveLeaseOwner(): string {
+  if (typeof window === 'undefined') return 'pwa-server';
+  try {
+    const existing = sessionStorage.getItem(LEASE_OWNER_STORAGE_KEY);
+    if (existing) return existing;
+    const created = `pwa-${crypto.randomUUID().slice(0, 8)}`;
+    sessionStorage.setItem(LEASE_OWNER_STORAGE_KEY, created);
+    return created;
+  } catch {
+    return `pwa-${crypto.randomUUID().slice(0, 8)}`;
+  }
+}
+
+const LEASE_OWNER = resolveLeaseOwner();
 
 export function getLeaseOwner(): string {
   return LEASE_OWNER;
@@ -467,6 +482,25 @@ export async function releaseProcessLock(): Promise<void> {
   }
 }
 
+/**
+ * Return leased rows to the queue. Call only while this tab holds the sync
+ * lock: a crash used to leave items as `leased` for the rest of the lease,
+ * and the sender skipped them while the clock still moved.
+ */
+export async function reclaimInFlightQueueItems(): Promise<void> {
+  const nowIso = new Date().toISOString();
+  await db.sync_queue
+    .where('status')
+    .anyOf(['leased', 'syncing'])
+    .modify((row) => {
+      row.status = 'pending';
+      row.next_retry_at = nowIso;
+      row.updated_at = nowIso;
+      delete row.lease_owner;
+      delete row.lease_until;
+    });
+}
+
 export async function forceReleaseStaleLocks(): Promise<void> {
   const now = Date.now();
   const existing = await kvGet(PROCESS_LOCK_KEY);
@@ -478,19 +512,6 @@ export async function forceReleaseStaleLocks(): Promise<void> {
       }
     } catch {
       await kvRemove(PROCESS_LOCK_KEY);
-    }
-  }
-
-  const leased = await db.sync_queue.where('status').equals('leased').toArray();
-  for (const item of leased) {
-    if (item.id === undefined) continue;
-    if (!item.lease_until || item.lease_until <= new Date(now).toISOString()) {
-      await db.sync_queue.update(item.id, {
-        status: 'pending',
-        lease_owner: undefined,
-        lease_until: undefined,
-        updated_at: new Date().toISOString(),
-      });
     }
   }
 
