@@ -55,7 +55,45 @@ export async function deleteDraft(responseId: string): Promise<boolean> {
     }
   );
 
-  // Best-effort outside tx (same table already cleared; safe if redundant).
   await deleteResponseBlobs(responseId).catch(() => undefined);
   return true;
+}
+
+export async function reopenForCorrection(
+  queueId: string,
+  responseId: string
+): Promise<{ surveyId: string } | null> {
+  const response = await db.responses
+    .where('response_id')
+    .equals(responseId)
+    .first();
+  if (!response) return null;
+  if (response.sync_status === 'synced') return null;
+
+  await db.transaction('rw', db.responses, db.sync_queue, async () => {
+    const existing = await db.responses
+      .where('response_id')
+      .equals(responseId)
+      .first();
+    if (!existing || existing.id === undefined) return;
+
+    await db.responses.update(existing.id, {
+      status: 'draft',
+      sync_status: 'pending',
+      completed_at: undefined,
+      immutable: false,
+      sync_error: 'Corrección pendiente',
+      updated_at: new Date().toISOString(),
+    });
+
+    const queueItem = await db.sync_queue.where('queue_id').equals(queueId).first();
+    if (
+      queueItem?.id !== undefined &&
+      (queueItem.status === 'dead_letter' || queueItem.status === 'failed_permanent')
+    ) {
+      await db.sync_queue.delete(queueItem.id);
+    }
+  });
+
+  return { surveyId: response.survey_id };
 }

@@ -5,7 +5,12 @@ import { ScanBarcode } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import {
+  barcodePattern,
+  matchesBarcodePattern,
+} from '@/lib/forms/field-rules';
 import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
+import { BarcodeScanner } from './barcode-scanner';
 import { QuestionRendererProps } from './question-renderer';
 
 export function BarcodeQuestion({
@@ -16,41 +21,22 @@ export function BarcodeQuestion({
   error,
 }: QuestionRendererProps) {
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const isHidden = normalizeQuestionType(question.question_type) === 'barcode_hidden';
+  const pattern = barcodePattern(question.validation_rules);
+  const current = typeof value === 'string' ? value : '';
+  const patternMismatch =
+    current.length > 0 && !matchesBarcodePattern(current, pattern);
 
-  const handleScan = async () => {
-    setScanError(null);
-
-    if (!('BarcodeDetector' in window)) {
-      setScanError('Escaneo no disponible en este navegador. Ingresa el código manualmente.');
+  const acceptCode = (next: string) => {
+    if (!matchesBarcodePattern(next, pattern)) {
+      setScanError('El código no cumple el formato esperado.');
+      setScanning(false);
       return;
     }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      await video.play();
-
-      const detector = new (window as Window & {
-        BarcodeDetector: new (opts: { formats: string[] }) => {
-          detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
-        };
-      }).BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13'] });
-
-      const codes = await detector.detect(video);
-      stream.getTracks().forEach((track) => track.stop());
-
-      if (codes[0]?.rawValue) {
-        onChange(codes[0].rawValue);
-      } else {
-        setScanError('No se detectó ningún código. Intenta de nuevo o escríbelo.');
-      }
-    } catch {
-      setScanError('No se pudo acceder a la cámara. Ingresa el código manualmente.');
-    }
+    setScanError(null);
+    setScanning(false);
+    onChange(next);
   };
 
   return (
@@ -68,8 +54,11 @@ export function BarcodeQuestion({
         <Input
           type={isHidden ? 'password' : 'text'}
           inputSize="mobile"
-          value={typeof value === 'string' ? value : ''}
-          onChange={(e) => onChange(e.target.value)}
+          value={current}
+          onChange={(e) => {
+            setScanError(null);
+            onChange(e.target.value);
+          }}
           placeholder="Código escaneado o manual"
           disabled={disabled}
           aria-invalid={!!error}
@@ -79,7 +68,7 @@ export function BarcodeQuestion({
           type="button"
           variant="outline"
           size="mobile"
-          onClick={handleScan}
+          onClick={() => setScanning(true)}
           disabled={disabled}
           aria-label="Escanear código"
         >
@@ -87,8 +76,22 @@ export function BarcodeQuestion({
         </Button>
       </div>
 
+      {patternMismatch && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          El código no cumple el formato esperado.
+        </p>
+      )}
       {scanError && <p className="text-sm text-amber-600 dark:text-amber-400">{scanError}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {scanning && (
+        <BarcodeScanner
+          onDetect={acceptCode}
+          onClose={(message) => {
+            setScanning(false);
+            if (message) setScanError(message);
+          }}
+        />
+      )}
     </div>
   );
 }

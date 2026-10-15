@@ -43,6 +43,7 @@ export async function registerServiceWorker() {
       type: 'WARM_URLS',
       urls: [
         '/',
+        '/home',
         '/surveys',
         '/sync',
         '/maps',

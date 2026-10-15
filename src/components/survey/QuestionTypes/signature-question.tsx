@@ -1,11 +1,15 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import SignaturePad from 'signature_pad';
-import { Eraser } from 'lucide-react';
+import { Eraser, Maximize2, Minimize2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
 import { saveFileBlob, deleteFileBlob } from '@/lib/services/file-blob.service';
+import {
+  signatureStrokeLimits,
+  strokeCountAllowed,
+} from '@/lib/forms/field-rules';
 import { QuestionRendererProps } from './question-renderer';
 
 export function SignatureQuestion({
@@ -20,10 +24,24 @@ export function SignatureQuestion({
   const questionKey = question.question_key || question.id.toString();
   const signatureFiles = files[questionKey] || [];
   const hasSignature = signatureFiles.length > 0;
+  const { min: minStrokes, max: maxStrokes } = signatureStrokeLimits(
+    question.validation_rules
+  );
+  const [fullscreen, setFullscreen] = useState(false);
+  const [strokeError, setStrokeError] = useState<string | null>(null);
 
   const saveSignature = useCallback(() => {
     const pad = padRef.current;
     if (!pad || pad.isEmpty()) return;
+    const strokeErrorMessage = strokeCountAllowed(pad.toData().length, {
+      min: minStrokes,
+      max: maxStrokes,
+    });
+    if (strokeErrorMessage) {
+      setStrokeError(strokeErrorMessage);
+      return;
+    }
+    setStrokeError(null);
 
     const dataUrl = pad.toDataURL('image/png');
     fetch(dataUrl)
@@ -54,7 +72,7 @@ export function SignatureQuestion({
           },
         ]);
       });
-  }, [question.id, questionKey, responseId, setFiles]);
+  }, [maxStrokes, minStrokes, question.id, questionKey, responseId, setFiles]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -109,6 +127,10 @@ export function SignatureQuestion({
     };
   }, [saveSignature]);
 
+  useEffect(() => {
+    window.dispatchEvent(new Event('resize'));
+  }, [fullscreen]);
+
   const clearSignature = async () => {
     padRef.current?.clear();
     signatureFiles.forEach((f) => {
@@ -134,15 +156,21 @@ export function SignatureQuestion({
         <p className="text-sm text-muted-foreground">{question.ui.helper_text}</p>
       )}
 
-      <div className="rounded-xl border border-input bg-card overflow-hidden touch-none">
+      <div
+        className={
+          fullscreen
+            ? 'fixed inset-0 z-50 flex flex-col bg-background p-4'
+            : 'rounded-xl border border-input bg-card overflow-hidden touch-none'
+        }
+      >
         <canvas
           ref={canvasRef}
-          className="w-full h-40 block cursor-crosshair"
+          className={fullscreen ? 'min-h-0 w-full flex-1 cursor-crosshair' : 'block h-40 w-full cursor-crosshair'}
           aria-label="Área para firmar"
         />
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Button
           type="button"
           variant="outline"
@@ -152,10 +180,21 @@ export function SignatureQuestion({
           <Eraser className="h-4 w-4 mr-2" />
           Limpiar
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="mobile"
+          onClick={() => setFullscreen((current) => !current)}
+        >
+          {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          {fullscreen ? 'Cerrar' : 'Pantalla completa'}
+        </Button>
         {hasSignature && (
           <span className="text-sm text-muted-foreground">Firma capturada</span>
         )}
       </div>
+
+      {strokeError && <p className="text-sm text-amber-600 dark:text-amber-400">{strokeError}</p>}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>

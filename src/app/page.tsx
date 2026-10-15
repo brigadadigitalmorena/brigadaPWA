@@ -12,9 +12,12 @@ export default function Home() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        router.replace('/surveys');
+        router.replace('/home');
       } else {
-        router.replace('/login');
+        const seen =
+          typeof window !== 'undefined' &&
+          localStorage.getItem('brigada_welcome_seen') === '1';
+        router.replace(seen ? '/login' : '/welcome');
       }
     }
   }, [isAuthenticated, isLoading, router]);

@@ -87,6 +87,43 @@ export function toSampleUpload(sample: FieldSessionSample): FieldSampleUpload {
   };
 }
 
+export type FieldQueuePlan = 'insert' | 'skip' | 'reopen' | 'touch';
+
+const LIVE_QUEUE_STATUSES = new Set(['pending', 'leased', 'syncing', 'retry_wait']);
+const TERMINAL_QUEUE_STATUSES = new Set(['failed', 'failed_permanent', 'dead_letter']);
+
+/**
+ * Decide what a route re-enqueue may do to an existing sync row.
+ *
+ * A finished session upsert must stay finished when the snapshot did not
+ * change, and a failed row must keep its retry count. New GPS points are the
+ * only reason to reopen a completed sample upload.
+ */
+export function planFieldQueueWrite(args: {
+  existingStatus?: string | null;
+  existingPayload?: string | null;
+  nextPayload: string;
+  reopenCompleted: boolean;
+}): FieldQueuePlan {
+  const status = args.existingStatus;
+  if (!status || status === 'discarded' || status === 'cancelled') {
+    return 'insert';
+  }
+  if (status === 'completed') {
+    if (!args.reopenCompleted && args.existingPayload === args.nextPayload) {
+      return 'skip';
+    }
+    return 'reopen';
+  }
+  if (TERMINAL_QUEUE_STATUSES.has(status)) {
+    return 'skip';
+  }
+  if (LIVE_QUEUE_STATUSES.has(status)) {
+    return 'touch';
+  }
+  return 'insert';
+}
+
 function parseSamplePayload(raw: string | undefined): Record<string, unknown> | null {
   if (!raw) return null;
   try {

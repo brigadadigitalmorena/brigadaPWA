@@ -16,8 +16,36 @@ import {
   splitByGeometry,
 } from '@/lib/maps/geojson';
 import { createBasemapStyle, resizeMapWhenReady } from '@/lib/maps/basemap-style';
+import {
+  gisSampleIntervalMs,
+  readTrack,
+  type GisTrack,
+} from '@/lib/forms/field-rules';
+import { GisAutoTrack } from './gis-auto-track';
 
 type GisPoint = { lat: number; lng: number };
+
+function readGisPoints(value: unknown): GisPoint[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const point = item as { lat?: number; lng?: number };
+      if (typeof point.lat !== 'number' || typeof point.lng !== 'number') return [];
+      return [{ lat: point.lat, lng: point.lng }];
+    });
+  }
+  const track = readTrack(value);
+  if (track.coordinates.length > 0) {
+    return track.coordinates.map(([lng, lat]) => ({ lat, lng }));
+  }
+  if (value && typeof value === 'object' && 'lat' in value) {
+    const point = value as { lat?: number; lng?: number };
+    if (typeof point.lat === 'number' && typeof point.lng === 'number') {
+      return [{ lat: point.lat, lng: point.lng }];
+    }
+  }
+  return [];
+}
 
 function answerGeoJson(
   points: GisPoint[],
@@ -59,28 +87,39 @@ export function GisQuestion({
   disabled,
   error,
 }: QuestionRendererProps) {
-  const points = useMemo<Array<{ lat: number; lng: number }>>(
-    () =>
-      Array.isArray(value)
-        ? (value as Array<{ lat: number; lng: number }>)
-        : value && typeof value === 'object' && 'lat' in (value as object)
-          ? [value as { lat: number; lng: number }]
-          : [],
-    [value]
-  );
+  const points = useMemo(() => readGisPoints(value), [value]);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const onChangeRef = useRef(onChange);
   const pointsRef = useRef(points);
+  const valueRef = useRef(value);
   const [mapError, setMapError] = useState<string | null>(null);
 
   const normalizedType = normalizeQuestionType(question.question_type);
+  const isTracking =
+    normalizedType === 'gis_tracking_manual' ||
+    normalizedType === 'gis_tracking_auto';
   const isMultiPoint =
     normalizedType === 'gis_line' ||
     normalizedType === 'gis_polygon' ||
-    normalizedType === 'gis_tracking_manual' ||
-    normalizedType === 'gis_tracking_auto';
+    isTracking;
+
+  const commitPoints = (next: GisPoint[]) => {
+    if (isTracking) {
+      const previous = readTrack(value);
+      const track: GisTrack = {
+        type: 'LineString',
+        coordinates: next.map((point) => [point.lng, point.lat]),
+        timestamps: next.map(
+          (_, index) => previous.timestamps[index] ?? new Date().toISOString()
+        ),
+      };
+      onChange(track);
+      return;
+    }
+    onChange(isMultiPoint ? next : (next[0] ?? null));
+  };
   const operationalRows = useLiveQuery(async () => {
     const map = await staticMapsRepository.getFirstMap();
     return map ? staticMapsRepository.getFeatures(map.map_id) : [];
@@ -96,7 +135,8 @@ export function GisQuestion({
 
   useEffect(() => {
     pointsRef.current = points;
-  }, [points]);
+    valueRef.current = value;
+  }, [points, value]);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,11 +243,21 @@ export function GisQuestion({
         map.on('click', (event) => {
           if (disabled) return;
           const nextPoint = { lat: event.lngLat.lat, lng: event.lngLat.lng };
-          onChangeRef.current(
-            isMultiPoint
-              ? [...pointsRef.current, nextPoint]
-              : nextPoint
-          );
+          const next = isMultiPoint
+            ? [...pointsRef.current, nextPoint]
+            : [nextPoint];
+          if (isTracking) {
+            const previous = readTrack(valueRef.current);
+            onChangeRef.current({
+              type: 'LineString',
+              coordinates: next.map((point) => [point.lng, point.lat]),
+              timestamps: next.map(
+                (_, index) => previous.timestamps[index] ?? new Date().toISOString()
+              ),
+            });
+            return;
+          }
+          onChangeRef.current(isMultiPoint ? next : next[0]);
         });
 
         mapRef.current = map;
@@ -224,7 +274,7 @@ export function GisQuestion({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [disabled, isMultiPoint, normalizedType]);
+  }, [disabled, isMultiPoint, isTracking, normalizedType]);
 
   useEffect(() => {
     pointsRef.current = points;
@@ -257,7 +307,7 @@ export function GisQuestion({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
-        onChange(isMultiPoint ? [...points, point] : point);
+        commitPoints(isMultiPoint ? [...points, point] : [point]);
       },
       () => setMapError('No se pudo obtener la ubicación actual')
     );
@@ -279,6 +329,15 @@ export function GisQuestion({
         className="h-56 w-full overflow-hidden rounded-xl border border-border"
       />
 
+      {normalizedType === 'gis_tracking_auto' && (
+        <GisAutoTrack
+          value={value}
+          disabled={disabled}
+          intervalMs={gisSampleIntervalMs(question.validation_rules)}
+          onChange={onChange}
+        />
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
@@ -295,7 +354,7 @@ export function GisQuestion({
             type="button"
             variant="ghost"
             size="mobile"
-            onClick={() => onChange(isMultiPoint ? [] : null)}
+            onClick={() => commitPoints([])}
             disabled={disabled}
           >
             Limpiar puntos ({points.length})
