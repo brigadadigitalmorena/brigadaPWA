@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react';
-import { Camera, FileUp, X } from 'lucide-react';
+import { Camera, FileUp, Pencil, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
 import { generateLocalId } from '@/lib/utils/uuid';
 import { saveFileBlob, deleteFileBlob } from '@/lib/services/file-blob.service';
 import { compressPhoto } from '@/lib/services/image-compression.service';
+import { DOCUMENT_ACCEPT, maxDurationSeconds } from '@/lib/forms/field-rules';
 import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
+import { CaptureRecorder } from './capture-recorder';
+import { PhotoAnnotation } from './photo-annotation';
 import { QuestionRendererProps } from './question-renderer';
 
 export function MediaQuestion({
@@ -16,6 +19,7 @@ export function MediaQuestion({
   const { files, setFiles, removeFile, responseId } = useSurveyFillStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [annotatingId, setAnnotatingId] = useState<string | null>(null);
 
   const questionKey = question.question_key || question.id.toString();
   const questionFiles = files[questionKey] || [];
@@ -23,8 +27,12 @@ export function MediaQuestion({
   const isPhoto = ['photo', 'selfie', 'photo_no_gallery', 'photo_canvas'].includes(
     normalizedType
   );
+  const isCanvas = normalizedType === 'photo_canvas';
+  const isNoGallery = normalizedType === 'photo_no_gallery';
   const isVideo = normalizedType === 'video';
   const isVoice = normalizedType === 'voice';
+  const isDocument = normalizedType === 'file' || normalizedType === 'document';
+  const durationLimit = maxDurationSeconds(question.validation_rules);
   const captureFacing =
     normalizedType === 'selfie'
       ? 'user'
@@ -37,28 +45,29 @@ export function MediaQuestion({
       ? 'video/*'
       : isVoice
         ? 'audio/*'
-        : '*/*';
+        : isDocument
+          ? DOCUMENT_ACCEPT
+          : '*/*';
+
+  const storeFile = async (originalFile: File) => {
+    const file = isPhoto ? await compressPhoto(originalFile) : originalFile;
+    const fileId = generateLocalId();
+    await saveFileBlob(fileId, responseId || 'draft', file);
+    return {
+      id: fileId,
+      fileId,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      fileType: question.question_type,
+      questionId: question.id.toString(),
+    };
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     setPreviewError(null);
 
-    const previews = await Promise.all(
-      selectedFiles.map(async (originalFile) => {
-        const file = isPhoto ? await compressPhoto(originalFile) : originalFile;
-        const fileId = generateLocalId();
-        await saveFileBlob(fileId, responseId || 'draft', file);
-
-        return {
-          id: fileId,
-          fileId,
-          file,
-          previewUrl: URL.createObjectURL(file),
-          fileType: question.question_type,
-          questionId: question.id.toString(),
-        };
-      })
-    );
+    const previews = await Promise.all(selectedFiles.map(storeFile));
 
     setFiles(questionKey, [...questionFiles, ...previews]);
 
@@ -93,7 +102,7 @@ export function MediaQuestion({
         ref={inputRef}
         type="file"
         accept={accept}
-        capture={captureFacing}
+        capture={isNoGallery || isPhoto ? captureFacing : undefined}
         onChange={handleFileChange}
         className="hidden"
         id={`media-${question.id}`}
@@ -109,16 +118,31 @@ export function MediaQuestion({
         >
           {isPhoto ? <Camera className="h-6 w-6" /> : <FileUp className="h-6 w-6" />}
           <span className="text-xs">
-            {isPhoto
-              ? 'Tomar foto / Galería'
-              : isVideo
-                ? 'Grabar o seleccionar video'
-                : isVoice
-                  ? 'Grabar o seleccionar audio'
-                  : 'Seleccionar archivo'}
+            {isNoGallery
+              ? 'Solo cámara'
+              : isPhoto
+                ? 'Tomar foto / Galería'
+                : isVideo
+                  ? 'Seleccionar video'
+                  : isVoice
+                    ? 'Seleccionar audio'
+                    : isDocument
+                      ? 'PDF u Office'
+                      : 'Seleccionar archivo'}
           </span>
         </Button>
       </div>
+
+      {(isVoice || isVideo) && (
+        <CaptureRecorder
+          kind={isVideo ? 'video' : 'audio'}
+          maxDurationS={durationLimit}
+          onCapture={async (file) => {
+            const preview = await storeFile(file);
+            setFiles(questionKey, [...questionFiles, preview]);
+          }}
+        />
+      )}
 
       {previewError && (
         <p className="text-sm text-destructive">{previewError}</p>
@@ -144,6 +168,16 @@ export function MediaQuestion({
                   {file.file.name}
                 </div>
               )}
+              {isCanvas && (
+                <button
+                  type="button"
+                  onClick={() => setAnnotatingId(file.id)}
+                  className="absolute bottom-1 left-1 rounded-full bg-background/90 p-1 shadow-sm"
+                  aria-label="Anotar foto"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleRemove(file.id)}
@@ -158,6 +192,25 @@ export function MediaQuestion({
       )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {annotatingId && (
+        <PhotoAnnotation
+          imageUrl={
+            questionFiles.find((file) => file.id === annotatingId)?.previewUrl ?? ''
+          }
+          onCancel={() => setAnnotatingId(null)}
+          onSave={async (blob) => {
+            const current = questionFiles.find((file) => file.id === annotatingId);
+            if (current) await handleRemove(current.id);
+            const file = new File([blob], `anotada-${Date.now()}.jpg`, {
+              type: 'image/jpeg',
+            });
+            const preview = await storeFile(file);
+            const remaining = questionFiles.filter((item) => item.id !== annotatingId);
+            setFiles(questionKey, [...remaining, preview]);
+            setAnnotatingId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

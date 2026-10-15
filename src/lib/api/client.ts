@@ -178,6 +178,10 @@ apiClient.interceptors.request.use(
       }
     }
 
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      config.headers.delete('Content-Type');
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOut, Moon, Sun, User } from 'lucide-react';
+import { LogOut, Moon, Sun, User, LifeBuoy, Share2, Bug, Palette } from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
 import { toast } from 'sonner';
 import { useTheme } from '@/contexts/theme-context';
@@ -16,12 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useRouter } from 'next/navigation';
 
 interface UserMenuProps {
   user: UserType | null;
 }
 
 export function UserMenu({ user }: UserMenuProps) {
+  const router = useRouter();
   const { logout } = useAuth();
   const { theme, toggleTheme, mounted } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -95,6 +97,43 @@ export function UserMenu({ user }: UserMenuProps) {
             )}
             {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
           </Button>
+
+          <Button
+            variant="outline"
+            size="mobile"
+            className="w-full justify-start gap-3"
+            onClick={() => {
+              setIsOpen(false);
+              router.push('/profile');
+            }}
+          >
+            <User className="h-5 w-5" />
+            Perfil y contraseña
+          </Button>
+
+          {(
+            [
+              ['/settings/theme', 'Apariencia', Palette],
+              ['/help', 'Ayuda', LifeBuoy],
+              ['/networks', 'Redes', Share2],
+              ['/report', 'Reportar un error', Bug],
+              ['/debug', 'Diagnóstico', Bug],
+            ] as const
+          ).map(([href, label, Icon]) => (
+            <Button
+              key={href}
+              variant="outline"
+              size="mobile"
+              className="w-full justify-start gap-3"
+              onClick={() => {
+                setIsOpen(false);
+                router.push(href);
+              }}
+            >
+              <Icon className="h-5 w-5" />
+              {label}
+            </Button>
+          ))}
 
           <ColorSchemeSelector />
 

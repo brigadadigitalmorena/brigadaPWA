@@ -54,3 +54,17 @@ export async function isUrlCachedOffline(url: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Soft Next.js navigations request RSC and fail offline (SW NetworkFirst).
+ * Hard-assign so the fill shell in pages-cache can be served.
+ */
+export function navigateToSurveyFill(
+  href: string,
+  event?: { preventDefault: () => void },
+): void {
+  if (typeof window === 'undefined') return;
+  if (navigator.onLine) return;
+  event?.preventDefault();
+  window.location.assign(href);
+}

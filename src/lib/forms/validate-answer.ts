@@ -6,9 +6,13 @@
 
 import type { Question, ValidationRules } from '@/lib/types';
 import {
-  DEFAULT_REQUIRED_INE_FIELDS,
-  INE_REQUIRED_FIELD_LABELS,
-} from '@/lib/ocr/ine-required-fields';
+  formatMissingIneFields,
+  getMissingRequiredIneFields,
+  isIneQuestionType,
+  resolveRequiredIneFields,
+} from '@/lib/forms/ine-answer';
+import { isCompleteZip, parseZipValue } from '@/lib/forms/zip-answer';
+import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[\d+\-() ]{7,20}$/;
@@ -49,131 +53,28 @@ function isPlainEmptyObject(value: unknown): boolean {
   });
 }
 
-function getRequiredIneFields(rules: ValidationRules): string[] {
-  const raw = Array.isArray(rules.required_fields)
-    ? rules.required_fields
-    : Array.isArray(rules.requiredFields)
-      ? rules.requiredFields
-      : [];
-  return raw.filter((field): field is string => typeof field === 'string');
-}
-
-/**
- * Which INE sides must be captured.
- *
- * The CMS emits `require_front` / `require_back`
- * (webCMS/src/lib/survey/question-type-registry.ts, `ine_ocr` defaults) but the
- * backend never validated them, so they were previously honoured by nobody.
- * They are capture requirements, not field requirements: a back-side photo with
- * incomplete OCR must still satisfy `require_back`.
- */
-function resolveRequiredCaptures(rules: ValidationRules): string[] {
-  const captures: string[] = [];
-  if (rules.require_front !== false) captures.push('front');
-  if (rules.require_back !== false) captures.push('back');
-  return captures;
-}
-
-function resolveRequiredIneFields(
-  rules: ValidationRules,
-  required: boolean,
-): string[] {
-  const captures = resolveRequiredCaptures(rules);
-  const configured = getRequiredIneFields(rules);
-  const base =
-    configured.length > 0
-      ? [...captures, ...configured]
-      : required
-        ? [...DEFAULT_REQUIRED_INE_FIELDS]
-        : captures;
-  // An explicit `require_*: false` always wins, including over the defaults.
-  const denied = new Set(
-    [
-      rules.require_front === false ? 'front' : null,
-      rules.require_back === false ? 'back' : null,
-    ].filter((field): field is string => field !== null),
-  );
-  return base.filter((field) => !denied.has(field));
-}
-
-function hasIneValue(value: unknown): boolean {
-  if (typeof value === 'string') return value.trim().length > 0;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return Boolean(value);
-  }
-  return Object.values(value as Record<string, unknown>).some(hasIneValue);
-}
-
-function toSnakeCase(field: string): string {
-  return field.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
-}
-
-function toCamelCase(field: string): string {
-  return field.replace(/_([a-z0-9])/g, (_, chr: string) => chr.toUpperCase());
-}
-
-/** Both key conventions, so a snake_case config resolves a camelCase field. */
-function ineFieldAliases(field: string): string[] {
-  const snake = toSnakeCase(field);
-  const camel = toCamelCase(field);
-  return snake === camel ? [field] : [field, snake, camel];
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-/**
- * Resolves an INE field across every shape the answer can take:
- *   1. flat answer top level   — buildFlatIneAnswer emits snake_case here
- *   2. `ocrData.data`          — PWA `IneOcrResult` nests OCR fields in `.data`
- *   3. `ocrData` top level     — brigadaApp's `INEOcrResult` is already flat
- * plus the snake_case alias of each, because the backend `required_fields`
- * config uses camelCase while the persisted answer uses snake_case.
- */
-function findIneField(
-  data: Record<string, unknown>,
-  ocrData: Record<string, unknown>,
-  field: string,
-): unknown {
-  const ocrPayload = asRecord(ocrData['data']);
-  const aliases = ineFieldAliases(field);
-  for (const key of aliases) {
-    if (hasIneValue(data[key])) return data[key];
-  }
-  for (const key of aliases) {
-    if (hasIneValue(ocrPayload[key])) return ocrPayload[key];
-  }
-  for (const key of aliases) {
-    if (hasIneValue(ocrData[key])) return ocrData[key];
-  }
-  return undefined;
-}
-
-function getMissingRequiredIneFields(
-  value: unknown,
-  requiredFields: string[],
-): string[] {
-  const data =
-    typeof value === 'string'
-      ? { front: value, back: null }
-      : asRecord(value);
-  const ocrData = asRecord(data['ocrData']);
-
-  return requiredFields.filter((field) => {
-    if (field === 'ocrData') return !hasIneValue(ocrData);
-    return !findIneField(data, ocrData, field);
-  });
-}
-
 export function isEmptyAnswerValue(value: unknown): boolean {
   if (value === undefined || value === null) return true;
   if (typeof value === 'string') return value.trim() === '';
   if (Array.isArray(value)) return value.length === 0;
   if (typeof value === 'number' && Number.isNaN(value)) return true;
   return isPlainEmptyObject(value);
+}
+
+const YES_NO_TRUE = new Set(['true', '1', 'sí', 'si', 'yes']);
+const YES_NO_FALSE = new Set(['false', '0', '2', 'no']);
+
+/** Backend `yes_no` answers must be booleans. */
+export function coerceYesNoValue(value: unknown): boolean | undefined {
+  if (value === true || value === false) return value;
+  if (value === 1) return true;
+  if (value === 0) return false;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (YES_NO_TRUE.has(normalized)) return true;
+    if (YES_NO_FALSE.has(normalized)) return false;
+  }
+  return undefined;
 }
 
 function parseDateValue(value: unknown): Date | null {
@@ -214,7 +115,7 @@ export function validateAnswer(
   question: Question,
   value: unknown
 ): string | null {
-  const questionType = String(question.question_type ?? '');
+  const questionType = normalizeQuestionType(question.question_type);
   if (questionType === 'read_only' || questionType === 'data_list') {
     return null;
   }
@@ -230,17 +131,32 @@ export function validateAnswer(
     return null;
   }
 
-  if (questionType === 'ine' || questionType === 'ine_ocr' || questionType === 'credential') {
-    const requiredIneFields = Array.from(
-      new Set(resolveRequiredIneFields(rules, required)),
+  if (isIneQuestionType(question.question_type)) {
+    const missing = getMissingRequiredIneFields(
+      value,
+      resolveRequiredIneFields(question)
     );
-    const missingFields = getMissingRequiredIneFields(value, requiredIneFields);
-    if (missingFields.length > 0) {
-      return `Faltan campos requeridos del INE: ${missingFields
-        .map((field) => INE_REQUIRED_FIELD_LABELS[field] ?? field)
-        .join(', ')}`;
+    if (missing.length > 0) {
+      return formatMissingIneFields(missing);
     }
+    return null;
   }
+
+  if (questionType === 'codigo_postal_autofill') {
+    const zip = parseZipValue(value);
+    const requiredZip = Boolean(question.is_required);
+    if (requiredZip && !isCompleteZip(zip.codigo_postal)) {
+      return 'Ingresa un código postal de 5 dígitos';
+    }
+    if (!requiredZip && !isCompleteZip(zip.codigo_postal)) {
+      return null;
+    }
+    if (requiredZip && !zip.colonia.trim()) {
+      return 'Selecciona una colonia';
+    }
+    return null;
+  }
+
 
   if (typeof value === 'string') {
     const minLength = toFiniteNumber(rules.min_length);

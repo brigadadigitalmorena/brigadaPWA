@@ -157,7 +157,7 @@ const assignments = await getMyAssignments();  // GET /mobile/surveys (assigned 
 await submitResponse(responseData);            // POST /mobile/responses
 ```
 
-Drafts locales: `/drafts` enlaza a `/surveys/{id}/fill?title=…` con un href plano. **No** hay `surveyResumeHref` ni `resumeDraftId`; si se implementa "Continuar", `scope.ts` expone hoy solo `surveyFillHref`, y los ids de query ausentes deben quedar en `null` (`Number(null) === 0` rompe el fallback de Dexie).
+Reanuda un borrador local desde `/drafts` vía `surveyResumeHref` (`resumeDraftId` + campaña/entitlement). Los ids de query ausentes deben quedar en `null` (`Number(null) === 0` rompe el fallback de Dexie). "Continuar" offline usa navegación dura (hard navigation) para que el shell de fill del SW cargue.
 
 ## Conventions
 
@@ -187,8 +187,9 @@ Drafts locales: `/drafts` enlaza a `/surveys/{id}/fill?title=…` con un href pl
 | Guardrails anti-deriva PWA vs App | `ai-context/guardrails.md` |
 | Particularidades técnicas | `ai-context/particularities.md` |
 | API types | `src/lib/types/index.ts` |
-| Respuesta compuesta INE (flat snake_case) | `src/lib/ocr/build-flat-ine-answer.ts` |
+| Respuesta compuesta INE (`ine-answer`) | `src/lib/forms/ine-answer.ts` |
 | Defaults y labels de validación INE | `src/lib/ocr/ine-required-fields.ts` |
+| ZIP autofill (respuesta + parser) | `src/lib/forms/zip-answer.ts` |
 | ZIP autofill (render + parser de dirección) | `src/components/survey/QuestionTypes/zip-autofill-question.tsx`, `src/lib/ocr/ine-address.ts` |
 | Database schema | `src/lib/db/database.ts` |
 | Auth context | `src/contexts/auth.context.tsx` |
@@ -328,7 +329,8 @@ Ver `ai-context/00-overview.md#variación-respecto-a-brigadaapp`, `ai-context/gu
 
 ## Future Enhancements (tracking en `10-backlog.md`)
 
-- [ ] Push notifications (Web Push VAPID)
+- [ ] Push notifications (VAPID registration exists; needs a web push backend)
+- [x] Background sync wake (Periodic Background Sync, best-effort)
 - [ ] Background sync improvements (solo Chromium)
 - [ ] Conflict resolution UI
 - [x] Signature capture
@@ -336,12 +338,18 @@ Ver `ai-context/00-overview.md#variación-respecto-a-brigadaapp`, `ai-context/gu
 - [ ] Multi-language support (i18n)
 - [ ] INE OCR server-side validation
 - [x] Image compression before upload
-- [x] Respuesta compuesta INE (flat snake_case, `extract_*`, `translateSexo`)
+- [x] INE compound answer + ocr_autofill
 - [x] ZIP colonia lookup (`/mobile/zip/{code}`)
-- [ ] Autofill de OCR hacia otras preguntas (`ocr_autofill`) — en PWA solo existe `codigo_postal_autofill`
-- [ ] Editar respuesta desde sync fallido — no implementado; el copy "Corregir respuesta" se retiró por engañoso (PR #3)
-- [ ] Profile / password / avatar — sin rutas; solo `avatar_url` en types
-- [ ] In-app notifications inbox — sin pantalla; hoy solo `web-push.service.ts` (Notification API del navegador)
+- [x] Home + daily metrics
+- [x] Submission map
+- [x] Photo annotation, in-app audio/video, barcode pattern
+- [x] GIS auto-track
+- [x] Sentry / PostHog (env-gated)
+- [x] Help, networks, report issue, theme, welcome, debug, response history
+- [x] Storage / schema / pending-confirm banners
+- [x] Corregir respuesta from failed sync
+- [x] Profile / password / avatar
+- [x] In-app notifications inbox
 - [ ] CSP + HSTS + Permissions-Policy headers
 - [ ] Test suite real (Vitest + Playwright + CI)
 - [ ] Guardrails anti-deriva en CI

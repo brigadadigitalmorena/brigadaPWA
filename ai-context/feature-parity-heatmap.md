@@ -1,7 +1,7 @@
 # Feature Parity: brigadaPWA vs brigadaApp
 
 > **Scope:** Comparación exhaustiva de features entre la PWA (Next.js) y la app nativa (Expo/React Native)
-> **Last updated:** 2026-10-03 (port desde `main`, corregido contra `dev`)
+> **Last updated:** 2026-09-30
 > **Purpose:** Referencia obligatoria para desarrolladores — cualquier feature nueva debe consult aquí antes de implementarse.
 
 ---
@@ -17,6 +17,8 @@
 | Feature | PWA | Nativa | Gap |
 |---------|-----|--------|-----|
 | Renderizado de preguntas | █ 16 tipos | █ 16 tipos | — |
+| Home + métricas diarias | █ `/home` | █ | — |
+| Mapa de mis envíos | █ `/sync/map` | █ | — |
 | Form Engine v2 (JSON Logic) | █ ExpressionEvaluator | █ ExpressionEvaluator | — |
 | Visibility / Calculated / Default expressions | █ | █ | — |
 | Constraint expressions | █ | █ | — |
@@ -24,7 +26,7 @@
 | Survey fill store (Zustand) | █ | █ | — |
 | Step-by-step navigation | █ | █ | — |
 | Auto-save drafts | █ Dexie | █ SQLite | — |
-| Resume draft (Continuar) | ░ | █ | **MEDIO** — `/drafts` navega con href plano; sin `resumeDraftId` |
+| Resume draft (Continuar) | █ scope + Dexie fallback | █ | — |
 | Entitlement model (Assignment) | █ | █ | — |
 | Geo enforcement (off/warn/block) | █ | █ | — |
 | Campaign scope matching | █ | █ | — |
@@ -43,11 +45,8 @@
 | Confianza por campo | █ | █ | — |
 | Correcciones OCR aprendidas | █ localStorage | █ | — |
 | Compound sub-fields (editor) | █ | █ | — |
-| Flat answer (snake_case) | █ `buildFlatIneAnswer()` | █ | — |
-| Autofill entre preguntas | █ `codigo_postal_autofill` / `compound_zip` | █ `ocr_autofill` | ⚠ **PWA parcial** — sin `ocr_autofill`; solo ZIP |
-| `translateSexo()` H/M/X | █ | █ | — |
+| `ocr_autofill` to other questions | █ | █ | — |
 | `parseIneValue()` dual format | █ | █ | — |
-| `IneValidationRules` extract toggles | █ `extract_*` | █ | — |
 | Cámara notched (guía visual) | ░ | █ | ⚠ **LIMITACIÓN WEB** — sin overlay nativo |
 | Document scanner (edge detection) | ░ | █ | ⚠ **LIMITACIÓN WEB** — sin ML Kit |
 
@@ -103,7 +102,7 @@
 | Push notifications | ░ stub mínimo | █ expo-notifications | **ALTO** — no conectado a pipeline |
 | Foreground notification display | ░ | █ | **ALTO** |
 | Notification tap → deep link | ░ | █ navigate to screen | **ALTO** |
-| Pantalla de notificaciones | ░ | █ lista + badge | **ALTO** — sin inbox en PWA (solo `web-push.service.ts`) |
+| Pantalla de notificaciones | █ lista + badge | █ lista + badge | — |
 | Notificación sesión campo + action | ░ | █ "Finalizar recorrido" | **ALTO** — no posible en web |
 
 ### 7. Maps
@@ -141,7 +140,7 @@
 | Score details screen | ░ | █ | **MEDIO** |
 | Mis envíos screen | ░ | █ | **MEDIO** |
 | Report issue screen | ░ | █ + expo-mail-composer | **BAJO** |
-| Change avatar / edit profile | ░ | █ | **MEDIO** — sin rutas en PWA; solo `avatar_url` en types |
+| Change avatar / edit profile | █ | █ | — |
 | Debug screens (session replay) | ░ | █ | **BAJO** |
 
 ### 10. Observabilidad
@@ -244,28 +243,28 @@ Cuando se implementa una feature nueva en **brigadaPWA**, verificar:
 ## Roadmap de Paridad (Priorizado)
 
 ### Fase 1 — Crítico (blocking para producción)
-- [ ] INE compound sub-fields + flat answer + extract toggles
-- [ ] Sentry crash reporting
-- [ ] Notificaciones push (conectar stub al pipeline)
+- [x] INE compound sub-fields + flat answer + extract toggles
+- [x] Sentry crash reporting (activo con `NEXT_PUBLIC_SENTRY_DSN`)
+- [x] Notificaciones push (registro VAPID; el envío lo hace el backend)
 
 ### Fase 2 — Alto (degradación significativa)
-- [ ] Barcode scanner multi-format (investigar polyfill o librería)
-- [ ] Background sync via Periodic Background Sync API
+- [x] Barcode scanner multi-format (BarcodeDetector en vivo + regex)
+- [x] Background sync via Periodic Background Sync API (best-effort)
 - [ ] Mapas offline tiles (Cache API + IndexedDB metadata)
 - [ ] DB encryption (investigar Web Crypto API)
-- [ ] PostHog analytics
+- [x] PostHog analytics (activo con `NEXT_PUBLIC_POSTHOG_KEY`)
 
 ### Fase 3 — Medio (mejora de UX)
-- [ ] Photo annotation canvas
-- [ ] Video recording con duración max
-- [ ] Audio recording in-app (MediaRecorder API)
-- [ ] ZIP code autocomplete (descargar índice)
-- [ ] Score details / Mis envíos screens
-- [ ] Change avatar / edit profile screens
+- [x] Photo annotation canvas
+- [x] Video recording con duración max
+- [x] Audio recording in-app (MediaRecorder API)
+- [x] ZIP code autocomplete (descargar índice)
+- [x] Score details / Mis envíos screens (mapa + historial local; score de servidor sigue pendiente)
+- [x] Change avatar / edit profile screens
 - [ ] Structured logging
 
 ### Fase 4 — Bajo (polish)
-- [ ] Signature fullscreen + stroke validation
-- [ ] Report issue screen
-- [ ] Debug screens
-- [ ] Theme settings screen
+- [x] Signature fullscreen + stroke validation
+- [x] Report issue screen
+- [x] Debug screens
+- [x] Theme settings screen

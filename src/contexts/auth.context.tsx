@@ -1,8 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { AuthState } from '@/lib/types';
-import { getCurrentUser, isAuthenticated, login as loginApi, logout as logoutApi } from '@/lib/api/auth.service';
+import { AuthState, User } from '@/lib/types';
+import {
+  getCurrentUser,
+  isAuthenticated,
+  login as loginApi,
+  logout as logoutApi,
+  persistUser,
+  refreshUser as refreshUserApi,
+} from '@/lib/api/auth.service';
 import { loadTokensFromStorage } from '@/lib/api/client';
 import { clearDatabase, db } from '@/lib/db/database';
 import { fieldSessionService } from '@/lib/services/field-session.service';
@@ -12,6 +19,7 @@ interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  setUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -134,10 +142,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const user = getCurrentUser();
+    const user = await refreshUserApi();
     if (user) {
       setState((prev) => ({ ...prev, user }));
     }
+  }, []);
+
+  const setUser = useCallback((user: User) => {
+    persistUser(user);
+    setState((prev) => ({ ...prev, user }));
   }, []);
 
   return (
@@ -147,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         refreshUser,
+        setUser,
       }}
     >
       {children}

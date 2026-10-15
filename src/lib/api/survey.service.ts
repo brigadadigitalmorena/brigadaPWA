@@ -204,25 +204,37 @@ export async function loadSurveyForFill(
   }
 
   const durable = await readCachedSurveyVersion(surveyId);
-  if (durable && options?.campaignId == null && options?.entitlementId == null) {
+
+  let entitlements: Assignment[] = [];
+  try {
+    entitlements = await getMyEntitlements();
+  } catch (err) {
+    if (!durable) throw err;
+    console.warn('Using cached survey schema (entitlements unavailable)', err);
+  }
+
+  const entitlement =
+    matchEntitlement(entitlements, surveyId, options) ??
+    matchEntitlement(entitlements, surveyId);
+
+  if (entitlement?.latest_version) {
+    cacheEntitlement(surveyId, entitlement);
+    await persistEntitlements([entitlement]);
+
+    return {
+      title: titleFromUrl ?? entitlement.survey_title,
+      version: normalizeSurveyVersion(entitlement.latest_version),
+    };
+  }
+
+  if (durable) {
     return {
       title: titleFromUrl ?? durable.title,
       version: durable.version,
     };
   }
 
-  const entitlement = await getEntitlementForSurvey(surveyId, options);
-  if (!entitlement?.latest_version) {
-    throw new Error('No published version available for this survey');
-  }
-
-  cacheEntitlement(surveyId, entitlement);
-  await persistEntitlements([entitlement]);
-
-  return {
-    title: titleFromUrl ?? entitlement.survey_title,
-    version: normalizeSurveyVersion(entitlement.latest_version),
-  };
+  throw new Error('No published version available for this survey');
 }
 
 export async function getLatestSurveyVersion(surveyId: number): Promise<SurveyVersion> {
