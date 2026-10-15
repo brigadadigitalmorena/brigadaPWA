@@ -146,36 +146,100 @@ export function resolveRequiredIneFields(question: Question): string[] {
       : [];
 
   const type = normalizeQuestionType(question.question_type);
+  const requireFront = rules.require_front !== false;
+  const requireBack = rules.require_back !== false;
+
   if (configured.length > 0) {
-    const withSides = ['front', 'back', ...configured];
-    return [
-      ...new Set(normalizeIneRequiredFields(withSides, question.question_type)),
-    ];
+    let withSides = configured;
+    if (requireFront && !withSides.includes('front')) withSides = ['front', ...withSides];
+    if (requireBack && !withSides.includes('back')) withSides = [...withSides, 'back'];
+    const base = [...new Set(normalizeIneRequiredFields(withSides, question.question_type))];
+    return base.filter((f) => !(rules.require_front === false && f === 'front') && !(rules.require_back === false && f === 'back'));
   }
 
   if (!question.is_required) {
-    if (type === 'ine_front') return ['front'];
-    if (type === 'ine_back') return ['back'];
-    return ['front', 'back'];
+    const res = [];
+    if (requireFront || type === 'ine_front') res.push('front');
+    if (requireBack || type === 'ine_back') res.push('back');
+    if (res.length === 0 && (type !== 'ine_front' && type !== 'ine_back')) {
+      if (requireFront) res.push('front');
+      if (requireBack) res.push('back');
+    }
+    if (type === 'ine_front' && !requireFront && res.includes('front')) res.splice(res.indexOf('front'),1);
+    if (type === 'ine_back' && !requireBack && res.includes('back')) res.splice(res.indexOf('back'),1);
+    return res.filter((f) => !(rules.require_front === false && f === 'front') && !(rules.require_back === false && f === 'back'));
   }
 
-  return normalizeIneRequiredFields(
-    [...DEFAULT_REQUIRED_INE_FIELDS],
-    question.question_type
-  );
+  const baseDefaults = [...DEFAULT_REQUIRED_INE_FIELDS];
+  let res = normalizeIneRequiredFields(baseDefaults, question.question_type);
+  res = res.filter((f) => !(rules.require_front === false && f === 'front') && !(rules.require_back === false && f === 'back'));
+  if (rules.require_front === true && !res.includes('front')) res.unshift('front');
+  if (rules.require_back === true && !res.includes('back')) res.push('back');
+  return res;
+}
+
+function toSnakeCase(field: string): string {
+  return field.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function toCamelCase(field: string): string {
+  return field.replace(/_([a-z0-9])/g, (_, chr: string) => chr.toUpperCase());
+}
+
+function ineFieldAliases(field: string): string[] {
+  const snake = toSnakeCase(field);
+  const camel = toCamelCase(field);
+  return snake === camel ? [field] : [field, snake, camel];
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function findIneField(
+  data: Record<string, unknown>,
+  ocrData: Record<string, unknown>,
+  field: string,
+): unknown {
+  const ocrPayload = asRecord(ocrData['data']);
+  const aliases = ineFieldAliases(field);
+  for (const key of aliases) {
+    if (hasIneValue(data[key])) return data[key];
+  }
+  for (const key of aliases) {
+    if (hasIneValue(ocrPayload[key])) return ocrPayload[key];
+  }
+  for (const key of aliases) {
+    if (hasIneValue(ocrData[key])) return ocrData[key];
+  }
+  return undefined;
+}
+
+function hasIneValue(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return Boolean(value);
+  }
+  return Object.values(value as Record<string, unknown>).some(hasIneValue);
 }
 
 export function getMissingRequiredIneFields(
   value: unknown,
   requiredFields: string[]
 ): string[] {
-  const data = parseIneValue(value);
+  const parsed = parseIneValue(value);
+  const data = typeof value === 'string' ? { front: value, back: null } : asRecord(value);
+  const ocrData = asRecord(data['ocrData']);
+  const ocr = (parsed.ocrData as Record<string, unknown> | null) ?? ocrData;
   return requiredFields.filter((field) => {
     if (field === 'front' || field === 'back') {
-      return isBlank(data[field]);
+      return isBlank(parsed[field]);
     }
-    if (field === 'ocrData') return !data.ocrData;
-    const ocr = data.ocrData as Record<string, unknown> | null;
+    if (field === 'ocrData') return !parsed.ocrData && !hasIneValue(ocrData);
+    const found = findIneField(data, ocrData, field);
+    if (found !== undefined && hasIneValue(found)) return false;
     return isBlank(ocr?.[field]);
   });
 }
