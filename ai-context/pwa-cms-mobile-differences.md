@@ -79,8 +79,8 @@ Estas librerías interpretan el **mismo JSON** que publica el CMS. Si una versi�
 | Contrato | Dónde vive | Quién lo consume |
 |----------|------------|------------------|
 | `json-logic-js` **2.0.5** | Los tres clientes | Visibility, calculated, constraint, label |
-| Matrices `ai-context/contracts/jsonlogic-operator-matrix.v2.json` | BackEnd, CMS, FrontEnd (copias) — **PWA no tiene copia** | Qué operadores están permitidos en el builder |
-| `validation_rules.v2.json` | Mismas copias — **PWA no tiene copia** | Claves que el renderer debe leer |
+| Matrices `ai-context/contracts/jsonlogic-operator-matrix.v2.json` | BackEnd, CMS, FrontEnd (copias) | Qué operadores están permitidos en el builder |
+| `validation_rules.v2.json` | Mismas copias | Claves que el renderer debe leer |
 | Tipos de pregunta backend | `BACKEND_QUESTION_TYPES` en PWA `src/lib/survey/question-type-registry.ts` | CMS builder + móvil renderers + PWA renderers |
 | `client_id` UNIQUE / status `duplicate` = éxito | Backend ingestión | Cola de sync PWA y móvil |
 | Entitlements (`entitlement_id`, `campaign_id`) | Backend `GET /mobile/surveys` | PWA `normalize.ts` + móvil assignments |
@@ -153,8 +153,11 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Gestiones: `/mobile/gestiones/tracking`, comments
 - Mapas: `/mobile/maps`, tiles OSM manifest (proxy Next dedicado)
 - Notificaciones in-app: `/mobile/notifications*`
-- ZIP: `/mobile/zip/{code}`
-- Recorridos: `/mobile/field-sessions*`
+- ZIP: `/mobile/zip-lookup/{code}`
+- Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar.
+- Métricas: `GET /mobile/daily-metrics` (`/home`)
+- Redes: `GET /public/app-config` → `social_links` (`/networks`)
+- Reporte: `/report` abre el cliente de correo (el móvil usa el compositor nativo)
 
 ### 4.2 Endpoints de campo que el PWA **aún no** consume (móvil sí o backend ya existe)
 
@@ -163,11 +166,9 @@ Priorizar contra el heatmap, no implementar “porque existe”:
 | Endpoint | Uso en móvil | PWA |
 |----------|--------------|-----|
 | `GET /mobile/score/latest` | `score-details.tsx` | No hay pantalla de score |
-| `GET /mobile/daily-metrics` | Home / métricas | No |
-| `POST /mobile/push-token` | Expo push | Stub Web Push; VAPID y payload distintos a Expo |
-| `GET /mobile/responses/me` | Historial servidor | Envíos son cola local `/sync` |
+| `POST /mobile/push-token` | Expo push | Registro Web Push si hay `NEXT_PUBLIC_VAPID_PUBLIC_KEY`; el envío lo hace el backend |
+| `GET /mobile/responses/me` | Historial servidor | Envíos son cola local `/sync` e historial local `/sync/history` |
 | `POST /mobile/sync/validate`, reconcile, restore | Recuperación de dispositivo | Parcial / no |
-| Issue reporting | `report-issue.tsx` + mail | No |
 
 ### 4.3 Lo que el CMS llama y el PWA no debe llamar
 
@@ -214,7 +215,7 @@ Invariantes del backend (romperlas es pérdida de datos):
 | GPS con pantalla bloqueada | Foreground service | Imposible | Recorridos PWA solo con pestaña visible + WakeLock |
 | Background sync 15 min | `expo-background-task` | Solo con SW / pestaña | Usuario debe abrir la PWA para drenar cola |
 
-Service Worker PWA (`workers/sw.js`): precache de shell (`/surveys`, `/drafts`, `/sync`, …), NetworkFirst para RSC (`next-rsc-cache`, timeout 3 s), fill shell `/surveys/__fill_shell__`. El CMS **no** es PWA.
+Service Worker PWA (`workers/sw.js`): precache solo de `/offline.html` y el manifest (el HTML de la app no se precachea: un miss rechazaba la navegación y Chrome mostraba “página no disponible” hasta Recargar). Navegaciones en línea piden el HTML fresco, con tope de 4 s también sobre `navigationPreload`; si la red no responde, se usa la última copia (`pages-cache-v5`). No se pinta primero la copia vieja: tras un deploy ese HTML apunta a chunks que ya no existen y la app instalada se queda en “Cargando...” porque el JS nunca arranca. El `install` del worker no bloquea la activación más de esos 4 s y llama `skipWaiting` para que el teléfono deje el worker viejo sin depender del aviso de recarga. `/_next/static` es CacheFirst. RSC sigue en NetworkFirst (`next-rsc-cache`, timeout 3 s). Fill shell `/surveys/__fill_shell__`. El ícono instalado abre `/home` (`start_url`). `/` y un `/home` sin sesión redirigen con un script previo a React para no quedarse en “Cargando...”. `sw.js` se sirve con `Cache-Control: no-cache`. El CMS **no** es PWA.
 
 ---
 
@@ -239,7 +240,7 @@ Los tres clientes usan JSONLogic. El PWA adapta `SurveyVersion` → schema en `s
 
 Al cambiar visibilidad/constraints:
 
-1. Ver operadores permitidos en `jsonlogic-operator-matrix.v2.json` (lo tienen BackEnd, CMS y FrontEnd; **el PWA no tiene copia todavía**, así que hay que leerlo del CMS o del BackEnd).
+1. Ver operadores permitidos en `jsonlogic-operator-matrix.v2.json` (CMS/BackEnd).
 2. Portar evaluación a PWA `ExpressionEvaluator` / `json-logic.ts`.
 3. No inventar operadores que el builder no serializa.
 
@@ -251,7 +252,7 @@ Al añadir soporte en PWA:
 
 1. Alias en `question-type-registry.ts`.
 2. Renderer en `src/components/survey/QuestionTypes/`.
-3. `validate-answer.ts` + shape de respuesta (`src/lib/ocr/build-flat-ine-answer.ts`, `src/components/survey/QuestionTypes/zip-autofill-question.tsx`).
+3. `validate-answer.ts` + shape de respuesta (`ine-answer.ts`, `zip-answer.ts`).
 4. Misma clave de `validation_rules` que lee **móvil**, no un nombre “más claro”.
 5. Payload de sync idéntico al de `brigadaFrontEnd` (el backend no tiene adaptador PWA).
 
@@ -263,16 +264,11 @@ Móvil tiene componentes extra más maduros: `voice-question`, `video-question`,
 
 | Contrato | Archivo PWA | Notas |
 |----------|-------------|-------|
-| Respuesta compuesta INE `{ front, back, ocrData }` | `src/lib/ocr/build-flat-ine-answer.ts` | Emite flat snake_case; aplica toggles `extract_*`, `translateSexo()`, `parseIneValue()` |
-| Defaults y labels de validación | `src/lib/ocr/ine-required-fields.ts` | Defaults reducidos a `front`, `back`, `nombre`, `curp` |
-| ZIP `{ codigo_postal, colonia, … }` | `src/components/survey/QuestionTypes/zip-autofill-question.tsx` + `src/lib/ocr/ine-address.ts` | Lookup `/mobile/zip/{code}` (`datasets.service.ts`) |
+| Respuesta compuesta INE `{ front, back, ocrData }` | `src/lib/forms/ine-answer.ts` | `ocr_autofill` a otras preguntas |
+| ZIP `{ codigo_postal, colonia, … }` | `src/lib/forms/zip-answer.ts` | Lookup `/mobile/zip-lookup/{code}` |
 | Parser OCR | `src/lib/ocr/*` (más completo que móvil en MRZ / diccionario) | Captura: `<input>` vs ML Kit + scanner |
 
 El CMS solo configura extraer/autofill; no corre Tesseract.
-
-**Sobre `ocr_autofill`:** en el PWA el autofill entre preguntas es `codigo_postal_autofill` / `compound_zip` (renderer `zip-autofill-question.tsx`), no `ocr_autofill`. `ocr_autofill` sigue siendo un concepto del CMS y la app móvil; el PWA no lo implementa.
-
-**Alcance de la validación INE:** `validate-answer.ts` honra `required_fields`, `require_front` y `require_back`, y resuelve los campos en cascada (respuesta plana → `ocrData.data` → `ocrData`) tolerando camelCase y snake_case. Todo esto es **validación de cliente**: el backend no aplica `required_fields` ni `require_*` en servidor, así que un cliente con lógica antigua puede enviar respuestas que otro cliente rechazaría. `require_front`/`require_back` son requisitos de *captura* (la foto), no de extracción: un reverso con OCR vacío los satisface.
 
 ---
 
@@ -290,13 +286,11 @@ El CMS solo configura extraer/autofill; no corre Tesseract.
 | `/maps` | `maps`, `static-map-viewer` | `/dashboard/maps`, `/dashboard/areas-v2` |
 | `/recorridos` | GIS tracking **por pregunta**; no hay módulo Recorridos 1:1 | Config `field_tracking` en encuesta/campaña |
 | `/sync` | `mis-envios` | `/dashboard/sync-monitor` (ops, no el brigadista) |
-| — (sin pantalla) | `notifications` + tap → deep link | `/dashboard/notifications` (admin) |
-| — (sin pantalla) | `profile`, `edit-profile`, `change-password`, `change-avatar` | `/dashboard/settings` (admin) |
+| `/notifications` | archivo existe, **tab `href: null`** (“not available yet”) | `/dashboard/notifications` (admin) |
+| `/profile`, `/profile/password` | `profile`, `edit-profile`, `change-password`, `change-avatar` | `/dashboard/settings` (admin) |
 | — | `score-details`, `report-issue`, `theme-settings`, `networks`, `help`, `debug/*` | analytics, users, roles, cron, whitelist, builder, … |
 
 Nav PWA: `src/components/common/nav-items.ts` (módulos gated por `app-config.service.ts`). Offline desactiva tracking/notifications según `offlineEnabledModules`.
-
-**Rutas que el PWA NO tiene.** `src/app/(dashboard)/` expone solo `drafts`, `extras`, `maps`, `recorridos`, `surveys`, `sync` y `tracking`. No existe pantalla de notificaciones ni de perfil: `notifications` es una clave de módulo en `app-config.service.ts` y `web-push.service.ts` usa la `Notification` API del navegador, sin inbox en UI. Tampoco existe `resumeDraftId` niContinuar sobre `surveyResumeHref` — `/drafts` navega con un href plano. Cuando se implementen, deben decirlo aquí y en `feature-parity-heatmap.md`, no al revés.
 
 ### 7.2 CMS — `src/app/dashboard` (no portar al PWA)
 

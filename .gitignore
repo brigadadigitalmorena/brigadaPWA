@@ -47,6 +47,7 @@ Thumbs.db
 # PWA
 .sw.js
 .service-worker.js
+.env*
 
 # Slidev
 ai-context/slides/dist/
