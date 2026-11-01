@@ -1,9 +1,10 @@
 import { db } from '@/lib/db/database';
-import { deleteResponseBlobs } from '@/lib/services/file-blob.service';
 
 /**
  * Discard a local draft and cascade-clean related files / queue rows.
  * Mirrors mobile `offlineSyncService.deleteDraft` + responseRepository cascade.
+ * Indexed lookups only: a full-table filter inside the write transaction can
+ * stall while a sync is also using the queue.
  */
 export async function deleteDraft(responseId: string): Promise<boolean> {
   const response = await db.responses
@@ -20,7 +21,14 @@ export async function deleteDraft(responseId: string): Promise<boolean> {
     .where('response_id')
     .equals(responseId)
     .toArray();
-  const fileIds = new Set(files.map((f) => f.file_id));
+  const entityIds = [responseId, ...files.map((file) => file.file_id)];
+  const queueGroups = await Promise.all(
+    entityIds.map((entityId) => db.sync_queue.where('entity_id').equals(entityId).toArray())
+  );
+  const queueIds = queueGroups
+    .flat()
+    .map((item) => item.id)
+    .filter((id): id is number => id !== undefined);
 
   await db.transaction(
     'rw',
@@ -29,33 +37,17 @@ export async function deleteDraft(responseId: string): Promise<boolean> {
     db.file_blobs,
     db.sync_queue,
     async () => {
-      const queueItems = await db.sync_queue
-        .filter(
-          (item) =>
-            item.entity_id === responseId ||
-            (item.entity_type === 'file' && fileIds.has(item.entity_id)) ||
-            (item.operation_type === 'UPLOAD_FILE' && fileIds.has(item.entity_id)) ||
-            (item.operation_type === 'CREATE_RESPONSE' &&
-              item.entity_id === responseId)
-        )
-        .toArray();
-
-      for (const item of queueItems) {
-        if (item.id !== undefined) {
-          await db.sync_queue.delete(item.id);
-        }
+      if (queueIds.length > 0) {
+        await db.sync_queue.bulkDelete(queueIds);
       }
-
       await db.local_files.where('response_id').equals(responseId).delete();
       await db.file_blobs.where('response_id').equals(responseId).delete();
-
       if (response.id !== undefined) {
         await db.responses.delete(response.id);
       }
     }
   );
 
-  await deleteResponseBlobs(responseId).catch(() => undefined);
   return true;
 }
 

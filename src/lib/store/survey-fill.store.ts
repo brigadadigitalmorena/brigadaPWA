@@ -183,13 +183,16 @@ function buildFillableQuestions(
   if (!version?.sections) return [];
 
   const entries: FillableQuestionEntry[] = [];
+  const dataLists = version.data_lists ?? {};
 
   version.sections.forEach((section, sectionIndex) => {
+    if (!isRelevant(section.relevance_expression, answers, dataLists)) return;
+
     const visibleQuestions =
       section.questions?.filter(
         (question) =>
           isFillableQuestion(question) &&
-          isRelevant(question.relevance_expression, answers)
+          isRelevant(question.relevance_expression, answers, dataLists)
       ) ?? [];
 
     visibleQuestions.forEach((question) => {
@@ -421,11 +424,16 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
   },
 
   getVisibleQuestions: (section) => {
-    const { answers } = get();
+    const { answers, version } = get();
+    const dataLists = version?.data_lists ?? {};
+    if (!isRelevant(section.relevance_expression, answers, dataLists)) {
+      return [];
+    }
     return (
       section.questions?.filter(
         (q) =>
-          isFillableQuestion(q) && isRelevant(q.relevance_expression, answers)
+          isFillableQuestion(q) &&
+          isRelevant(q.relevance_expression, answers, dataLists)
       ) || []
     );
   },

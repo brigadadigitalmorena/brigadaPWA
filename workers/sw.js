@@ -380,12 +380,20 @@ registerRoute(
   })
 );
 
-setDefaultHandler(
-  new NetworkFirst({
-    cacheName: 'default-cache',
-    networkTimeoutSeconds: 3,
-  })
-);
+const defaultGetHandler = new NetworkFirst({
+  cacheName: 'default-cache',
+  networkTimeoutSeconds: 3,
+});
+
+// POST/PUT must not use NetworkFirst. After its 3s cache miss it keeps waiting
+// for the network, so a slow upload leaves Enviar spinning until the page reloads.
+setDefaultHandler(async (options) => {
+  const method = options.request.method;
+  if (method !== 'GET' && method !== 'HEAD') {
+    return fetch(options.request);
+  }
+  return defaultGetHandler.handle(options);
+});
 
 // A thrown strategy (precache miss, NetworkFirst with an empty cache) must not
 // reject the document fetch — that is the Chrome "página no disponible" screen.

@@ -1,7 +1,8 @@
 # Feature Parity: brigadaPWA vs brigadaApp
 
 > **Scope:** Comparación exhaustiva de features entre la PWA (Next.js) y la app nativa (Expo/React Native)
-> **Last updated:** 2026-09-30
+> **Last updated:** 2026-09-30. La matriz de abajo está desactualizada respecto al código.
+> **Lectura vigente (2026-11-01):** los 44 tipos de pregunta y el runtime JSONLogic coinciden con CMS y móvil. El PWA ahora aplica `default_expression` / `label_expression` / `is_required_expr` / `constraint_message`, `data_lists` en la relevancia, `normalize_*`, fechas `today`/`now` en hora local, `step`, hora, precisión GPS, geometría GIS y el muestreo de `gis_tracking_auto` (intervalo, filtro 0 m, duración máxima). Siguen fuera de alcance web: GPS con pantalla bloqueada, cifrado de IndexedDB y tareas nativas en background. El envío poda respuestas ocultas, adjunta GPS de alta precisión en cada cierre, y al volver la red dispara el lote pendiente. En `origin/dev` del backend la campaña ya publica `geo_enforcement` (`off`/`warn`/`block`) y `field_tracking` como objeto, y la respuesta persiste `field_session_client_id`.
 > **Purpose:** Referencia obligatoria para desarrolladores — cualquier feature nueva debe consult aquí antes de implementarse.
 
 ---

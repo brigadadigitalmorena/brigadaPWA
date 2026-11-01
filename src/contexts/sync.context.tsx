@@ -55,14 +55,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    return () => window.removeEventListener('offline', handleOffline);
   }, []);
 
   const pendingCount =
@@ -196,21 +191,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Wake on reconnect
-  const wasOnline = useRef(isOnline);
+  // Wake the pending batch as soon as the browser reports a connection.
   useEffect(() => {
-    if (isOnline && !wasOnline.current) {
-      const t = setTimeout(() => {
-        syncNow();
-        void import('@/lib/services/static-maps-sync.service').then((m) =>
-          m.syncStaticMaps()
-        );
-      }, 1000);
-      wasOnline.current = isOnline;
-      return () => clearTimeout(t);
-    }
-    wasOnline.current = isOnline;
-  }, [isOnline, syncNow]);
+    const handleOnline = () => {
+      setIsOnline(true);
+      void syncNow();
+      void import('@/lib/services/static-maps-sync.service').then((m) =>
+        m.syncStaticMaps()
+      );
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [syncNow]);
 
   // Wake on visibility / focus
   useEffect(() => {

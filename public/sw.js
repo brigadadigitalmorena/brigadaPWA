@@ -3519,12 +3519,17 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       ]
     })
   );
-  setDefaultHandler(
-    new NetworkFirst({
-      cacheName: "default-cache",
-      networkTimeoutSeconds: 3
-    })
-  );
+  var defaultGetHandler = new NetworkFirst({
+    cacheName: "default-cache",
+    networkTimeoutSeconds: 3
+  });
+  setDefaultHandler(async (options) => {
+    const method = options.request.method;
+    if (method !== "GET" && method !== "HEAD") {
+      return fetch(options.request);
+    }
+    return defaultGetHandler.handle(options);
+  });
   setCatchHandler(async ({ request, event }) => {
     if (request.mode === "navigate") {
       return navigationHandler({ request, event });

@@ -17,17 +17,36 @@ function parseMaybeJson(
   }
 }
 
+function readExpression(
+  question: Question,
+  keys: Array<keyof Question>
+): Record<string, unknown> | null {
+  for (const key of keys) {
+    const parsed = parseMaybeJson(
+      question[key] as string | Record<string, unknown> | null | undefined
+    );
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 function questionToField(question: Question): FormSchemaFieldResponse {
   return {
     question_id: question.id,
     question_key: question.question_key ?? null,
     type: question.question_type,
     label: question.question_text,
+    label_expression: readExpression(question, ['label_expression']),
     required: question.is_required,
+    is_required_expr: readExpression(question, ['is_required_expr']),
     relevance: parseMaybeJson(question.relevance_expression),
     constraint: parseMaybeJson(question.constraint_expression),
+    constraint_message: question.constraint_message ?? null,
     calculated: parseMaybeJson(question.calculated_expression),
-    default_expression: parseMaybeJson(question.default_value_expression),
+    default_expression: readExpression(question, [
+      'default_expression',
+      'default_value_expression',
+    ]),
     appearance: question.appearance ?? null,
     ui: (question.ui as Record<string, unknown> | undefined) ?? null,
     options: (question.options ?? []).map((opt) => ({

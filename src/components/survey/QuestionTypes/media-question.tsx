@@ -15,7 +15,8 @@ import { QuestionRendererProps } from './question-renderer';
 export function MediaQuestion({
   question,
   error,
-}: Omit<QuestionRendererProps, 'onChange' | 'value' | 'disabled'>) {
+  onChange,
+}: Omit<QuestionRendererProps, 'value' | 'disabled'>) {
   const { files, setFiles, removeFile, responseId } = useSurveyFillStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -49,6 +50,11 @@ export function MediaQuestion({
           ? DOCUMENT_ACCEPT
           : '*/*';
 
+  const publishFiles = (nextFiles: typeof questionFiles) => {
+    setFiles(questionKey, nextFiles);
+    onChange(nextFiles.length > 0 ? nextFiles.map((file) => file.fileId) : null);
+  };
+
   const storeFile = async (originalFile: File) => {
     const file = isPhoto ? await compressPhoto(originalFile) : originalFile;
     const fileId = generateLocalId();
@@ -69,7 +75,7 @@ export function MediaQuestion({
 
     const previews = await Promise.all(selectedFiles.map(storeFile));
 
-    setFiles(questionKey, [...questionFiles, ...previews]);
+    publishFiles([...questionFiles, ...previews]);
 
     if (inputRef.current) {
       inputRef.current.value = '';
@@ -85,6 +91,8 @@ export function MediaQuestion({
       await deleteFileBlob(file.fileId);
     }
     removeFile(questionKey, fileId);
+    const remaining = questionFiles.filter((item) => item.id !== fileId);
+    onChange(remaining.length > 0 ? remaining.map((item) => item.fileId) : null);
   };
 
   return (
@@ -139,7 +147,7 @@ export function MediaQuestion({
           maxDurationS={durationLimit}
           onCapture={async (file) => {
             const preview = await storeFile(file);
-            setFiles(questionKey, [...questionFiles, preview]);
+            publishFiles([...questionFiles, preview]);
           }}
         />
       )}
@@ -206,7 +214,7 @@ export function MediaQuestion({
             });
             const preview = await storeFile(file);
             const remaining = questionFiles.filter((item) => item.id !== annotatingId);
-            setFiles(questionKey, [...remaining, preview]);
+            publishFiles([...remaining, preview]);
             setAnnotatingId(null);
           }}
         />

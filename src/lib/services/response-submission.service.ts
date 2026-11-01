@@ -8,7 +8,11 @@ import { readCachedEntitlement } from '@/lib/utils/survey-version';
 import { readDurableEntitlements } from '@/lib/services/entitlement-cache.service';
 import { matchEntitlement } from '@/lib/campaigns/scope';
 import { fieldSessionService } from '@/lib/services/field-session.service';
-import { captureLocationIfRequired } from '@/lib/api/survey.service';
+import { pruneHiddenAnswers } from '@/lib/forms/prune-hidden-answers';
+import {
+  captureLocationIfRequired,
+  captureSubmitLocation,
+} from '@/lib/api/survey.service';
 
 export interface FinalizeResponseInput {
   responseId: string;
@@ -26,6 +30,11 @@ export interface FinalizeResponseInput {
   surveyType?: string | null;
   campaignId?: number | null;
   entitlementId?: number | null;
+  /**
+   * Keys currently visible in `formEngine.visibleFields`.
+   * When present, answers for any other key are dropped before queueing.
+   */
+  visibleAnswerKeys?: readonly string[];
 }
 
 function getAppVersion(): string {
@@ -70,9 +79,21 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
   const resolvedEntitlement = cachedEntitlement ?? durableMatch;
   const surveyType = resolveSurveyType(input.surveyId, input.surveyType);
   const isManagement = surveyType === 'gestion';
+  const visibleKeys = input.visibleAnswerKeys
+    ? new Set(input.visibleAnswerKeys)
+    : null;
+  const answers = visibleKeys
+    ? pruneHiddenAnswers(input.answers, visibleKeys)
+    : input.answers;
+  const files = visibleKeys
+    ? Object.fromEntries(
+        Object.entries(input.files).filter(([key]) => visibleKeys.has(key))
+      )
+    : input.files;
+  const freshLocation = await captureSubmitLocation(input.location);
   const location = await captureLocationIfRequired(
     resolvedEntitlement,
-    input.location,
+    freshLocation,
   );
   // FIELD-TRACK-1 — resolved now, not at sync time: by the time the queue
   // drains, the brigadista may have already ended this route.
@@ -84,7 +105,7 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
     survey_id: input.surveyId,
     survey_version: versionString,
     status: 'completed',
-    answers_json: JSON.stringify(input.answers),
+    answers_json: JSON.stringify(answers),
     brigadista_user_id: user.id.toString(),
     brigadista_name: `${user.nombre} ${user.apellido}`,
     brigadista_role: user.role_key,
@@ -126,7 +147,7 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
 
     await db.responses.put(response);
 
-    const allFiles = Object.values(input.files).flat();
+    const allFiles = Object.values(files).flat();
 
     for (const preview of allFiles) {
       const fileId = preview.fileId || generateLocalId();
@@ -203,7 +224,7 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
       payload_json: JSON.stringify({
         response_id: input.responseId,
         version_id: input.version.id,
-        answers: input.answers,
+        answers,
         questions: input.version.sections
           ?.flatMap((s) => s.questions || [])
           .map((q) => ({ id: q.id, question_key: q.question_key })),

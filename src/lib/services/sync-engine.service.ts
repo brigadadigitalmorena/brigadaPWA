@@ -31,6 +31,7 @@ import {
   recordSubmitOutcome,
   normalizeConfirmDocumentPayload,
   SYNC_PRIORITY,
+  SYNC_TIMEOUTS,
 } from '@/lib/sync';
 import {
   classifySampleReadiness,
@@ -99,6 +100,40 @@ function emptyRun(
   skippedReason?: SyncRunResult['skippedReason']
 ): SyncRunResult {
   return { attempted: 0, succeeded: 0, failed: 0, skippedReason, errors: [] };
+}
+
+function syncFailureMessage(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  const raw = err instanceof Error ? err.message : '';
+  if (
+    code === 'ECONNABORTED' ||
+    code === 'ERR_CANCELED' ||
+    raw.toLowerCase().includes('timeout') ||
+    raw.toLowerCase().includes('tardó demasiado') ||
+    raw.toLowerCase().includes('aborted')
+  ) {
+    return 'La red tardó demasiado. El envío no se confirmó y sigue pendiente.';
+  }
+  return getApiErrorMessage(err, raw || 'Error desconocido');
+}
+
+async function fetchWithDeadline(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error('La subida tardó demasiado');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const SYNC_LOCK_NAME = 'brigada-sync-queue';
@@ -201,10 +236,7 @@ async function drainSyncQueue(options?: SyncEngineOptions): Promise<SyncRunResul
         recordSubmitOutcome(outcome);
         result = {
           success: false,
-          error: getApiErrorMessage(
-            err,
-            err instanceof Error ? err.message : 'Error desconocido'
-          ),
+          error: syncFailureMessage(err),
           errorCode: outcome === 'network_failure' ? 'NETWORK_FAILURE' : 'SYNC_ERROR',
         };
       }
@@ -568,11 +600,15 @@ async function processFileItem(
       return { success: false, error: 'URL de subida no disponible', errorCode: 'PRESIGN_MISSING' };
     }
 
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: fileBlob,
-      headers: { 'Content-Type': localFile.mime_type },
-    });
+    const uploadResponse = await fetchWithDeadline(
+      uploadUrl,
+      {
+        method: 'PUT',
+        body: fileBlob,
+        headers: { 'Content-Type': localFile.mime_type },
+      },
+      SYNC_TIMEOUTS.FILE_PUT_MS
+    );
 
     if (!uploadResponse.ok) {
       const code =

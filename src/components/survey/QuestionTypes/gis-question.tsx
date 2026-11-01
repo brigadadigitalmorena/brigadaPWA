@@ -18,6 +18,7 @@ import {
 import { createBasemapStyle, resizeMapWhenReady } from '@/lib/maps/basemap-style';
 import {
   gisSampleIntervalMs,
+  maxDurationSeconds,
   readTrack,
   type GisTrack,
 } from '@/lib/forms/field-rules';
@@ -334,6 +335,8 @@ export function GisQuestion({
           value={value}
           disabled={disabled}
           intervalMs={gisSampleIntervalMs(question.validation_rules)}
+          maxDurationS={maxDurationSeconds(question.validation_rules)}
+          minDistanceM={0}
           onChange={onChange}
         />
       )}

@@ -97,7 +97,7 @@ await db.transaction('rw', db.responses, db.sync_queue, async () => {
 - Process queue when online
 - Exponential backoff for retries
 - Dead letter queue for permanent failures
-- “Último confirmado” advances only after the server accepts at least one item. A tap on Enviar / Sincronizar ahora reports that result in place; a lock or an empty attempt does not move the clock.
+- “Último confirmado” advances only after the server accepts at least one item. A tap on Enviar / Sincronizar ahora reports that result in place; a lock or an empty attempt does not move the clock. A stalled upload or API call gives up (12s for the API, 20s for the file) and says the send was not confirmed.
 
 ### Service Worker
 
@@ -139,7 +139,7 @@ const assignments = await getMyAssignments();
 await submitResponse(responseData);
 ```
 
-Resume a local draft from `/drafts` via `surveyResumeHref` (`resumeDraftId` + campaign/entitlement). Missing query ids must stay `null` (`Number(null) === 0` breaks Dexie fallback). Offline Continuar uses a hard navigation so the SW fill shell can load.
+Resume a local draft from `/drafts` via `surveyResumeHref` (`resumeDraftId` + campaign/entitlement). Missing query ids must stay `null` (`Number(null) === 0` breaks Dexie fallback). Offline Continuar uses a hard navigation so the SW fill shell can load. On the fill screen, a required photo counts once the file is attached, the validation notice stays on the question, and Anterior / Borrador / Siguiente rise above the mobile keyboard.
 
 ## Conventions
 

@@ -34,13 +34,19 @@ export function barcodePattern(
   return typeof pattern === 'string' && pattern.trim() ? pattern : undefined;
 }
 
+function anchoredPattern(pattern: string): string {
+  const trimmed = pattern.trim();
+  if (trimmed.startsWith('^') && trimmed.endsWith('$')) return trimmed;
+  return `^(?:${trimmed})$`;
+}
+
 export function matchesBarcodePattern(
   value: string,
   pattern: string | undefined
 ): boolean {
   if (!pattern) return true;
   try {
-    return new RegExp(pattern).test(value);
+    return new RegExp(anchoredPattern(pattern)).test(value);
   } catch {
     return true;
   }
@@ -49,7 +55,9 @@ export function matchesBarcodePattern(
 export function maxDurationSeconds(
   rules: ValidationRules | undefined
 ): number | undefined {
-  const value = ruleNumber(rules, 'max_duration_s');
+  const value =
+    ruleNumber(rules, 'max_duration_s') ??
+    ruleNumber(rules, 'max_duration_seconds');
   if (value == null || value <= 0) return undefined;
   return value;
 }
@@ -144,6 +152,10 @@ export function appendTrackSample(
 }
 
 export function gisSampleIntervalMs(rules: ValidationRules | undefined): number {
-  const seconds = ruleNumber(rules, 'interval_s') ?? 30;
+  const seconds =
+    ruleNumber(rules, 'interval_s') ??
+    ruleNumber(rules, 'sample_interval_s') ??
+    ruleNumber(rules, 'interval_seconds') ??
+    30;
   return Math.max(30, seconds) * 1000;
 }

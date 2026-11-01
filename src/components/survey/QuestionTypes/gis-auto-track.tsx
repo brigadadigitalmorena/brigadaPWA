@@ -12,6 +12,9 @@ interface GisAutoTrackProps {
   value: unknown;
   disabled?: boolean;
   intervalMs: number;
+  /** Auto mode keeps every sample. Manual callers can pass a positive filter. */
+  minDistanceM?: number;
+  maxDurationS?: number;
   onChange: (value: GisTrack) => void;
 }
 
@@ -19,6 +22,8 @@ export function GisAutoTrack({
   value,
   disabled,
   intervalMs,
+  minDistanceM = 0,
+  maxDurationS,
   onChange,
 }: GisAutoTrackProps) {
   const [tracking, setTracking] = useState(false);
@@ -33,30 +38,57 @@ export function GisAutoTrack({
 
   useEffect(() => {
     if (!tracking) return;
-    let watchId = 0;
-    const sample = (position: GeolocationPosition) => {
-      const current = readTrack(valueRef.current);
-      const next = appendTrackSample(
-        current,
-        [position.coords.longitude, position.coords.latitude],
-        new Date(position.timestamp).toISOString(),
-        5
-      );
-      if (next.coordinates.length !== current.coordinates.length) {
-        valueRef.current = next;
-        onChangeRef.current(next);
-      }
-    };
     if (!navigator.geolocation) {
       setMessage('Geolocalización no disponible');
       setTracking(false);
       return;
     }
-    watchId = navigator.geolocation.watchPosition(sample, () => {
-      setMessage('No se pudo leer el GPS. Reintentando…');
-    }, { enableHighAccuracy: true, maximumAge: intervalMs });
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [intervalMs, tracking]);
+
+    let cancelled = false;
+    const startedAt = Date.now();
+
+    const sample = () => {
+      if (cancelled) return;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (cancelled) return;
+          const current = readTrack(valueRef.current);
+          const next = appendTrackSample(
+            current,
+            [position.coords.longitude, position.coords.latitude],
+            new Date(position.timestamp).toISOString(),
+            minDistanceM
+          );
+          if (next.coordinates.length !== current.coordinates.length) {
+            valueRef.current = next;
+            onChangeRef.current(next);
+          }
+        },
+        () => {
+          if (!cancelled) setMessage('No se pudo leer el GPS. Reintentando…');
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }
+      );
+    };
+
+    sample();
+    const intervalId = window.setInterval(() => {
+      if (
+        maxDurationS != null &&
+        (Date.now() - startedAt) / 1000 >= maxDurationS
+      ) {
+        setMessage(`Duración máxima alcanzada (${maxDurationS} s).`);
+        setTracking(false);
+        return;
+      }
+      sample();
+    }, intervalMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [intervalMs, maxDurationS, minDistanceM, tracking]);
 
   return (
     <div className="space-y-2">
@@ -65,7 +97,10 @@ export function GisAutoTrack({
         variant={tracking ? 'destructive' : 'outline'}
         size="mobile"
         disabled={disabled}
-        onClick={() => setTracking((current) => !current)}
+        onClick={() => {
+          setMessage(null);
+          setTracking((current) => !current);
+        }}
       >
         {tracking ? 'Detener recorrido automático' : 'Iniciar recorrido automático'}
       </Button>

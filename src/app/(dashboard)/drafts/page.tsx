@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { FileEdit, Trash2 } from 'lucide-react';
 import { readCachedEntitlement } from '@/lib/utils/survey-version';
 import { deleteDraft } from '@/lib/services/draft.service';
+import { toast } from 'sonner';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { parseOptionalScopeId, surveyResumeHref } from '@/lib/campaigns/scope';
 import { navigateToSurveyFill } from '@/lib/services/offline-warm.service';
@@ -80,7 +81,11 @@ export default function DraftsPage() {
 
     setDeletingId(responseId);
     try {
-      await deleteDraft(responseId);
+      const removed = await deleteDraft(responseId);
+      if (removed) toast.success('Borrador eliminado.');
+      else toast.error('No se pudo borrar el borrador.');
+    } catch {
+      toast.error('No se pudo borrar el borrador. Intenta de nuevo.');
     } finally {
       setDeletingId(null);
     }
@@ -134,7 +139,7 @@ export default function DraftsPage() {
                       }
                       aria-label={`Borrar borrador ${draft.survey_title}`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletingId === draft.response_id ? 'Borrando…' : <Trash2 className="h-4 w-4" />}
                     </Button>
                     <Link
                       href={href}

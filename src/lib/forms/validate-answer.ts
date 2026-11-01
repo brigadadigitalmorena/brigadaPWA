@@ -12,6 +12,7 @@ import {
   resolveRequiredIneFields,
 } from '@/lib/forms/ine-answer';
 import { isCompleteZip, parseZipValue } from '@/lib/forms/zip-answer';
+import { validateStructuredAnswer } from '@/lib/forms/validate-structured-answer';
 import { normalizeQuestionType } from '@/lib/survey/question-type-registry';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,9 +80,20 @@ export function coerceYesNoValue(value: unknown): boolean | undefined {
 
 function parseDateValue(value: unknown): Date | null {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const parsed = new Date(value);
+  const normalized = value.includes('T') ? value : `${value}T00:00:00`;
+  const parsed = new Date(normalized);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+}
+
+function resolveDateRule(raw: unknown, now = new Date()): Date | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const token = raw.trim().toLowerCase();
+  if (token === 'today') {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  if (token === 'now') return now;
+  return parseDateValue(raw);
 }
 
 function ageInYears(birth: Date, now: Date): number {
@@ -251,6 +263,15 @@ export function validateAnswer(
         }
       }
     }
+
+    const step = toFiniteNumber(rules.step);
+    if (step !== null && step > 0) {
+      const base = minValue ?? 0;
+      const units = (numericValue - base) / step;
+      if (Math.abs(units - Math.round(units)) > 1e-8) {
+        return `El valor debe avanzar en incrementos de ${step}`;
+      }
+    }
   }
 
   if (Array.isArray(value)) {
@@ -275,10 +296,16 @@ export function validateAnswer(
     Boolean(rules.not_future) ||
     typeof rules.min_date === 'string' ||
     typeof rules.max_date === 'string' ||
+    typeof rules.min_datetime === 'string' ||
+    typeof rules.max_datetime === 'string' ||
     minAge !== null ||
     maxAge !== null;
 
-  if (hasDateRestrictions && !NUMERIC_TYPES.has(questionType)) {
+  if (
+    hasDateRestrictions &&
+    !NUMERIC_TYPES.has(questionType) &&
+    questionType !== 'time'
+  ) {
     const dateValue = parseDateValue(value);
     if (!dateValue) {
       return 'Ingresa una fecha válida';
@@ -289,12 +316,18 @@ export function validateAnswer(
       return 'La fecha no puede ser futura';
     }
 
-    const minDate = parseDateValue(rules.min_date);
+    const minDate = resolveDateRule(
+      typeof rules.min_datetime === 'string' ? rules.min_datetime : rules.min_date,
+      now
+    );
     if (minDate && dateValue < minDate) {
       return 'La fecha es anterior al mínimo permitido';
     }
 
-    const maxDate = parseDateValue(rules.max_date);
+    const maxDate = resolveDateRule(
+      typeof rules.max_datetime === 'string' ? rules.max_datetime : rules.max_date,
+      now
+    );
     if (maxDate && dateValue > maxDate) {
       return 'La fecha supera el máximo permitido';
     }
@@ -308,7 +341,7 @@ export function validateAnswer(
     }
   }
 
-  return null;
+  return validateStructuredAnswer(questionType, value, rules);
 }
 
 export function questionKeyOf(question: Question): string {
