@@ -115,6 +115,10 @@ Estas librerías interpretan el **mismo JSON** que publica el CMS. Si una versi�
 
 **Implicación:** no reutilizar el `client.ts` del CMS en el PWA. El PWA debe seguir el cliente **móvil** (Bearer JWT, `/mobile/*`).
 
+**PWA sync vs sesión (2026-11-10):** `SyncProvider` vive en el layout raíz (también sobre `/login`). Los wakes automáticos (`focus` / `visibility` / `online` / SW / cola pendiente) **no** deben pintar el banner *“No hay sesión activa…”* sin token: se omiten o se tratan como idle silencioso. Al pasar a autenticado (login o boot con JWT), se limpia el aviso sticky y se reintenta el drenado con sesión.
+
+**PWA file upload `Failed to fetch` (2026-11-10):** Los ítems `Archivo` hacen `PUT` directo a R2 con `fetch`. Si el bucket no tiene CORS para el origen del PWA, o la API/proxy está caída, el navegador lanza `Failed to fetch`. La UI ahora mapea eso a `R2_CORS_OR_NETWORK` (mensaje en español). En backend: `python scripts/configure_r2_cors.py` sobre `brigada-dev`, y levantar el stack con `./scripts/start-local.sh` / `docker-compose.local.yml`.
+
 ### 3.2 Quién puede entrar dónde
 
 | Rol / permiso | CMS | Móvil | PWA |

@@ -30,6 +30,7 @@ import {
   classifySubmitError,
   recordSubmitOutcome,
   normalizeConfirmDocumentPayload,
+  describeUploadError,
   SYNC_PRIORITY,
   SYNC_TIMEOUTS,
 } from '@/lib/sync';
@@ -105,14 +106,24 @@ function emptyRun(
 function syncFailureMessage(err: unknown): string {
   const code = (err as { code?: string } | null)?.code;
   const raw = err instanceof Error ? err.message : '';
+  const normalized = raw.toLowerCase();
   if (
     code === 'ECONNABORTED' ||
     code === 'ERR_CANCELED' ||
-    raw.toLowerCase().includes('timeout') ||
-    raw.toLowerCase().includes('tardó demasiado') ||
-    raw.toLowerCase().includes('aborted')
+    normalized.includes('timeout') ||
+    normalized.includes('tardó demasiado') ||
+    normalized.includes('aborted')
   ) {
     return 'La red tardó demasiado. El envío no se confirmó y sigue pendiente.';
+  }
+  // Axios/browser network failures often surface as opaque English strings.
+  if (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network error') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed')
+  ) {
+    return 'No hay conexión con el servidor o el almacenamiento. Revisa la red e intenta de nuevo.';
   }
   return getApiErrorMessage(err, raw || 'Error desconocido');
 }
@@ -600,15 +611,26 @@ async function processFileItem(
       return { success: false, error: 'URL de subida no disponible', errorCode: 'PRESIGN_MISSING' };
     }
 
-    const uploadResponse = await fetchWithDeadline(
-      uploadUrl,
-      {
-        method: 'PUT',
-        body: fileBlob,
-        headers: { 'Content-Type': localFile.mime_type },
-      },
-      SYNC_TIMEOUTS.FILE_PUT_MS
-    );
+    let uploadResponse: globalThis.Response;
+    try {
+      uploadResponse = await fetchWithDeadline(
+        uploadUrl,
+        {
+          method: 'PUT',
+          body: fileBlob,
+          headers: { 'Content-Type': localFile.mime_type },
+        },
+        SYNC_TIMEOUTS.FILE_PUT_MS
+      );
+    } catch (putErr) {
+      const mapped = describeUploadError(putErr);
+      recordSubmitOutcome('network_failure');
+      return {
+        success: false,
+        error: mapped.message,
+        errorCode: mapped.code,
+      };
+    }
 
     if (!uploadResponse.ok) {
       const code =
@@ -624,34 +646,56 @@ async function processFileItem(
           presigned_expires_at: undefined,
         } as Partial<LocalFile>);
       }
+      const mapped = describeUploadError(
+        new Error(`upload failed with status ${uploadResponse.status}`)
+      );
       return {
         success: false,
-        error: `Error al subir archivo: ${uploadResponse.status}`,
+        error:
+          code === 'R2_403_EXPIRED'
+            ? mapped.message
+            : code === 'R2_RATE_LIMITED'
+              ? mapped.message
+              : `Error al subir archivo: ${uploadResponse.status}`,
         errorCode: code,
       };
     }
 
-    const finalRemote = remoteUrl || uploadUrl.split('?')[0];
-    await confirmFileUpload({
-      document_id: documentId,
-      remote_url: finalRemote,
-      storage_key: storageKey,
-    });
-
-    if (localFile.id !== undefined) {
-      await db.local_files.update(localFile.id, {
-        sync_status: 'uploaded',
+    try {
+      const finalRemote = remoteUrl || uploadUrl.split('?')[0];
+      await confirmFileUpload({
         document_id: documentId,
-        storage_key: storageKey,
         remote_url: finalRemote,
-        uploaded_at: new Date().toISOString(),
-        confirmed_at: new Date().toISOString(),
-      } as Partial<LocalFile>);
-    }
+        storage_key: storageKey,
+      });
 
-    await deleteFileBlob(localFile.file_id);
-    recordSubmitOutcome('success');
-    return { success: true };
+      if (localFile.id !== undefined) {
+        await db.local_files.update(localFile.id, {
+          sync_status: 'uploaded',
+          document_id: documentId,
+          storage_key: storageKey,
+          remote_url: finalRemote,
+          uploaded_at: new Date().toISOString(),
+          confirmed_at: new Date().toISOString(),
+        } as Partial<LocalFile>);
+      }
+
+      await deleteFileBlob(localFile.file_id);
+      recordSubmitOutcome('success');
+      return { success: true };
+    } catch (confirmErr) {
+      const mapped = describeUploadError(confirmErr);
+      // Prefer API message when present; fall back to upload-oriented copy.
+      const apiMessage = getApiErrorMessage(confirmErr, '');
+      return {
+        success: false,
+        error: apiMessage || mapped.message,
+        errorCode:
+          (confirmErr as { response?: { status?: number } })?.response?.status === 401
+            ? 'AUTH_REQUIRED'
+            : mapped.code,
+      };
+    }
   } finally {
     inFlightUploads.delete(file_id);
   }

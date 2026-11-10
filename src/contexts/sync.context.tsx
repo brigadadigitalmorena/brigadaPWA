@@ -20,7 +20,14 @@ import {
 import { configureOnlineModeKv } from '@/lib/sync';
 import { describeSyncRun, type SyncRunNotice } from '@/lib/sync/sync-run';
 import { fieldSessionService } from '@/lib/services/field-session.service';
+import { getAccessToken, loadTokensFromStorage } from '@/lib/api/client';
+import { useAuth } from '@/contexts/auth.context';
 import { toast } from 'sonner';
+
+function hasAccessSession(): boolean {
+  loadTokensFromStorage();
+  return Boolean(getAccessToken());
+}
 
 const LAST_SYNC_KEY = 'brigada_last_confirmed_sync_at';
 
@@ -43,12 +50,14 @@ configureOnlineModeKv({
 });
 
 export function SyncProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
   const [syncNotice, setSyncNotice] = useState<SyncRunNotice | null>(null);
   const [extraStats, setExtraStats] = useState({ deadLetter: 0, retryWait: 0 });
   const isSyncingRef = useRef(false);
+  const wasAuthenticatedRef = useRef(false);
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -89,6 +98,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const syncNow = useCallback(async (source?: 'user') => {
     const manual = source === 'user';
 
+    // Auto wakes must not surface "no session" while the user is still on
+    // /login — SyncProvider lives in the root layout and outlives auth.
+    if (!manual && !hasAccessSession()) {
+      return;
+    }
+
     if (!navigator.onLine) {
       const notice: SyncRunNotice = {
         tone: 'warning',
@@ -121,9 +136,15 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         onProgress: (message) => console.log('Sync progress:', message),
       });
       const notice = describeSyncRun(result);
-      const quietIdle = result.attempted === 0 && !result.skippedReason && !manual;
+      // no_session on a background wake is expected pre-login; never sticky-banner it.
+      const quietNoSession = result.skippedReason === 'no_session' && !manual;
+      const quietIdle =
+        quietNoSession ||
+        (result.attempted === 0 && !result.skippedReason && !manual);
 
-      if (notice.confirmed) {
+      if (quietNoSession) {
+        // Leave UI alone; login / auth effect will clear + retry with a token.
+      } else if (notice.confirmed) {
         const stamped = new Date().toISOString();
         setLastSyncedAt(stamped);
         try {
@@ -190,6 +211,26 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       console.error('Clear dead letter failed:', err);
     }
   }, []);
+
+  // Login / boot with token: drop sticky pre-auth notices and drain with a session.
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      wasAuthenticatedRef.current = false;
+      return;
+    }
+
+    const justSignedIn = !wasAuthenticatedRef.current;
+    wasAuthenticatedRef.current = true;
+    if (!justSignedIn) return;
+
+    setError(undefined);
+    setSyncNotice(null);
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      void syncNow();
+    }
+  }, [authLoading, isAuthenticated, syncNow]);
 
   // Wake the pending batch as soon as the browser reports a connection.
   useEffect(() => {

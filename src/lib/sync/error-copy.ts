@@ -198,6 +198,43 @@ const TABLE: Record<string, SyncErrorCopy> = {
     action: "Reintenta la sincronización.",
     needsManualFix: false,
   },
+  r2_cors_or_network: {
+    title: "No se pudo subir el archivo",
+    body: "El navegador no alcanzó el almacenamiento (CORS o red).",
+    action:
+      "Revisa la conexión. Si estás en local, confirma que la API esté arriba y que el bucket R2 permita el origen del PWA.",
+    needsManualFix: false,
+  },
+  r2_put_timeout: {
+    title: "Subida lenta",
+    action: "La red está lenta. El archivo se reintentará automáticamente.",
+    needsManualFix: false,
+  },
+  r2_put_transient: {
+    title: "Almacenamiento no disponible",
+    action: "Se reintentará automáticamente cuando la red responda.",
+    needsManualFix: false,
+  },
+  dns_resolution_failed: {
+    title: "No se resolvió el almacenamiento",
+    action: "Revisa DNS/VPN e intenta de nuevo.",
+    needsManualFix: false,
+  },
+  r2_403_permission: {
+    title: "Almacenamiento rechazó el archivo",
+    action: "Contacta a soporte si el error continúa.",
+    needsManualFix: true,
+  },
+  r2_rate_limited: {
+    title: "Demasiadas subidas",
+    action: "Espera un momento; el envío se reintentará solo.",
+    needsManualFix: false,
+  },
+  r2_403_expired: {
+    title: "Enlace de subida expirado",
+    action: "Se pedirá un enlace nuevo en el próximo intento.",
+    needsManualFix: false,
+  },
   field_session_not_synced: {
     title: "Preparando el recorrido",
     body: "Primero se registrará el recorrido y después se enviarán sus puntos.",

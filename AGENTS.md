@@ -98,6 +98,8 @@ await db.transaction('rw', db.responses, db.sync_queue, async () => {
 - Exponential backoff for retries
 - Dead letter queue for permanent failures
 - “Último confirmado” advances only after the server accepts at least one item. A tap on Enviar / Sincronizar ahora reports that result in place; a lock or an empty attempt does not move the clock. A stalled upload or API call gives up (12s for the API, 20s for the file) and says the send was not confirmed.
+- Auto-sync must not banner `no_session` while on `/login` (`SyncProvider` is root-level). On auth, clear sticky sync error and drain with a token.
+- Browser `Failed to fetch` on file PUT maps to `R2_CORS_OR_NETWORK` (not a raw English toast). Local uploads need API up + R2 bucket CORS for the PWA origin (`brigadaBackEnd/scripts/configure_r2_cors.py`).
 
 ### Service Worker
 
