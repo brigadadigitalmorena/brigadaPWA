@@ -2,13 +2,14 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, FileEdit, CloudOff } from 'lucide-react';
+import { AlertTriangle, ChevronRight, FileEdit, CloudOff } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import { Button } from '@/components/ui/button';
 import { RecorridoBanner } from '@/components/banners/recorrido-banner';
 import { FieldAlertBanners } from '@/components/banners/field-alert-banners';
+import { cn } from '@/lib/utils';
 
 function goTo(path: string) {
   // Hard navigation so SW / offline soft-nav does not strand the user.
@@ -91,18 +92,23 @@ export function FieldStatusBanners() {
       )}
 
       {draftCount > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 flex items-center gap-3">
-          <FileEdit className="h-5 w-5 text-amber-600 shrink-0" />
-          <div className="flex-1 text-sm min-w-0">
-            <p className="font-medium">
-              {draftCount} borrador{draftCount !== 1 ? 'es' : ''} guardado
-              {draftCount !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => goTo('/drafts')}>
-            Continuar
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={() => goTo('/drafts')}
+          className={cn(
+            'flex w-full items-center gap-2.5 rounded-xl border border-amber-500/25',
+            'bg-amber-500/5 px-3 py-2 text-left transition-colors',
+            'hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          )}
+          aria-label={`Continuar ${draftCount} borrador${draftCount !== 1 ? 'es' : ''} guardado${draftCount !== 1 ? 's' : ''}`}
+        >
+          <FileEdit className="h-4 w-4 shrink-0 text-amber-600" />
+          <span className="min-w-0 flex-1 text-sm font-medium">
+            {draftCount} borrador{draftCount !== 1 ? 'es' : ''} guardado
+            {draftCount !== 1 ? 's' : ''}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-amber-700/70" />
+        </button>
       )}
 
       {syncNotice?.confirmed && (

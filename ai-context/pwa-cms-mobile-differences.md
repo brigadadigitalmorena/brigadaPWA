@@ -160,9 +160,10 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - ZIP: `/mobile/zip-lookup/{code}`
 - Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
-- Redes: `GET /public/app-config` → `social_links` (`/networks`). El proxy de Next deja pasar `public/app-config` sin token (el cliente no manda `Authorization` en `/public/`). La lista se cachea en `localStorage`. El QR se genera en el cliente a partir de `url`, igual que en móvil.
+- Redes: `GET /public/app-config` → `social_links` (`/networks`). El proxy de Next deja pasar `public/app-config` sin token (el cliente no manda `Authorization` en `/public/`). La lista se cachea en `localStorage`. El QR se genera en el cliente a partir de `url`, igual que en móvil. UI: cards sin URL cruda, botón Compartir primario + iconos Abrir/QR, icono de plataforma.
+- Bottom nav móvil: 5 slots (Inicio, Encuestas, Mapas, Recorridos, **Más**). Borradores / Prioritarias / Gestión / Redes / Envíos / Ayuda / Apoyo viven en el sheet `MoreNavSheet`.
 - Ayuda: `/help` FAQ estático (paridad con móvil `app/help.tsx`: tips, mismas secciones, correo de soporte). Visible en sidebar, Inicio y menú de usuario (en móvil la entrada está en Perfil).
-- Modo Apoyo (`/mobile/support/*`): **no** hay UI en PWA ni en móvil; se mantiene solo en backend hasta implementar en ambos.
+- Modo Apoyo: `/support` (dueño: crear/listar/QR/revocar/reactivar/duplicar) y `/support-join` (helper por código, paridad con `support-mode.tsx` + `support-join.tsx` de `brigadaApp/dev`). Banner en sesión helper. API `/mobile/support/*`.
 - Reporte: `/report` abre el cliente de correo (el móvil usa el compositor nativo)
 
 ### 4.2 Endpoints de campo que el PWA **aún no** consume (móvil sí o backend ya existe)

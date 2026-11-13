@@ -1,6 +1,7 @@
 import {
   ClipboardList,
   FilePenLine,
+  Handshake,
   House,
   LifeBuoy,
   ListChecks,
@@ -61,6 +62,26 @@ export const NAV_ITEMS: NavItem[] = [
     description: 'Tus encuestas asignadas',
   },
   {
+    label: 'Mapas',
+    href: '/maps',
+    icon: MapPinned,
+    module: 'maps',
+    isActive: (path) => path.startsWith('/maps'),
+    placement: 'primary',
+    sidebarGroup: 'campo',
+    description: 'Mapas y tiles offline',
+  },
+  {
+    label: 'Recorridos',
+    href: '/recorridos',
+    icon: Route,
+    module: 'recorridos',
+    isActive: (path) => path.startsWith('/recorridos'),
+    placement: 'primary',
+    sidebarGroup: 'campo',
+    description: 'Sesiones de campo',
+  },
+  {
     label: 'Borradores',
     href: '/drafts',
     icon: FilePenLine,
@@ -72,7 +93,7 @@ export const NAV_ITEMS: NavItem[] = [
     badge: 'drafts',
   },
   {
-    label: 'Extras',
+    label: 'Prioritarias',
     href: '/extras',
     icon: Zap,
     module: 'extras',
@@ -87,29 +108,9 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ListChecks,
     module: 'tracking',
     isActive: (path) => path.startsWith('/tracking'),
-    placement: 'primary',
+    placement: 'more',
     sidebarGroup: 'trabajo',
     description: 'Seguimiento de gestión',
-  },
-  {
-    label: 'Mapas',
-    href: '/maps',
-    icon: MapPinned,
-    module: 'maps',
-    isActive: (path) => path.startsWith('/maps'),
-    placement: 'more',
-    sidebarGroup: 'campo',
-    description: 'Mapas y tiles offline',
-  },
-  {
-    label: 'Recorridos',
-    href: '/recorridos',
-    icon: Route,
-    module: 'recorridos',
-    isActive: (path) => path.startsWith('/recorridos'),
-    placement: 'more',
-    sidebarGroup: 'campo',
-    description: 'Sesiones de campo',
   },
   {
     label: 'Redes',
@@ -128,7 +129,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: EnviosIcon,
     module: 'sync',
     isActive: (path) => path.startsWith('/sync'),
-    placement: 'primary',
+    placement: 'more',
     sidebarGroup: 'sincronizacion',
     description: 'Estado de sincronización',
   },
@@ -142,16 +143,27 @@ export const NAV_ITEMS: NavItem[] = [
     sidebarGroup: 'soporte',
     description: 'Preguntas frecuentes',
   },
+  {
+    label: 'Apoyo',
+    href: '/support',
+    icon: Handshake,
+    module: 'support',
+    isActive: (path) => path.startsWith('/support'),
+    placement: 'more',
+    sidebarGroup: 'soporte',
+    description: 'Modo Apoyo para helpers',
+  },
 ];
 
-const PRIMARY_ORDER = ['/home', '/surveys', '/tracking', '/sync'] as const;
+const PRIMARY_ORDER = ['/home', '/surveys', '/maps', '/recorridos'] as const;
 const MORE_ORDER = [
   '/drafts',
   '/extras',
-  '/maps',
-  '/recorridos',
+  '/tracking',
   '/networks',
+  '/sync',
   '/help',
+  '/support',
 ] as const;
 
 function sortByHref(items: NavItem[], order: readonly string[]): NavItem[] {

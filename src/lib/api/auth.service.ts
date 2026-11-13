@@ -61,7 +61,7 @@ export function mapUserFromApi(raw: UserMeResponse, previous?: User | null): Use
 /**
  * Get or generate a unique device ID for this browser
  */
-function getDeviceId(): string {
+export function getDeviceId(): string {
   if (typeof window === 'undefined') return 'web-unknown';
 
   const storageKey = 'brigada_device_id';

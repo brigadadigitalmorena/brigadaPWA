@@ -6,10 +6,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   ClipboardList,
   FilePenLine,
+  Handshake,
   LifeBuoy,
   MapPinned,
   RefreshCw,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth.context';
 import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
 import { getDailyMetrics } from '@/lib/api/metrics.service';
@@ -19,7 +21,7 @@ import { PageHeader } from '@/components/common/page-header';
 import { DailyMetricsCard } from '@/components/home/daily-metrics-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const LINKS = [
+const BASE_LINKS = [
   { href: '/surveys', label: 'Encuestas', icon: ClipboardList },
   { href: '/drafts', label: 'Borradores', icon: FilePenLine },
   { href: '/sync', label: 'Mis envíos', icon: RefreshCw },
@@ -28,8 +30,15 @@ const LINKS = [
 ];
 
 export default function HomePage() {
+  const { isSupport } = useAuth();
   const { isOnline, pendingCount } = useSync();
   const [remote, setRemote] = useState<DailyMetrics | null>(null);
+  const LINKS = isSupport
+    ? BASE_LINKS
+    : [
+        ...BASE_LINKS,
+        { href: '/support', label: 'Apoyo', icon: Handshake },
+      ];
   const responses = useLiveQuery(() => db.responses.toArray(), []);
   const drafts =
     useLiveQuery(

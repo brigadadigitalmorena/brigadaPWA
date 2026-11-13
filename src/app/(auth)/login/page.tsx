@@ -215,6 +215,14 @@ function LoginPageContent() {
                 ¿Primera vez? Activa tu cuenta
               </Link>
             </p>
+            <p>
+              <Link
+                href="/support-join"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Modo Apoyo — unirme con código
+              </Link>
+            </p>
             <div className="text-muted-foreground space-y-1">
               <p>¿Olvidaste tu contraseña?</p>
               <p>Contacta al administrador del sistema</p>

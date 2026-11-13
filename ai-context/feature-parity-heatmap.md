@@ -142,7 +142,7 @@
 | Mis envíos screen | ░ | █ | **MEDIO** |
 | Report issue screen | ▓ `/report` mailto | █ + expo-mail-composer | **BAJO** |
 | Help / FAQ | █ `/help` (nav/Inicio/menú) | █ `/help` (perfil) | — |
-| Modo Apoyo (helpers) | ░ (API only) | ░ (API only) | — (ambos sin UI) |
+| Modo Apoyo (helpers) | ▓ `/support` + `/support-join` | █ `support-mode` + `support-join` | **MEDIO** (PWA sin escáner cámara / filtro encuestas avanzado) |
 | Change avatar / edit profile | █ | █ | — |
 | Debug screens (session replay) | ░ | █ | **BAJO** |
 

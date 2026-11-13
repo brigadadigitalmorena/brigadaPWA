@@ -7,6 +7,7 @@ import {
   Sun,
   User,
   LifeBuoy,
+  Handshake,
   Share2,
   Bug,
   Palette,
@@ -33,7 +34,7 @@ interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, isSupport } = useAuth();
   const { theme, toggleTheme, mounted } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -122,13 +123,20 @@ export function UserMenu({ user }: UserMenuProps) {
 
           {(
             [
-              ['/settings/theme', 'Apariencia', Palette],
-              ['/help', 'Ayuda', LifeBuoy],
-              ['/networks', 'Redes', Share2],
-              ['/report', 'Reportar un error', Bug],
-              ['/debug', 'Diagnóstico', Bug],
-            ] as const
-          ).map(([href, label, Icon]) => (
+              { href: '/settings/theme', label: 'Apariencia', Icon: Palette },
+              { href: '/help', label: 'Ayuda', Icon: LifeBuoy },
+              ...(!isSupport
+                ? [{ href: '/support', label: 'Modo Apoyo', Icon: Handshake }]
+                : []),
+              { href: '/networks', label: 'Redes', Icon: Share2 },
+              { href: '/report', label: 'Reportar un error', Icon: Bug },
+              { href: '/debug', label: 'Diagnóstico', Icon: Bug },
+            ] as Array<{
+              href: string;
+              label: string;
+              Icon: typeof Palette;
+            }>
+          ).map(({ href, label, Icon }) => (
             <Button
               key={href}
               variant="outline"

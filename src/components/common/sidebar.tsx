@@ -17,6 +17,7 @@ import {
   Navigation,
   Share2,
   LifeBuoy,
+  Handshake,
 } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
 import { toast } from 'sonner';
@@ -31,7 +32,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ user, currentPath }: SidebarProps) {
-  const { logout } = useAuth();
+  const { logout, isSupport } = useAuth();
   const { isOnline } = useSync();
 
   const allMenuItems: Array<{
@@ -111,10 +112,18 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       module: 'help',
       isActive: (path: string) => path.startsWith('/help'),
     },
+    {
+      label: 'Apoyo',
+      href: '/support',
+      icon: Handshake,
+      module: 'support',
+      isActive: (path: string) => path.startsWith('/support'),
+    },
   ];
-  const menuItems = allMenuItems.filter((item) =>
-    isModuleEnabled(item.module, isOnline)
-  );
+  const menuItems = allMenuItems.filter((item) => {
+    if (item.module === 'support' && isSupport) return false;
+    return isModuleEnabled(item.module, isOnline);
+  });
 
   const handleLogout = async () => {
     try {
