@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ClipboardList, FilePenLine, MapPinned, RefreshCw } from 'lucide-react';
+import {
+  ClipboardList,
+  FilePenLine,
+  LifeBuoy,
+  MapPinned,
+  RefreshCw,
+} from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
 import { getDailyMetrics } from '@/lib/api/metrics.service';
@@ -18,6 +24,7 @@ const LINKS = [
   { href: '/drafts', label: 'Borradores', icon: FilePenLine },
   { href: '/sync', label: 'Mis envíos', icon: RefreshCw },
   { href: '/sync/map', label: 'Mapa de envíos', icon: MapPinned },
+  { href: '/help', label: 'Ayuda', icon: LifeBuoy },
 ];
 
 export default function HomePage() {

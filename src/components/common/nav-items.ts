@@ -2,6 +2,7 @@ import {
   ClipboardList,
   FilePenLine,
   House,
+  LifeBuoy,
   ListChecks,
   MapPinned,
   Route,
@@ -16,7 +17,7 @@ import {
 } from '@/lib/services/app-config.service';
 
 export type NavPlacement = 'primary' | 'more';
-export type SidebarGroupId = 'trabajo' | 'campo' | 'sincronizacion';
+export type SidebarGroupId = 'trabajo' | 'campo' | 'sincronizacion' | 'soporte';
 
 export interface NavItem {
   label: string;
@@ -35,6 +36,7 @@ export const SIDEBAR_GROUPS: Array<{ id: SidebarGroupId; label: string }> = [
   { id: 'trabajo', label: 'Trabajo' },
   { id: 'campo', label: 'Campo' },
   { id: 'sincronizacion', label: 'Sincronización' },
+  { id: 'soporte', label: 'Soporte' },
 ];
 
 export const NAV_ITEMS: NavItem[] = [
@@ -130,10 +132,27 @@ export const NAV_ITEMS: NavItem[] = [
     sidebarGroup: 'sincronizacion',
     description: 'Estado de sincronización',
   },
+  {
+    label: 'Ayuda',
+    href: '/help',
+    icon: LifeBuoy,
+    module: 'help',
+    isActive: (path) => path.startsWith('/help'),
+    placement: 'more',
+    sidebarGroup: 'soporte',
+    description: 'Preguntas frecuentes',
+  },
 ];
 
 const PRIMARY_ORDER = ['/home', '/surveys', '/tracking', '/sync'] as const;
-const MORE_ORDER = ['/drafts', '/extras', '/maps', '/recorridos', '/networks'] as const;
+const MORE_ORDER = [
+  '/drafts',
+  '/extras',
+  '/maps',
+  '/recorridos',
+  '/networks',
+  '/help',
+] as const;
 
 function sortByHref(items: NavItem[], order: readonly string[]): NavItem[] {
   return [...items].sort(

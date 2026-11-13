@@ -16,6 +16,7 @@ import {
   Map,
   Navigation,
   Share2,
+  LifeBuoy,
 } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
 import { toast } from 'sonner';
@@ -102,6 +103,13 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       icon: RefreshCw,
       module: 'sync',
       isActive: (path: string) => path.startsWith('/sync'),
+    },
+    {
+      label: 'Ayuda',
+      href: '/help',
+      icon: LifeBuoy,
+      module: 'help',
+      isActive: (path: string) => path.startsWith('/help'),
     },
   ];
   const menuItems = allMenuItems.filter((item) =>

@@ -1,7 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOut, Moon, Sun, User, LifeBuoy, Share2, Bug, Palette } from 'lucide-react';
+import {
+  LogOut,
+  Moon,
+  Sun,
+  User,
+  LifeBuoy,
+  Share2,
+  Bug,
+  Palette,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/auth.context';
 import { toast } from 'sonner';
 import { useTheme } from '@/contexts/theme-context';

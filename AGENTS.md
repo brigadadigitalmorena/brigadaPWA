@@ -261,6 +261,7 @@ Users can install the PWA:
 - [x] GIS auto-track
 - [x] Sentry / PostHog (env-gated)
 - [x] Help, networks, report issue, theme, welcome, debug, response history
+- [x] Ayuda en sidebar/Inicio (`/help`, paridad FAQ con móvil; sin Modo Apoyo UI)
 - [x] Storage / schema / pending-confirm banners
 - [ ] Push notifications (VAPID registration exists; needs a web push backend)
 - [x] Background sync wake (Periodic Background Sync, best-effort)

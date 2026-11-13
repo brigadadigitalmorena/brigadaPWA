@@ -145,7 +145,7 @@ Prefijos del backend (`brigadaBackEnd/app/api/`):
 | `/mobile/*` | PWA + móvil | surveys, responses/batch, documents, notifications, gestiones, maps, zip-lookup, field-sessions, me, score |
 | `/auth/*` | CMS (y a veces overlap) | login cookie, refresh CMS |
 | `/admin/*` | **Solo CMS** | surveys builder, users, areas, analytics, cron, tiles admin |
-| `/public/*` | Activación sin sesión | codes |
+| `/public/*` | Activación sin sesión y config de la app | codes, `app-config` (`social_links`) |
 
 ### 4.1 Endpoints de campo que el PWA ya usa
 
@@ -160,7 +160,9 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - ZIP: `/mobile/zip-lookup/{code}`
 - Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
-- Redes: `GET /public/app-config` → `social_links` (`/networks`)
+- Redes: `GET /public/app-config` → `social_links` (`/networks`). El proxy de Next deja pasar `public/app-config` sin token (el cliente no manda `Authorization` en `/public/`). La lista se cachea en `localStorage`. El QR se genera en el cliente a partir de `url`, igual que en móvil.
+- Ayuda: `/help` FAQ estático (paridad con móvil `app/help.tsx`: tips, mismas secciones, correo de soporte). Visible en sidebar, Inicio y menú de usuario (en móvil la entrada está en Perfil).
+- Modo Apoyo (`/mobile/support/*`): **no** hay UI en PWA ni en móvil; se mantiene solo en backend hasta implementar en ambos.
 - Reporte: `/report` abre el cliente de correo (el móvil usa el compositor nativo)
 
 ### 4.2 Endpoints de campo que el PWA **aún no** consume (móvil sí o backend ya existe)

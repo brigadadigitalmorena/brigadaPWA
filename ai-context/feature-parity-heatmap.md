@@ -140,7 +140,9 @@
 | Guided tours | ░ | ░ | — (ninguno tiene) |
 | Score details screen | ░ | █ | **MEDIO** |
 | Mis envíos screen | ░ | █ | **MEDIO** |
-| Report issue screen | ░ | █ + expo-mail-composer | **BAJO** |
+| Report issue screen | ▓ `/report` mailto | █ + expo-mail-composer | **BAJO** |
+| Help / FAQ | █ `/help` (nav/Inicio/menú) | █ `/help` (perfil) | — |
+| Modo Apoyo (helpers) | ░ (API only) | ░ (API only) | — (ambos sin UI) |
 | Change avatar / edit profile | █ | █ | — |
 | Debug screens (session replay) | ░ | █ | **BAJO** |
 
