@@ -58,16 +58,21 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Perfil" description="Tu información en Brigada Digital" />
+    <div className="mx-auto w-full max-w-lg space-y-5 sm:space-y-6">
+      <PageHeader
+        title="Perfil"
+        description="Tu información en Brigada Digital"
+        backHref="/home"
+        backLabel="Inicio"
+      />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Foto y datos</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary">
+        <CardContent className="space-y-4 sm:space-y-5">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary">
               {user?.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -79,7 +84,7 @@ export default function ProfilePage() {
                 <User className="h-7 w-7" />
               )}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <input
                 ref={fileRef}
                 type="file"
@@ -110,6 +115,8 @@ export default function ProfilePage() {
               inputSize="mobile"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
+              placeholder="Nombre y apellido"
+              autoComplete="name"
             />
           </div>
           <div className="space-y-2">
@@ -120,21 +127,39 @@ export default function ProfilePage() {
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               inputMode="tel"
+              placeholder="Ej. 55 1234 5678"
+              autoComplete="tel"
             />
           </div>
           <div className="space-y-2">
-            <Label>Correo</Label>
-            <Input inputSize="mobile" value={user?.email ?? ''} disabled />
+            <Label htmlFor="profile-email">Correo</Label>
+            <Input
+              id="profile-email"
+              inputSize="mobile"
+              value={user?.email ?? ''}
+              disabled
+              placeholder="correo@ejemplo.com"
+            />
           </div>
-          <Button type="button" size="mobile" onClick={handleSave} disabled={saving}>
+          <Button
+            type="button"
+            size="mobile"
+            className="w-full sm:w-auto"
+            onClick={handleSave}
+            disabled={saving}
+          >
             {saving ? 'Guardando…' : 'Guardar cambios'}
           </Button>
         </CardContent>
       </Card>
 
       <Link href="/profile/password" className="block">
-        <Button variant="outline" size="mobile" className="w-full justify-start gap-3">
-          <Lock className="h-5 w-5" />
+        <Button
+          variant="outline"
+          size="mobile"
+          className="w-full justify-start gap-3"
+        >
+          <Lock className="h-5 w-5 shrink-0" />
           Cambiar contraseña
         </Button>
       </Link>

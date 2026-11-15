@@ -265,6 +265,7 @@ Users can install the PWA:
 - [x] Modo Apoyo PWA (`/support`, `/support-join`) alineado a `brigadaApp/dev`
 - [x] Drafts: no banner fantasma al abrir encuesta vacía; no demote completed→draft
 - [x] Mapas: sync full al abrir/Descargar cambios + borde tema + fullscreen visor
+- [x] Perfil/sesión responsive: volver a Inicio, menú scrolleable con Cerrar visible, placeholders de contraseña
 - [x] Storage / schema / pending-confirm banners
 - [ ] Push notifications (VAPID registration exists; needs a web push backend)
 - [x] Background sync wake (Periodic Background Sync, best-effort)

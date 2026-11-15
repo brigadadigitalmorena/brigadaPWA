@@ -183,7 +183,7 @@ function LoginPageContent() {
                     id="password"
                     value={field.value}
                     onChange={field.onChange}
-                    placeholder="••••••••"
+                    placeholder="Tu contraseña"
                     autoComplete="current-password"
                     disabled={isLoading}
                   />

@@ -93,7 +93,12 @@ export default function HelpPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <PageHeader title="Ayuda" description="Preguntas frecuentes de campo" />
+      <PageHeader
+        title="Ayuda"
+        description="Preguntas frecuentes de campo"
+        backHref="/home"
+        backLabel="Inicio"
+      />
 
       <section className="rounded-2xl border bg-card p-4">
         <div className="mb-3 flex items-center gap-2">

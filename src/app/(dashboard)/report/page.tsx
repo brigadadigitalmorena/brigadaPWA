@@ -37,6 +37,8 @@ export default function ReportPage() {
       <PageHeader
         title="Reportar un error"
         description="Se abre tu correo con el texto listo para soporte"
+        backHref="/home"
+        backLabel="Inicio"
       />
       <div className="space-y-2">
         <Label htmlFor="report">Qué pasó</Label>

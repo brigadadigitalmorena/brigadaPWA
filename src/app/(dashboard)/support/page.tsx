@@ -120,6 +120,8 @@ export default function SupportModePage() {
         <PageHeader
           title="Modo Apoyo"
           description="Esta sesión es de ayudante; no puedes gestionar apoyos desde aquí."
+          backHref="/home"
+          backLabel="Inicio"
         />
       </div>
     );
@@ -167,6 +169,8 @@ export default function SupportModePage() {
       <PageHeader
         title="Modo Apoyo"
         description="Genera un código o QR para que alguien te ayude a capturar encuestas"
+        backHref="/home"
+        backLabel="Inicio"
       />
 
       {!isOnline && (

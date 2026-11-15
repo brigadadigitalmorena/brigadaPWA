@@ -22,7 +22,8 @@ export default function ChangePasswordPage() {
   const [saving, setSaving] = useState(false);
 
   const checks = calcPasswordChecks(newPassword);
-  const strongEnough = checks.minLength && checks.hasUpper && checks.hasLower && checks.hasNumber;
+  const strongEnough =
+    checks.minLength && checks.hasUpper && checks.hasLower && checks.hasNumber;
 
   const handleSubmit = async () => {
     if (!strongEnough) {
@@ -52,10 +53,12 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-lg space-y-5 sm:space-y-6">
       <PageHeader
         title="Cambiar contraseña"
         description="Después de cambiarla tendrás que iniciar sesión de nuevo"
+        backHref="/profile"
+        backLabel="Perfil"
       />
       <Card>
         <CardContent className="space-y-4 pt-6">
@@ -65,6 +68,7 @@ export default function ChangePasswordPage() {
               id="current-password"
               value={currentPassword}
               onChange={setCurrentPassword}
+              placeholder="Escribe tu contraseña actual"
               autoComplete="current-password"
             />
           </div>
@@ -74,6 +78,7 @@ export default function ChangePasswordPage() {
               id="new-password"
               value={newPassword}
               onChange={setNewPassword}
+              placeholder="Mín. 8 caracteres, mayúscula y número"
               autoComplete="new-password"
             />
             <PasswordStrengthChecker password={newPassword} />
@@ -84,10 +89,17 @@ export default function ChangePasswordPage() {
               id="confirm-password"
               value={confirmPassword}
               onChange={setConfirmPassword}
+              placeholder="Repite la nueva contraseña"
               autoComplete="new-password"
             />
           </div>
-          <Button type="button" size="mobile" onClick={handleSubmit} disabled={saving}>
+          <Button
+            type="button"
+            size="mobile"
+            className="w-full sm:w-auto"
+            onClick={handleSubmit}
+            disabled={saving}
+          >
             {saving ? 'Guardando…' : 'Actualizar contraseña'}
           </Button>
         </CardContent>

@@ -10,8 +10,13 @@ export default function ThemeSettingsPage() {
   const { theme, toggleTheme, mounted } = useTheme();
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4">
-      <PageHeader title="Apariencia" description="Tema y color de la aplicación" />
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+      <PageHeader
+        title="Apariencia"
+        description="Tema y color de la aplicación"
+        backHref="/home"
+        backLabel="Inicio"
+      />
       <Button
         type="button"
         variant="outline"

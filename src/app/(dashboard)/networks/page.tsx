@@ -71,7 +71,12 @@ export default function NetworksPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <PageHeader title="Redes" description="Canales oficiales para compartir" />
+      <PageHeader
+        title="Redes"
+        description="Canales oficiales para compartir"
+        backHref="/home"
+        backLabel="Inicio"
+      />
       {status === 'loading' ? (
         <p className="text-sm text-muted-foreground">Cargando redes…</p>
       ) : status === 'unavailable' ? (

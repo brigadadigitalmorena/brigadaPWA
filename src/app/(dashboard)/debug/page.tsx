@@ -31,6 +31,8 @@ export default function DebugPage() {
       <PageHeader
         title="Diagnóstico"
         description="Estado local para soporte. No muestra tokens."
+        backHref="/home"
+        backLabel="Inicio"
       />
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl border p-3">

@@ -21,7 +21,7 @@ export function PasswordInput({
   id,
   value,
   onChange,
-  placeholder = '••••••••',
+  placeholder = 'Tu contraseña',
   disabled = false,
   autoComplete,
   inputSize = 'mobile',
