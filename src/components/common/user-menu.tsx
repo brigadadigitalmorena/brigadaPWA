@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/auth.context';
 import { toast } from 'sonner';
 import { useTheme } from '@/contexts/theme-context';
 import { User as UserType } from '@/lib/types';
+import { UserAvatar } from '@/components/common/user-avatar';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -66,9 +67,9 @@ export function UserMenu({ user }: UserMenuProps) {
     router.push(href);
   };
 
-  const initials = user
-    ? `${user.nombre?.[0] ?? ''}${user.apellido?.[0] ?? ''}`.toUpperCase() || 'U'
-    : 'U';
+  const displayName = user
+    ? `${user.nombre} ${user.apellido}`.trim() || user.email
+    : 'Usuario';
 
   const links = (
     [
@@ -92,10 +93,14 @@ export function UserMenu({ user }: UserMenuProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary touch-target"
+        className="touch-target rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Abrir menú de usuario"
       >
-        {initials}
+        <UserAvatar
+          name={displayName}
+          avatarUrl={user?.avatar_url}
+          size="sm"
+        />
       </button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -105,13 +110,13 @@ export function UserMenu({ user }: UserMenuProps) {
         >
           <div className="sticky top-0 z-10 shrink-0 border-b bg-popover px-4 pb-3 pt-4">
             <div className="flex items-start gap-3 pr-10">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <User className="h-5 w-5" />
-              </div>
+              <UserAvatar
+                name={displayName}
+                avatarUrl={user?.avatar_url}
+                size="md"
+              />
               <DialogHeader className="min-w-0 flex-1 gap-1 text-left">
-                <DialogTitle className="truncate">
-                  {user ? `${user.nombre} ${user.apellido}` : 'Usuario'}
-                </DialogTitle>
+                <DialogTitle className="truncate">{displayName}</DialogTitle>
                 <DialogDescription className="truncate">
                   {user?.email ?? 'Brigadista'}
                 </DialogDescription>

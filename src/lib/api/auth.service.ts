@@ -47,7 +47,12 @@ export function mapUserFromApi(raw: UserMeResponse, previous?: User | null): Use
     apellido: raw.apellido || fromFull?.apellido || previous?.apellido || '',
     role_key: raw.role_key ?? previous?.role_key ?? '',
     telefono: raw.telefono ?? raw.phone ?? previous?.telefono,
-    avatar_url: raw.avatar_url ?? previous?.avatar_url,
+    // Prefer an explicit API value (including null clear). Only fall back when
+    // the payload omits the field entirely.
+    avatar_url:
+      raw.avatar_url !== undefined
+        ? raw.avatar_url ?? undefined
+        : previous?.avatar_url,
     created_at: raw.created_at || previous?.created_at || new Date().toISOString(),
     activo: raw.activo ?? raw.is_active ?? previous?.activo ?? true,
     permissions: raw.permissions ?? previous?.permissions ?? [],
@@ -167,11 +172,24 @@ export async function updateProfile(data: {
   return user;
 }
 
+function withAvatarCacheBust(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  const bust = `_t=${Date.now()}`;
+  return url.includes('?') ? `${url}&${bust}` : `${url}?${bust}`;
+}
+
 export async function uploadAvatar(file: File): Promise<User> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await apiClient.post<UserMeResponse>('/users/me/avatar', formData);
+  const response = await apiClient.post<UserMeResponse>(
+    '/users/me/avatar',
+    formData,
+    { timeout: 60_000 }
+  );
   const user = mapUserFromApi(response.data, getCurrentUser());
+  if (user.avatar_url) {
+    user.avatar_url = withAvatarCacheBust(user.avatar_url);
+  }
   persistUser(user);
   return user;
 }
