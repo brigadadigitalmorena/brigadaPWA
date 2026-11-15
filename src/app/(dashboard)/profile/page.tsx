@@ -26,13 +26,19 @@ export default function ProfilePage() {
   const { user, setUser } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
-  const [fullName, setFullName] = useState(
-    user ? `${user.nombre} ${user.apellido}`.trim() : ''
-  );
+  const [firstName, setFirstName] = useState(user?.nombre ?? '');
+  const [lastName, setLastName] = useState(user?.apellido ?? '');
   const [phone, setPhone] = useState(user?.telefono ?? '');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setFirstName(user.nombre ?? '');
+    setLastName(user.apellido ?? '');
+    setPhone(user.telefono ?? '');
+  }, [user?.id, user?.nombre, user?.apellido, user?.telefono]);
 
   useEffect(() => {
     return () => {
@@ -52,14 +58,19 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
-    if (!fullName.trim()) {
+    if (!firstName.trim()) {
       toast.error('El nombre es obligatorio.');
+      return;
+    }
+    if (!lastName.trim()) {
+      toast.error('El apellido es obligatorio.');
       return;
     }
     setSaving(true);
     try {
       const next = await updateProfile({
-        full_name: fullName.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         phone: phone.trim() || null,
       });
       setUser(next);
@@ -111,7 +122,7 @@ export default function ProfilePage() {
   };
 
   const displayName =
-    fullName.trim() ||
+    `${firstName} ${lastName}`.trim() ||
     (user ? `${user.nombre} ${user.apellido}`.trim() : '') ||
     user?.email ||
     'Usuario';
@@ -164,16 +175,29 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="profile-name">Nombre completo</Label>
-            <Input
-              id="profile-name"
-              inputSize="mobile"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              placeholder="Nombre y apellido"
-              autoComplete="name"
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="profile-first-name">Nombre</Label>
+              <Input
+                id="profile-first-name"
+                inputSize="mobile"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                placeholder="Tu nombre"
+                autoComplete="given-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-last-name">Apellidos</Label>
+              <Input
+                id="profile-last-name"
+                inputSize="mobile"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                placeholder="Tus apellidos"
+                autoComplete="family-name"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="profile-phone">Teléfono</Label>

@@ -7,6 +7,10 @@ interface UserMeResponse {
   id: number;
   email: string;
   full_name?: string;
+  /** PATCH/GET /users/me shape */
+  first_name?: string;
+  last_name?: string;
+  /** Login /mobile shape */
   nombre?: string;
   apellido?: string;
   phone?: string;
@@ -43,8 +47,20 @@ export function mapUserFromApi(raw: UserMeResponse, previous?: User | null): Use
   return {
     id: raw.id,
     email: raw.email,
-    nombre: raw.nombre || fromFull?.nombre || previous?.nombre || '',
-    apellido: raw.apellido || fromFull?.apellido || previous?.apellido || '',
+    // Prefer explicit first/last from /users/me; then login nombre/apellido;
+    // then split full_name; finally keep previous local values.
+    nombre:
+      raw.first_name ||
+      raw.nombre ||
+      fromFull?.nombre ||
+      previous?.nombre ||
+      '',
+    apellido:
+      raw.last_name ||
+      raw.apellido ||
+      fromFull?.apellido ||
+      previous?.apellido ||
+      '',
     role_key: raw.role_key ?? previous?.role_key ?? '',
     telefono: raw.telefono ?? raw.phone ?? previous?.telefono,
     // Prefer an explicit API value (including null clear). Only fall back when
@@ -162,7 +178,8 @@ export async function refreshUser(): Promise<User | null> {
 }
 
 export async function updateProfile(data: {
-  full_name?: string;
+  first_name?: string;
+  last_name?: string;
   phone?: string | null;
   avatar_url?: string | null;
 }): Promise<User> {
