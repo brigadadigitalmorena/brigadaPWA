@@ -399,7 +399,7 @@ export default function StaticMapViewer({
           'relative min-h-0 overflow-hidden rounded-xl border bg-slate-100',
           expanded
             ? 'flex-1 min-h-[50dvh]'
-            : 'h-[min(55vh,32rem)] min-h-64 sm:min-h-80'
+            : 'h-[min(70dvh,40rem)] min-h-72 sm:min-h-[28rem]'
         )}
       >
         <div ref={containerRef} className="absolute inset-0" aria-label={mapName} />

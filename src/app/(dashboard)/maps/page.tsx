@@ -7,13 +7,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOfflineMaps } from '@/hooks/use-offline-maps';
 import { useSync } from '@/contexts/sync.context';
@@ -39,7 +33,7 @@ const StaticMapViewer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid h-[min(55vh,32rem)] min-h-64 place-items-center rounded-xl border bg-muted/30 text-sm text-muted-foreground sm:min-h-80">
+      <div className="grid h-[min(70dvh,40rem)] min-h-72 place-items-center rounded-xl border bg-muted/30 text-sm text-muted-foreground sm:min-h-[28rem]">
         Cargando visor…
       </div>
     ),
@@ -170,7 +164,9 @@ export default function MapsPage() {
     } catch (error) {
       if (!(error instanceof TileDownloadCancelledError)) {
         toast.error(
-          error instanceof Error ? error.message : 'No se pudo actualizar el mapa.'
+          error instanceof Error
+            ? error.message
+            : 'No se pudo actualizar el mapa.'
         );
       }
       await refreshTileStatuses(tileManifest);
@@ -214,7 +210,7 @@ export default function MapsPage() {
     window.requestAnimationFrame(() => {
       viewerSectionRef.current?.scrollIntoView({
         behavior: 'smooth',
-        block: 'start',
+        block: 'nearest',
       });
     });
   };
@@ -223,7 +219,7 @@ export default function MapsPage() {
     selectedMapId ?? offlineMaps.selectedMap?.map_id ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       <PageHeader
         title="Mapas operacionales"
         description="Consulta zonas y elementos territoriales aun sin conexión."
@@ -263,6 +259,7 @@ export default function MapsPage() {
           packs={tileManifest.packs}
           statuses={tileStatuses}
           busyPackId={busyPackId}
+          defaultCollapsed
           onDownload={(pack) => runTileAction(pack, 'download')}
           onCancel={(pack) => {
             offlineTilesService.cancelDownload(pack.pack_id);
@@ -295,12 +292,24 @@ export default function MapsPage() {
           }
         />
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[minmax(16rem,19rem)_minmax(0,1fr)]">
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground">
-              Mapas descargados
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-4 lg:grid-cols-[minmax(13rem,22%)_minmax(0,1fr)] lg:items-start lg:gap-5">
+          {/* Mobile: horizontal chips. Desktop: compact vertical list. */}
+          <section className="min-w-0 space-y-2">
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                Mapas descargados
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {offlineMaps.maps.length}
+              </span>
+            </div>
+
+            <div
+              className={cn(
+                'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                'lg:flex-col lg:overflow-visible lg:pb-0'
+              )}
+            >
               {offlineMaps.maps.map((map) => {
                 const selected = map.map_id === activeMapId;
                 const count = offlineMaps.featureCounts.get(map.map_id) ?? 0;
@@ -309,58 +318,57 @@ export default function MapsPage() {
                     key={map.map_id}
                     type="button"
                     onClick={() => selectMap(map.map_id)}
-                    className="block w-full text-left"
                     aria-pressed={selected}
+                    className={cn(
+                      'shrink-0 rounded-xl border-2 bg-card text-left transition-[border-color,box-shadow,background-color] duration-200',
+                      'w-[min(78vw,18rem)] p-3 lg:w-full lg:p-3',
+                      selected
+                        ? 'bg-primary/5 shadow-sm'
+                        : 'border-transparent hover:bg-muted/40'
+                    )}
+                    style={
+                      selected && accentColor
+                        ? {
+                            borderColor: accentColor,
+                            boxShadow: `0 0 0 1px ${accentColor}33`,
+                          }
+                        : undefined
+                    }
                   >
-                    <Card
-                      className={cn(
-                        'border-2 transition-[border-color,box-shadow,background-color] duration-200',
-                        selected
-                          ? 'bg-primary/5 shadow-sm ring-0'
-                          : 'border-transparent hover:bg-muted/40'
-                      )}
-                      style={
-                        selected && accentColor
-                          ? {
-                              borderColor: accentColor,
-                              boxShadow: `0 0 0 1px ${accentColor}33`,
-                            }
-                          : undefined
-                      }
-                    >
-                      <CardHeader className="space-y-2 p-4 sm:p-6">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base sm:text-lg">
-                            {map.name}
-                          </CardTitle>
-                          <Badge variant="outline">v{map.version}</Badge>
-                        </div>
-                        {map.description && (
-                          <CardDescription className="line-clamp-2">
-                            {map.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                      <CardContent className="flex items-center gap-2 px-4 pb-4 text-xs text-muted-foreground sm:px-6 sm:pb-6">
-                        <Shapes className="h-3.5 w-3.5 shrink-0" />
-                        {count.toLocaleString('es-MX')} elementos
-                        <span className="ml-auto shrink-0">
-                          {new Date(map.synced_at).toLocaleDateString('es-MX')}
-                        </span>
-                      </CardContent>
-                    </Card>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-2 text-sm font-semibold leading-snug">
+                        {map.name}
+                      </p>
+                      <Badge variant="outline" className="shrink-0 text-[10px]">
+                        v{map.version}
+                      </Badge>
+                    </div>
+                    {map.description ? (
+                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                        {map.description}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Shapes className="h-3 w-3 shrink-0" />
+                      <span className="truncate">
+                        {count.toLocaleString('es-MX')} elem.
+                      </span>
+                      <span className="ml-auto shrink-0">
+                        {new Date(map.synced_at).toLocaleDateString('es-MX')}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </section>
 
           <Card
             ref={viewerSectionRef}
             id="mapa-visor"
-            className="min-w-0 scroll-mt-24"
+            className="min-w-0 scroll-mt-20 lg:sticky lg:top-2"
           >
-            <CardContent className="p-3 sm:p-6">
+            <CardContent className="p-2.5 sm:p-4">
               {offlineMaps.selectedMap ? (
                 <StaticMapViewer
                   key={offlineMaps.selectedMap.map_id}
@@ -368,7 +376,7 @@ export default function MapsPage() {
                   features={offlineMaps.features}
                 />
               ) : (
-                <div className="grid min-h-64 place-items-center text-sm text-muted-foreground sm:min-h-80">
+                <div className="grid h-[min(70dvh,40rem)] min-h-72 place-items-center text-sm text-muted-foreground sm:min-h-[28rem]">
                   Selecciona un mapa.
                 </div>
               )}
