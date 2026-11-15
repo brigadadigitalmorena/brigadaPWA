@@ -300,6 +300,16 @@ El CMS solo configura extraer/autofill; no corre Tesseract.
 | `/extras` | `extras` | — (prioridad se configura en asignaciones) |
 | `/tracking` | `tracking` (Gestión) | `/dashboard/gestiones` (operación completa) |
 | `/maps` | `maps`, `static-map-viewer` | `/dashboard/maps`, `/dashboard/areas-v2` |
+
+### Mapas estáticos (PWA sync)
+
+- Al abrir `/maps` o pulsar **Descargar cambios** se hace sync **full** (`forceFull`):
+  omite el cursor `since`, descarga el catálogo publicado, actualiza versiones
+  distintas y **elimina** mapas locales que el CMS ya no publica.
+- Sync en background (login / online / focus) sigue siendo delta con cursor.
+- Tarjeta seleccionada usa el color de personalización (`data-color-scheme`)
+  en el borde y hace scroll al visor; el visor admite pantalla completa
+  (Fullscreen API + overlay CSS para iOS).
 | `/recorridos` | GIS tracking **por pregunta**; no hay módulo Recorridos 1:1 | Config `field_tracking` en encuesta/campaña |
 | `/sync` | `mis-envios` | `/dashboard/sync-monitor` (ops, no el brigadista) |
 | `/notifications` | archivo existe, **tab `href: null`** (“not available yet”) | `/dashboard/notifications` (admin) |

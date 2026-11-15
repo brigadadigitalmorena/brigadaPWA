@@ -35,6 +35,10 @@ export const staticMapsRepository = {
     return db.static_map_features.where('map_id').equals(mapId).sortBy('layer_id');
   },
 
+  countFeatures(mapId: number): Promise<number> {
+    return db.static_map_features.where('map_id').equals(mapId).count();
+  },
+
   async getFeatureCounts(): Promise<Map<number, number>> {
     const rows = await db.static_map_features.toArray();
     const counts = new Map<number, number>();
@@ -46,6 +50,33 @@ export const staticMapsRepository = {
 
   async getLocalVersion(mapId: number): Promise<number | null> {
     return (await db.static_maps.get(mapId))?.version ?? null;
+  },
+
+  async deleteMap(mapId: number): Promise<void> {
+    await db.transaction(
+      'rw',
+      db.static_maps,
+      db.static_map_features,
+      async () => {
+        await db.static_map_features.where('map_id').equals(mapId).delete();
+        await db.static_maps.delete(mapId);
+      }
+    );
+  },
+
+  /**
+   * Drop local maps that are no longer in the published server catalog.
+   */
+  async pruneMapsNotIn(publishedMapIds: Iterable<number>): Promise<number> {
+    const keep = new Set(publishedMapIds);
+    const local = await db.static_maps.toArray();
+    let removed = 0;
+    for (const map of local) {
+      if (keep.has(map.map_id)) continue;
+      await this.deleteMap(map.map_id);
+      removed += 1;
+    }
+    return removed;
   },
 
   /**

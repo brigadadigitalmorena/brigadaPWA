@@ -250,6 +250,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     const wake = () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
         syncNow();
+        // Delta pull for CMS map publishes while the tab was in background.
+        void import('@/lib/services/static-maps-sync.service').then((m) =>
+          m.syncStaticMaps()
+        );
       }
     };
     document.addEventListener('visibilitychange', wake);
