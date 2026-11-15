@@ -28,6 +28,38 @@ export const STATUS_BADGE_CLASSES: Record<ManagementStatus, string> = {
     'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300',
 };
 
+
+/** Chip colors for GestionMetrics filter pills (not 1:1 with ManagementStatus). */
+export const METRIC_CHIP_CLASSES: Record<
+  'all' | 'proceso' | 'resuelto' | 'problema',
+  { idle: string; active: string; icon: string; value: string }
+> = {
+  all: {
+    idle: 'border-border hover:bg-muted/60',
+    active: 'border-primary bg-primary/5',
+    icon: 'text-primary',
+    value: 'text-foreground',
+  },
+  proceso: {
+    idle: 'border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10',
+    active: 'border-amber-500/50 bg-amber-500/15',
+    icon: 'text-amber-700 dark:text-amber-300',
+    value: 'text-amber-800 dark:text-amber-200',
+  },
+  resuelto: {
+    idle: 'border-green-500/20 bg-green-500/5 hover:bg-green-500/10',
+    active: 'border-green-500/50 bg-green-500/15',
+    icon: 'text-green-700 dark:text-green-300',
+    value: 'text-green-800 dark:text-green-200',
+  },
+  problema: {
+    idle: 'border-red-500/20 bg-red-500/5 hover:bg-red-500/10',
+    active: 'border-red-500/50 bg-red-500/15',
+    icon: 'text-red-700 dark:text-red-300',
+    value: 'text-red-800 dark:text-red-200',
+  },
+};
+
 export function normalizeStatusLabels(
   labels?: Record<string, string>
 ): Record<ManagementStatus, string> {
