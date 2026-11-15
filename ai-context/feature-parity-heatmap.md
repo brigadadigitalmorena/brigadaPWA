@@ -139,7 +139,7 @@
 | Guided tours | ░ | ░ | — (ninguno tiene) |
 | Score details screen | ░ | █ | **MEDIO** |
 | Mis envíos screen | ░ | █ | **MEDIO** |
-| Report issue screen | ░ | █ + expo-mail-composer | **BAJO** |
+| Report issue screen | █ API + R2 evidence (`/issue-reports`) | █ + expo-mail-composer (API pending BD-24) | — |
 | Change avatar / edit profile | █ | █ | — |
 | Debug screens (session replay) | ░ | █ | **BAJO** |
 

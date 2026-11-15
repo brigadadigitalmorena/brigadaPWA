@@ -157,7 +157,7 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
 - Redes: `GET /public/app-config` → `social_links` (`/networks`)
-- Reporte: `/report` abre el cliente de correo (el móvil usa el compositor nativo)
+- Reporte: `/report` crea vía `POST /issue-reports` con evidencia R2 obligatoria (1–3 imágenes); el móvil aún usa MailComposer (BD-24)
 
 ### 4.2 Endpoints de campo que el PWA **aún no** consume (móvil sí o backend ya existe)
 
@@ -400,7 +400,7 @@ Checklist al implementar algo nuevo en PWA:
 Prioridad de campo (el heatmap visual aún puede listar ítems ya hechos; confiar en las tablas actualizadas y en el código):
 
 - Hecho recientemente: INE compound, ZIP, corregir respuesta, perfil/avatar/password, inbox notificaciones, resume de borradores con scope.
-- Sigue crítico / alto: Sentry, GPS background (⚠), durabilidad IndexedDB (⚠), push real, mapas offline al nivel 200 MB nativo, barcode multi-formato, background sync, cifrado, score/mis métricas, report-issue.
+- Sigue crítico / alto: Sentry, GPS background (⚠), durabilidad IndexedDB (⚠), push real, mapas offline al nivel 200 MB nativo, barcode multi-formato, background sync, cifrado, score/mis métricas.
 - Recorridos PWA existen; GPS de ruta se cae al background: no venderlos como el tracking nativo.
 
 ---

@@ -5,6 +5,24 @@
 
 ---
 
+## [2026-11-15] feat(report): issue reports con evidencia R2 (BD-25)
+
+Reemplaza `mailto:` en `/report` por el contrato unificado de backend (PR #121 / `dev`):
+
+- Cliente tipado `src/lib/api/issue-reports.service.ts` → upload-url, confirm, create
+- Flujo: comprimir imagen → presigned PUT R2 → confirm → `POST /issue-reports` con `client_id` + ≥1 `attachment_document_ids`
+- UI: título, severidad, descripción, 1–3 capturas obligatorias (JPEG/PNG/WebP ≤5 MB)
+- Idempotencia por `client_id`; sin conexión se bloquea el envío (cola offline deferred)
+- Docs: heatmap Report issue → █ API+R2; `pwa-cms-mobile-differences.md` actualizado
+
+### Edge cases
+
+- Create sin adjunto confirmado lo rechaza el backend; la UI exige ≥1 captura antes de enviar
+- Duplicate `client_id` → toast de éxito (no error)
+- Fallo de PUT R2 / CORS → mensaje en español; no se llama create
+
+---
+
 ## [2026-10-03] docs(paridad): port de `main` a `dev` + corrección de afirmaciones
 
 Porta dos commits de `origin/main` que nunca llegaron a `dev` (el compañero trabajó
