@@ -241,6 +241,15 @@ CMS builder  →  publica versión  →  Postgres
               POST /mobile/responses/batch (mismo payload)
 ```
 
+### 6.0 Drafts (PWA)
+
+Autosave en fill (~1.2 s) solo persiste Dexie cuando hay respuestas/archivos
+no vacíos. Abrir una encuesta sin capturar no debe dejar banner
+“borrador pendiente”. `saveDraft` nunca degrada `completed` → `draft`
+(carrera post-`finalizeResponse`). Al autenticar, `purgeEmptyDrafts()` limpia
+cáscaras vacías de sesiones anteriores. Contadores/banner/home/drafts filtran
+con `draftRowHasContent`.
+
 ### 6.1 Form Engine v2
 
 Los tres clientes usan JSONLogic. El PWA adapta `SurveyVersion` → schema en `src/lib/forms/survey-to-form-schema.ts` y `useSurveyFormEngine`.

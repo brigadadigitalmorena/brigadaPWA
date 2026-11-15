@@ -1,10 +1,9 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, ChevronRight, FileEdit, CloudOff } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
-import { db } from '@/lib/db/database';
+import { useDraftCount } from '@/components/common/use-draft-count';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import { Button } from '@/components/ui/button';
 import { RecorridoBanner } from '@/components/banners/recorrido-banner';
@@ -44,11 +43,7 @@ export function FieldStatusBanners() {
     router.push('/sync');
   };
 
-  const draftCount =
-    useLiveQuery(
-      () => db.responses.where('status').equals('draft').count(),
-      []
-    ) ?? 0;
+  const draftCount = useDraftCount();
 
   return (
     <div className="space-y-2">

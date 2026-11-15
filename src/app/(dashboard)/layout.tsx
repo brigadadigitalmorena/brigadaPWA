@@ -15,6 +15,7 @@ import { SupportModeBanner } from '@/components/support/support-mode-banner';
 import { ClipboardList } from 'lucide-react';
 import { registerWebPush } from '@/lib/services/web-push.service';
 import { registerPeriodicSync } from '@/lib/services/periodic-sync';
+import { purgeEmptyDrafts } from '@/lib/services/draft.service';
 
 export default function DashboardLayout({
   children,
@@ -37,6 +38,8 @@ export default function DashboardLayout({
     if (!isAuthenticated) return;
     void registerWebPush(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
     void registerPeriodicSync();
+    // Clear empty draft shells left by hydrate autosave on prior sessions.
+    void purgeEmptyDrafts();
   }, [isAuthenticated]);
 
   if (isLoading) {

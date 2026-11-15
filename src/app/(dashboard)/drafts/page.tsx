@@ -10,7 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileEdit, Trash2 } from 'lucide-react';
 import { readCachedEntitlement } from '@/lib/utils/survey-version';
-import { deleteDraft } from '@/lib/services/draft.service';
+import {
+  deleteDraft,
+  draftRowHasContent,
+} from '@/lib/services/draft.service';
 import { toast } from 'sonner';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { parseOptionalScopeId, surveyResumeHref } from '@/lib/campaigns/scope';
@@ -27,8 +30,21 @@ export default function DraftsPage() {
       .reverse()
       .sortBy('updated_at');
 
+    const meaningful: typeof rows = [];
+    for (const row of rows) {
+      if (draftRowHasContent(row)) {
+        meaningful.push(row);
+        continue;
+      }
+      const fileCount = await db.local_files
+        .where('response_id')
+        .equals(row.response_id)
+        .count();
+      if (fileCount > 0) meaningful.push(row);
+    }
+
     const withTitles = await Promise.all(
-      rows.map(async (draft) => {
+      meaningful.map(async (draft) => {
         const survey = await db.surveys
           .where('survey_id')
           .equals(String(draft.survey_id))

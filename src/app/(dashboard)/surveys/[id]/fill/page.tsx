@@ -15,6 +15,10 @@ import {
   finalizeResponse,
   buildDeviceInfo,
 } from '@/lib/services/response-submission.service';
+import {
+  deleteDraft,
+  draftPayloadHasContent,
+} from '@/lib/services/draft.service';
 import { useFieldSessionGate } from '@/hooks/use-field-session-gate';
 import { useFieldSession } from '@/hooks/use-field-session';
 import { isAutoAdvanceType } from '@/lib/survey/field-types';
@@ -448,6 +452,11 @@ function SurveyFillPageContent() {
   };
 
   const handleSaveDraft = async () => {
+    const snapshot = useSurveyFillStore.getState();
+    if (!draftPayloadHasContent(snapshot.answers, snapshot.files)) {
+      toast.message('Nada que guardar todavía');
+      return;
+    }
     await saveDraft();
     toast.success('Borrador guardado');
   };
@@ -458,10 +467,23 @@ function SurveyFillPageContent() {
       return;
     }
 
+    const snapshot = useSurveyFillStore.getState();
+    const hasContent = draftPayloadHasContent(snapshot.answers, snapshot.files);
+
+    // Mirror mobile: empty open → leave without parking a draft banner.
+    if (!hasContent) {
+      if (snapshot.responseId) {
+        await deleteDraft(snapshot.responseId);
+      }
+      router.push('/surveys');
+      return;
+    }
+
     if (isDirty) {
       const confirmed = await confirm({
         title: 'Salir de la encuesta',
-        description: 'Tienes cambios sin guardar. ¿Deseas salir de todos modos?',
+        description:
+          'Tu avance queda como borrador. ¿Deseas salir de todos modos?',
         confirmText: 'Salir',
         cancelText: 'Continuar',
         variant: 'warning',
@@ -470,6 +492,7 @@ function SurveyFillPageContent() {
       if (!confirmed) return;
     }
 
+    await saveDraft();
     router.push('/surveys');
   };
 

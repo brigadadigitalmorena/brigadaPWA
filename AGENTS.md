@@ -263,6 +263,7 @@ Users can install the PWA:
 - [x] Help, networks, report issue, theme, welcome, debug, response history
 - [x] Ayuda en sidebar/Inicio (`/help`, paridad FAQ con móvil)
 - [x] Modo Apoyo PWA (`/support`, `/support-join`) alineado a `brigadaApp/dev`
+- [x] Drafts: no banner fantasma al abrir encuesta vacía; no demote completed→draft
 - [x] Storage / schema / pending-confirm banners
 - [ ] Push notifications (VAPID registration exists; needs a web push backend)
 - [x] Background sync wake (Periodic Background Sync, best-effort)

@@ -17,6 +17,7 @@ import { db } from '@/lib/db/database';
 import { getDailyMetrics } from '@/lib/api/metrics.service';
 import { countCompletedToday, type DailyMetrics } from '@/lib/metrics/daily-metrics';
 import { captureEvent } from '@/lib/observability/client';
+import { draftRowHasContent } from '@/lib/services/draft.service';
 import { PageHeader } from '@/components/common/page-header';
 import { DailyMetricsCard } from '@/components/home/daily-metrics-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,10 +42,22 @@ export default function HomePage() {
       ];
   const responses = useLiveQuery(() => db.responses.toArray(), []);
   const drafts =
-    useLiveQuery(
-      () => db.responses.where('status').equals('draft').toArray(),
-      []
-    ) ?? [];
+    useLiveQuery(async () => {
+      const rows = await db.responses.where('status').equals('draft').toArray();
+      const kept: typeof rows = [];
+      for (const row of rows) {
+        if (draftRowHasContent(row)) {
+          kept.push(row);
+          continue;
+        }
+        const fileCount = await db.local_files
+          .where('response_id')
+          .equals(row.response_id)
+          .count();
+        if (fileCount > 0) kept.push(row);
+      }
+      return kept;
+    }, []) ?? [];
 
   useEffect(() => {
     captureEvent('screen.home.opened', {
