@@ -129,12 +129,15 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-5 sm:space-y-6">
-      <PageHeader
-        title="Perfil"
-        description="Tu información en Brigada Digital"
-        backHref="/home"
-        backLabel="Inicio"
-      />
+      <div className="sticky top-0 z-10 -mx-4 space-y-3 border-b bg-background/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+        <PageHeader
+          title="Perfil"
+          description="Tu información en Brigada Digital"
+          backHref="/home"
+          backLabel="Volver al inicio"
+          backVariant="button"
+        />
+      </div>
 
       <Card>
         <CardHeader className="pb-2">
@@ -241,6 +244,12 @@ export default function ProfilePage() {
         >
           <Lock className="h-5 w-5 shrink-0" />
           Cambiar contraseña
+        </Button>
+      </Link>
+
+      <Link href="/home" className="block pb-2">
+        <Button variant="secondary" size="mobile" className="w-full">
+          Cerrar perfil
         </Button>
       </Link>
     </div>

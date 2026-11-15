@@ -22,13 +22,13 @@ import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 interface UserMenuProps {
   user: UserType | null;
@@ -41,6 +41,8 @@ export function UserMenu({ user }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
 
+  const closeMenu = () => setIsOpen(false);
+
   const handleLogout = async () => {
     const confirmed = await confirm({
       title: 'Cerrar sesión',
@@ -52,7 +54,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
     if (!confirmed) return;
 
-    setIsOpen(false);
+    closeMenu();
     try {
       await logout();
     } catch (error) {
@@ -63,8 +65,11 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   const goTo = (href: string) => {
-    setIsOpen(false);
-    router.push(href);
+    closeMenu();
+    // Defer navigation so the dialog unmounts before the route change on mobile.
+    window.setTimeout(() => {
+      router.push(href);
+    }, 0);
   };
 
   const displayName = user
@@ -73,6 +78,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
   const links = (
     [
+      { href: '/profile', label: 'Perfil y contraseña', Icon: User },
       { href: '/settings/theme', label: 'Apariencia', Icon: Palette },
       { href: '/help', label: 'Ayuda', Icon: LifeBuoy },
       ...(!isSupport
@@ -106,10 +112,19 @@ export function UserMenu({ user }: UserMenuProps) {
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent
           showCloseButton={false}
-          className="flex max-h-[min(92dvh,36rem)] w-[min(100%-1.5rem,24rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-sm"
+          className={cn(
+            // Mobile: bottom sheet that always keeps Cerrar in the thumb zone.
+            '!left-0 !right-0 !top-auto !bottom-0 !translate-x-0 !translate-y-0',
+            '!w-full !max-w-none rounded-b-none rounded-t-2xl',
+            'flex max-h-[min(92dvh,40rem)] flex-col gap-0 overflow-hidden p-0',
+            // Desktop / tablet: centered dialog.
+            'sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto',
+            'sm:!-translate-x-1/2 sm:!-translate-y-1/2',
+            'sm:!w-full sm:!max-w-sm sm:rounded-xl'
+          )}
         >
-          <div className="sticky top-0 z-10 shrink-0 border-b bg-popover px-4 pb-3 pt-4">
-            <div className="flex items-start gap-3 pr-10">
+          <div className="relative shrink-0 border-b bg-popover px-4 pb-3 pt-4">
+            <div className="flex items-start gap-3 pr-12">
               <UserAvatar
                 name={displayName}
                 avatarUrl={user?.avatar_url}
@@ -122,18 +137,16 @@ export function UserMenu({ user }: UserMenuProps) {
                 </DialogDescription>
               </DialogHeader>
             </div>
-            <DialogClose
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="absolute right-2 top-2"
-                  aria-label="Cerrar menú"
-                />
-              }
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-2 top-2 z-20 h-10 w-10"
+              aria-label="Cerrar menú"
+              onClick={closeMenu}
             >
-              <X className="h-4 w-4" />
-            </DialogClose>
+              <X className="h-5 w-5" />
+            </Button>
           </div>
 
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-3">
@@ -152,16 +165,6 @@ export function UserMenu({ user }: UserMenuProps) {
               {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
             </Button>
 
-            <Button
-              variant="outline"
-              size="mobile"
-              className="w-full justify-start gap-3"
-              onClick={() => goTo('/profile')}
-            >
-              <User className="h-5 w-5 shrink-0" />
-              Perfil y contraseña
-            </Button>
-
             {links.map(({ href, label, Icon }) => (
               <Button
                 key={href}
@@ -176,7 +179,7 @@ export function UserMenu({ user }: UserMenuProps) {
             ))}
           </div>
 
-          <div className="shrink-0 space-y-2 border-t bg-popover px-4 py-3 safe-area-bottom">
+          <div className="shrink-0 space-y-2 border-t bg-popover px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <Button
               variant="outline"
               size="mobile"
@@ -187,10 +190,11 @@ export function UserMenu({ user }: UserMenuProps) {
               Cerrar sesión
             </Button>
             <Button
+              type="button"
               variant="secondary"
               size="mobile"
               className="w-full"
-              onClick={() => setIsOpen(false)}
+              onClick={closeMenu}
             >
               Cerrar
             </Button>

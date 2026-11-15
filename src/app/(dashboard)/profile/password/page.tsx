@@ -58,7 +58,8 @@ export default function ChangePasswordPage() {
         title="Cambiar contraseña"
         description="Después de cambiarla tendrás que iniciar sesión de nuevo"
         backHref="/profile"
-        backLabel="Perfil"
+        backLabel="Volver al perfil"
+        backVariant="button"
       />
       <Card>
         <CardContent className="space-y-4 pt-6">

@@ -268,6 +268,7 @@ Users can install the PWA:
 - [x] Perfil/sesión responsive: volver a Inicio, menú scrolleable con Cerrar visible, placeholders de contraseña
 - [x] Avatar: preview local al subir + cache-bust + visible en menú de sesión
 - [x] Reportar error: capturas con preview + Web Share / mailto fallback
+- [x] Menú sesión bottom-sheet + Perfil con salir sticky/Cerrar perfil
 - [x] Storage / schema / pending-confirm banners
 - [ ] Push notifications (VAPID registration exists; needs a web push backend)
 - [x] Background sync wake (Periodic Background Sync, best-effort)
