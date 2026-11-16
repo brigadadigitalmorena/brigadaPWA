@@ -232,9 +232,14 @@ export class ExpressionEvaluator {
     const calculated: AnswersMap = {};
 
     for (const section of schema.sections) {
+      const sectionVisible = this._evalBool(
+        section.relevance as Record<string, unknown> | undefined,
+        answers,
+        true,
+      );
       for (const field of section.fields) {
         const key = fieldKey(field);
-        const visible = this.isVisible(field, answers);
+        const visible = sectionVisible && this.isVisible(field, answers);
         visibility[key] = visible;
         errors[key] = visible ? this.checkConstraint(field, answers) : null;
 

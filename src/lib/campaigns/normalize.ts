@@ -1,3 +1,5 @@
+import { DEFAULT_FIELD_TRACKING } from '@/lib/api/field-session.service';
+import type { FieldTrackingConfig } from '@/lib/api/field-session.service';
 import type { Assignment } from '@/lib/types';
 
 function asFiniteNumber(value: unknown): number | undefined {
@@ -11,6 +13,23 @@ function asFiniteNumber(value: unknown): number | undefined {
 
 function asOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+/**
+ * Assigned surveys send `field_tracking` as the config object.
+ * A bare `true` is accepted as “enabled” with the default route settings.
+ */
+export function coerceFieldTracking(value: unknown): FieldTrackingConfig | null {
+  if (value === true) {
+    return { ...DEFAULT_FIELD_TRACKING, enabled: true };
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as FieldTrackingConfig;
+}
+
+export function coerceGeoEnforcement(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  return value.trim() === 'none' ? 'off' : value.trim();
 }
 
 /**
@@ -72,6 +91,8 @@ export function normalizeAssignedSurvey(row: unknown): Assignment | null {
     survey_title: surveyTitle,
     entitlement_id: entitlementId,
     entitlement_status: entitlementStatus,
+    geo_enforcement: coerceGeoEnforcement(source.geo_enforcement),
+    field_tracking: coerceFieldTracking(source.field_tracking),
     ...(campaignId != null ? { campaign_id: campaignId } : {}),
     ...(campaignName ? { campaign_name: campaignName } : {}),
   };

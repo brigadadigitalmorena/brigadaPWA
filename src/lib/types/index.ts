@@ -77,6 +77,9 @@ export interface SurveyVersion {
   data_lists?: Record<string, unknown>;
 }
 
+/** JSONLogic as stored by the API: object, or a legacy JSON string. */
+export type JsonLogicSource = string | Record<string, unknown> | null;
+
 export interface SurveySection {
   id: number;
   version_id: number;
@@ -84,7 +87,7 @@ export interface SurveySection {
   title: string;
   description?: string;
   order: number;
-  relevance_expression?: string;
+  relevance_expression?: JsonLogicSource;
   questions?: Question[];
 }
 
@@ -98,10 +101,15 @@ export interface Question {
   is_required: boolean;
   validation_rules?: ValidationRules;
   options?: AnswerOption[];
-  relevance_expression?: string;
-  constraint_expression?: string;
-  calculated_expression?: string;
-  default_value_expression?: string;
+  relevance_expression?: JsonLogicSource;
+  constraint_expression?: JsonLogicSource;
+  constraint_message?: string | null;
+  calculated_expression?: JsonLogicSource;
+  /** Legacy PWA name. The API field is `default_expression`. */
+  default_value_expression?: JsonLogicSource;
+  default_expression?: JsonLogicSource;
+  label_expression?: JsonLogicSource;
+  is_required_expr?: JsonLogicSource;
   section_id?: number | string;
   group_type?: string;
   appearance?: string;

@@ -1,7 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3, Layers3 } from 'lucide-react';
-import type {
-  GestionTrackingRow,
-} from '@/lib/api/gestion.service';
+import type { GestionTrackingRow } from '@/lib/api/gestion.service';
+import { METRIC_CHIP_CLASSES } from '@/lib/gestion/display';
 import type { GestionStatusFilter } from './gestion-filters';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +58,7 @@ export function GestionMetrics({
       {items.map((item) => {
         const Icon = item.icon;
         const active = activeStatus === item.key;
+        const colors = METRIC_CHIP_CLASSES[item.key];
         return (
           <button
             key={item.key}
@@ -68,22 +68,20 @@ export function GestionMetrics({
             className={cn(
               'flex min-h-16 items-center gap-3 rounded-xl border bg-card px-3 py-2 text-left transition-colors',
               'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              active
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:bg-muted/60'
+              active ? colors.active : colors.idle
             )}
           >
             <Icon
-              className={cn(
-                'h-5 w-5 shrink-0',
-                item.key === 'problema'
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-primary'
-              )}
+              className={cn('h-5 w-5 shrink-0', colors.icon)}
               aria-hidden
             />
             <span>
-              <span className="block text-xl font-semibold leading-none">
+              <span
+                className={cn(
+                  'block text-xl font-semibold leading-none',
+                  colors.value
+                )}
+              >
                 {item.value}
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">

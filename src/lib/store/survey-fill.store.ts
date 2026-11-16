@@ -13,6 +13,10 @@ import { generateResponseId } from '@/lib/utils/uuid';
 import { isRelevant } from '@/lib/utils/json-logic';
 import { isFillableQuestion } from '@/lib/survey/field-types';
 import { loadFileBlob } from '@/lib/services/file-blob.service';
+import {
+  deleteDraft,
+  draftPayloadHasContent,
+} from '@/lib/services/draft.service';
 
 export interface LocalFilePreview {
   id: string;
@@ -183,13 +187,16 @@ function buildFillableQuestions(
   if (!version?.sections) return [];
 
   const entries: FillableQuestionEntry[] = [];
+  const dataLists = version.data_lists ?? {};
 
   version.sections.forEach((section, sectionIndex) => {
+    if (!isRelevant(section.relevance_expression, answers, dataLists)) return;
+
     const visibleQuestions =
       section.questions?.filter(
         (question) =>
           isFillableQuestion(question) &&
-          isRelevant(question.relevance_expression, answers)
+          isRelevant(question.relevance_expression, answers, dataLists)
       ) ?? [];
 
     visibleQuestions.forEach((question) => {
@@ -325,12 +332,29 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
     if (!user) return;
 
     try {
-      const response = buildDraftResponse(state, user);
-
       const existing = await db.responses
         .where('response_id')
         .equals(state.responseId)
         .first();
+
+      // Never demote a finalized / completed response back to draft.
+      // Autosave can still fire after finalize if the fill page has not
+      // unmounted yet (pending debounce from the last answer change).
+      if (existing && existing.status !== 'draft') {
+        return;
+      }
+
+      const hasContent = draftPayloadHasContent(state.answers, state.files);
+      if (!hasContent) {
+        // Opening a survey hydrates + autosaves; without this guard every
+        // peek leaves a phantom draft that only clears on submit.
+        if (existing?.status === 'draft') {
+          await deleteDraft(state.responseId);
+        }
+        return;
+      }
+
+      const response = buildDraftResponse(state, user);
 
       if (existing?.id !== undefined) {
         response.id = existing.id;
@@ -421,11 +445,16 @@ export const useSurveyFillStore = create<SurveyFillState>((set, get) => ({
   },
 
   getVisibleQuestions: (section) => {
-    const { answers } = get();
+    const { answers, version } = get();
+    const dataLists = version?.data_lists ?? {};
+    if (!isRelevant(section.relevance_expression, answers, dataLists)) {
+      return [];
+    }
     return (
       section.questions?.filter(
         (q) =>
-          isFillableQuestion(q) && isRelevant(q.relevance_expression, answers)
+          isFillableQuestion(q) &&
+          isRelevant(q.relevance_expression, answers, dataLists)
       ) || []
     );
   },

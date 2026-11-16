@@ -8,13 +8,14 @@ import { BottomNav } from '@/components/common/bottom-nav';
 import { SyncIndicator } from '@/components/sync/sync-indicator';
 import { NotificationBell } from '@/components/common/notification-bell';
 import { UserMenu } from '@/components/common/user-menu';
-import { InstallPrompt } from '@/components/common/install-prompt';
 import { LoadingState } from '@/components/common/loading-state';
 import { FieldStatusBanners } from '@/components/banners/field-status-banners';
 import { ObservabilityBootstrap } from '@/components/common/observability-bootstrap';
+import { SupportModeBanner } from '@/components/support/support-mode-banner';
 import { ClipboardList } from 'lucide-react';
 import { registerWebPush } from '@/lib/services/web-push.service';
 import { registerPeriodicSync } from '@/lib/services/periodic-sync';
+import { purgeEmptyDrafts } from '@/lib/services/draft.service';
 
 export default function DashboardLayout({
   children,
@@ -37,6 +38,8 @@ export default function DashboardLayout({
     if (!isAuthenticated) return;
     void registerWebPush(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
     void registerPeriodicSync();
+    // Clear empty draft shells left by hydrate autosave on prior sessions.
+    void purgeEmptyDrafts();
   }, [isAuthenticated]);
 
   if (isLoading) {
@@ -51,7 +54,6 @@ export default function DashboardLayout({
     return (
       <div className="flex h-screen overflow-hidden bg-background">
         <main className="flex-1 overflow-hidden">{children}</main>
-        <InstallPrompt />
         <ObservabilityBootstrap />
       </div>
     );
@@ -62,18 +64,19 @@ export default function DashboardLayout({
       <Sidebar user={user} currentPath={pathname} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
+        <SupportModeBanner />
         <header
-          className="flex items-center justify-between border-b bg-background px-4 safe-area-top"
+          className="flex items-center justify-between border-b bg-background px-4 pr-5 safe-area-top md:pr-6"
           style={{ height: 'var(--header-height)' }}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 md:hidden">
               <ClipboardList className="h-4 w-4 text-primary" />
             </div>
-            <h1 className="text-lg font-semibold truncate md:hidden">Brigada</h1>
+            <h1 className="truncate text-lg font-semibold md:hidden">Brigada</h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <NotificationBell />
             <SyncIndicator />
             <UserMenu user={user} />
@@ -92,7 +95,6 @@ export default function DashboardLayout({
         <BottomNav />
       </div>
 
-      <InstallPrompt />
       <ObservabilityBootstrap />
     </div>
   );

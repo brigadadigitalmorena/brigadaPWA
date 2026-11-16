@@ -12,7 +12,9 @@ export type ModuleKey =
   | 'maps'
   | 'recorridos'
   | 'notifications'
-  | 'networks';
+  | 'networks'
+  | 'help'
+  | 'support';
 
 export interface AppConfigModules {
   onlineEnabledModules: ModuleKey[];
@@ -31,6 +33,8 @@ const DEFAULT_CONFIG: AppConfigModules = {
     'recorridos',
     'notifications',
     'networks',
+    'help',
+    'support',
   ],
   offlineEnabledModules: [
     'home',
@@ -41,6 +45,7 @@ const DEFAULT_CONFIG: AppConfigModules = {
     'maps',
     'recorridos',
     'networks',
+    'help',
   ],
 };
 

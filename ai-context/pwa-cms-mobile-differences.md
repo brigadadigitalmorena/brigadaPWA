@@ -115,6 +115,10 @@ Estas librerías interpretan el **mismo JSON** que publica el CMS. Si una versi�
 
 **Implicación:** no reutilizar el `client.ts` del CMS en el PWA. El PWA debe seguir el cliente **móvil** (Bearer JWT, `/mobile/*`).
 
+**PWA sync vs sesión (2026-11-10):** `SyncProvider` vive en el layout raíz (también sobre `/login`). Los wakes automáticos (`focus` / `visibility` / `online` / SW / cola pendiente) **no** deben pintar el banner *“No hay sesión activa…”* sin token: se omiten o se tratan como idle silencioso. Al pasar a autenticado (login o boot con JWT), se limpia el aviso sticky y se reintenta el drenado con sesión.
+
+**PWA file upload `Failed to fetch` (2026-11-10):** Los ítems `Archivo` hacen `PUT` directo a R2 con `fetch`. Si el bucket no tiene CORS para el origen del PWA, o la API/proxy está caída, el navegador lanza `Failed to fetch`. La UI ahora mapea eso a `R2_CORS_OR_NETWORK` (mensaje en español). En backend: `python scripts/configure_r2_cors.py` sobre `brigada-dev`, y levantar el stack con `./scripts/start-local.sh` / `docker-compose.local.yml`.
+
 ### 3.2 Quién puede entrar dónde
 
 | Rol / permiso | CMS | Móvil | PWA |
@@ -141,7 +145,7 @@ Prefijos del backend (`brigadaBackEnd/app/api/`):
 | `/mobile/*` | PWA + móvil | surveys, responses/batch, documents, notifications, gestiones, maps, zip-lookup, field-sessions, me, score |
 | `/auth/*` | CMS (y a veces overlap) | login cookie, refresh CMS |
 | `/admin/*` | **Solo CMS** | surveys builder, users, areas, analytics, cron, tiles admin |
-| `/public/*` | Activación sin sesión | codes |
+| `/public/*` | Activación sin sesión y config de la app | codes, `app-config` (`social_links`) |
 
 ### 4.1 Endpoints de campo que el PWA ya usa
 
@@ -156,7 +160,10 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - ZIP: `/mobile/zip-lookup/{code}`
 - Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
-- Redes: `GET /public/app-config` → `social_links` (`/networks`)
+- Redes: `GET /public/app-config` → `social_links` (`/networks`). El proxy de Next deja pasar `public/app-config` sin token (el cliente no manda `Authorization` en `/public/`). La lista se cachea en `localStorage`. El QR se genera en el cliente a partir de `url`, igual que en móvil. UI: cards sin URL cruda, botón Compartir primario + iconos Abrir/QR, icono de plataforma.
+- Bottom nav móvil: 5 slots (Inicio, Encuestas, Mapas, Recorridos, **Más**). Borradores / Prioritarias / Gestión / Redes / Envíos / Ayuda / Apoyo viven en el sheet `MoreNavSheet`.
+- Ayuda: `/help` FAQ estático (paridad con móvil `app/help.tsx`: tips, mismas secciones, correo de soporte). Visible en sidebar, Inicio y menú de usuario (en móvil la entrada está en Perfil).
+- Modo Apoyo: `/support` (dueño: crear/listar/QR/revocar/reactivar/duplicar) y `/support-join` (helper por código, paridad con `support-mode.tsx` + `support-join.tsx` de `brigadaApp/dev`). Banner en sesión helper. API `/mobile/support/*`.
 - Reporte: `/report` crea vía `POST /issue-reports` con evidencia R2 obligatoria (1–3 imágenes); el móvil aún usa MailComposer (BD-24)
 
 ### 4.2 Endpoints de campo que el PWA **aún no** consume (móvil sí o backend ya existe)
@@ -234,6 +241,15 @@ CMS builder  →  publica versión  →  Postgres
               POST /mobile/responses/batch (mismo payload)
 ```
 
+### 6.0 Drafts (PWA)
+
+Autosave en fill (~1.2 s) solo persiste Dexie cuando hay respuestas/archivos
+no vacíos. Abrir una encuesta sin capturar no debe dejar banner
+“borrador pendiente”. `saveDraft` nunca degrada `completed` → `draft`
+(carrera post-`finalizeResponse`). Al autenticar, `purgeEmptyDrafts()` limpia
+cáscaras vacías de sesiones anteriores. Contadores/banner/home/drafts filtran
+con `draftRowHasContent`.
+
 ### 6.1 Form Engine v2
 
 Los tres clientes usan JSONLogic. El PWA adapta `SurveyVersion` → schema en `src/lib/forms/survey-to-form-schema.ts` y `useSurveyFormEngine`.
@@ -288,7 +304,18 @@ El CMS solo configura extraer/autofill; no corre Tesseract.
 | `/sync` | `mis-envios` | `/dashboard/sync-monitor` (ops, no el brigadista) |
 | `/notifications` | archivo existe, **tab `href: null`** (“not available yet”) | `/dashboard/notifications` (admin) |
 | `/profile`, `/profile/password` | `profile`, `edit-profile`, `change-password`, `change-avatar` | `/dashboard/settings` (admin) |
-| — | `score-details`, `report-issue`, `theme-settings`, `networks`, `help`, `debug/*` | analytics, users, roles, cron, whitelist, builder, … |
+| `/help`, `/support`, `/support-join`, `/networks`, `/report` | help, support-mode/join, networks, report-issue | analytics, users, roles, cron, whitelist, builder, … |
+| — | `score-details`, `theme-settings`, `debug/*` | — |
+
+### Mapas estáticos (PWA sync)
+
+- Al abrir `/maps` o pulsar **Descargar cambios** se hace sync **full** (`forceFull`):
+  omite el cursor `since`, descarga el catálogo publicado, actualiza versiones
+  distintas y **elimina** mapas locales que el CMS ya no publica.
+- Sync en background (login / online / focus) sigue siendo delta con cursor.
+- Tarjeta seleccionada usa el color de personalización (`data-color-scheme`)
+  en el borde y hace scroll al visor; el visor admite pantalla completa
+  (Fullscreen API + overlay CSS para iOS).
 
 Nav PWA: `src/components/common/nav-items.ts` (módulos gated por `app-config.service.ts`). Offline desactiva tracking/notifications según `offlineEnabledModules`.
 

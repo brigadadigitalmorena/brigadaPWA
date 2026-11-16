@@ -9,15 +9,28 @@ interface BeforeInstallPromptEvent extends Event {
 
 function getInitialInstalledState(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.matchMedia('(display-mode: standalone)').matches;
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return (
+    window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true
+  );
+}
+
+function isIosBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const iPadOs = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return /iPad|iPhone|iPod/.test(ua) || iPadOs;
 }
 
 export function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(getInitialInstalledState);
+  const [isIos, setIsIos] = useState(false);
 
   useEffect(() => {
+    setIsIos(isIosBrowser());
+
     // Listen for beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       const event = e as BeforeInstallPromptEvent;
@@ -71,6 +84,7 @@ export function useInstallPrompt() {
   return {
     isInstallable,
     isInstalled,
+    isIos,
     install,
   };
 }

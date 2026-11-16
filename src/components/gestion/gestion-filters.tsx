@@ -1,7 +1,15 @@
+'use client';
+
 import { Search, X } from 'lucide-react';
 import type { ManagementStatus } from '@/lib/api/gestion.service';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export type GestionStatusFilter =
   | ManagementStatus
@@ -36,7 +44,7 @@ export function GestionFilters({
 
   return (
     <section className="space-y-3" aria-label="Filtros de gestiones">
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -73,20 +81,29 @@ export function GestionFilters({
           </select>
         )}
         {hasFilters && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="mobile"
-            onClick={() => {
-              onQueryChange('');
-              onStatusChange('all');
-              onSurveyChange('all');
-            }}
-            className="shrink-0"
-          >
-            <X className="h-4 w-4" aria-hidden />
-            Limpiar
-          </Button>
+          <TooltipProvider delay={200}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Limpiar"
+                    onClick={() => {
+                      onQueryChange('');
+                      onStatusChange('all');
+                      onSurveyChange('all');
+                    }}
+                    className="shrink-0 self-end text-muted-foreground sm:self-auto"
+                  >
+                    <X aria-hidden />
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">Limpiar</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </section>

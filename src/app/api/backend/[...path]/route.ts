@@ -14,11 +14,15 @@ const PUBLIC_PATH_PREFIXES = [
   'mobile/token/refresh',
 ];
 
+/** Exact paths the backend serves without a session. The client omits Authorization on `/public/`. */
+const PUBLIC_EXACT_PATHS = ['public/app-config'];
+
 function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
 function isPublicPath(path: string): boolean {
+  if (PUBLIC_EXACT_PATHS.includes(path)) return true;
   return PUBLIC_PATH_PREFIXES.some(
     (prefix) => path === prefix || path.startsWith(prefix)
   );

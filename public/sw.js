@@ -2235,6 +2235,12 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
   };
 
+  // node_modules/workbox-routing/setCatchHandler.js
+  function setCatchHandler(handler) {
+    const defaultRouter2 = getOrCreateDefaultRouter();
+    defaultRouter2.setCatchHandler(handler);
+  }
+
   // node_modules/workbox-routing/setDefaultHandler.js
   function setDefaultHandler(handler) {
     const defaultRouter2 = getOrCreateDefaultRouter();
@@ -3262,28 +3268,19 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
 
   // workers/sw.js
   var PAGES_CACHE = "pages-cache-v5";
-  var STATIC_CACHE = "static-resources-cache-v5";
-  var IMAGES_CACHE = "images-cache-v5";
-  var API_CACHE = "api-cache-v5";
+  var STATIC_CACHE = "static-resources-cache-v4";
+  var IMAGES_CACHE = "images-cache-v4";
+  var API_CACHE = "api-cache-v4";
   var OFFLINE_TILE_CACHE = "brigada-offline-tiles-v1";
   var TILE_MANIFEST_CACHE = "tile-manifest-cache-v1";
-  var shellUrls = [
-    "/",
-    "/offline.html",
-    "/manifest.json",
-    "/surveys",
-    "/sync",
-    "/maps",
-    "/recorridos",
-    "/drafts",
-    "/extras"
-  ];
+  var precacheUrls = ["/offline.html", "/manifest.json"];
   var injected = self.__WB_MANIFEST || [];
   var precacheEntries = [
     ...injected,
-    ...shellUrls.map((url) => ({ url, revision: null }))
+    ...precacheUrls.map((url) => ({ url, revision: null }))
   ];
   precacheAndRoute(precacheEntries);
+  var NAV_NETWORK_TIMEOUT_MS = 4e3;
   async function findCachedFillShell(cache) {
     const shell = await cache.match("/surveys/__fill_shell__");
     if (shell) return shell;
@@ -3312,51 +3309,132 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       }
     );
   }
-  async function navigationHandler({ request }) {
-    const cache = await caches.open(PAGES_CACHE);
-    const url = new URL(request.url);
-    const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
-    const authRoute = isAuthRoute(url.pathname);
-    try {
-      const networkResponse = await fetch(request);
-      if (networkResponse && networkResponse.ok) {
-        if (!authRoute) {
-          cache.put(request, networkResponse.clone()).catch(() => {
-          });
-          if (isFillRoute) {
-            cache.put("/surveys/__fill_shell__", networkResponse.clone()).catch(() => {
-            });
-          }
-        }
-        return networkResponse;
-      }
-    } catch {
-    }
-    if (authRoute) {
-      const exact = await cache.match(request) || await cache.match(`${url.origin}${url.pathname}`) || await caches.match(request.url, { ignoreSearch: true });
-      if (exact) return exact;
-      return authOfflineResponse();
-    }
-    const withoutQuery = `${url.origin}${url.pathname}`;
-    if (isFillRoute) {
-      const fillShell = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true }) || await findCachedFillShell(cache);
-      if (fillShell) return fillShell;
-    }
-    const cached = await cache.match(request) || await cache.match(withoutQuery) || await caches.match(request.url, { ignoreSearch: true });
-    if (cached) return cached;
-    const offline = await caches.match("/offline.html");
-    if (offline) return offline;
+  function offlineFallbackResponse() {
     return new Response(
-      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Abre Brigada en l\xEDnea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><a href="/surveys">Ir a encuestas</a></p></body></html>',
+      '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sin conexi\xF3n</title></head><body style="font-family:system-ui;padding:2rem;text-align:center"><h1>Sin conexi\xF3n</h1><p>Abre Brigada en l\xEDnea al menos una vez y visita tus encuestas para poder usarlas offline.</p><p><button onclick="location.reload()" style="font-size:1rem;padding:.75rem 1.25rem;border-radius:12px;border:0;background:#FF1B8D;color:#fff;cursor:pointer">Reintentar</button></p></body></html>',
       {
         status: 503,
         headers: { "Content-Type": "text/html; charset=utf-8" }
       }
     );
   }
+  async function matchPage(cache, request, url) {
+    const withoutQuery = `${url.origin}${url.pathname}`;
+    return await cache.match(request) || await cache.match(withoutQuery) || await cache.match(url.pathname);
+  }
+  async function matchOfflineShell() {
+    const names = await caches.keys();
+    for (const name of names) {
+      if (name === OFFLINE_TILE_CACHE || name === IMAGES_CACHE) continue;
+      const cache = await caches.open(name);
+      const hit = await cache.match("/offline.html");
+      if (hit) return hit;
+    }
+    return void 0;
+  }
+  async function storePage(cache, request, response, isFillRoute) {
+    try {
+      await cache.put(request.url, response.clone());
+      if (isFillRoute) {
+        await cache.put("/surveys/__fill_shell__", response.clone());
+      }
+    } catch {
+    }
+  }
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("nav-timeout")), ms);
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        }
+      );
+    });
+  }
+  async function preloadOrFetch(request, event) {
+    if (event && event.preloadResponse) {
+      try {
+        const preloaded = await withTimeout(
+          event.preloadResponse,
+          NAV_NETWORK_TIMEOUT_MS
+        );
+        if (preloaded) return preloaded;
+      } catch {
+      }
+    }
+    return withTimeout(fetch(request), NAV_NETWORK_TIMEOUT_MS);
+  }
+  async function handleNavigation({ request, event }) {
+    const cache = await caches.open(PAGES_CACHE);
+    const url = new URL(request.url);
+    const isFillRoute = /\/surveys\/\d+\/fill\/?$/.test(url.pathname);
+    const authRoute = isAuthRoute(url.pathname);
+    const browserOffline = typeof self.navigator !== "undefined" && self.navigator.onLine === false;
+    if (!browserOffline) {
+      try {
+        const networkResponse = await preloadOrFetch(request, event);
+        const redirect = networkResponse && networkResponse.status >= 300 && networkResponse.status < 400;
+        if (networkResponse && (networkResponse.ok || redirect)) {
+          if (networkResponse.ok && event && event.waitUntil && !authRoute) {
+            const pageUrl = request.url;
+            event.waitUntil(
+              (async () => {
+                try {
+                  const again = await fetch(pageUrl, {
+                    credentials: "same-origin",
+                    cache: "no-store"
+                  });
+                  if (again && again.ok) {
+                    await storePage(cache, request, again, isFillRoute);
+                  }
+                } catch {
+                }
+              })()
+            );
+          }
+          return networkResponse;
+        }
+      } catch {
+      }
+    }
+    if (authRoute) {
+      const exact = await matchPage(cache, request, url);
+      if (exact) return exact;
+      return authOfflineResponse();
+    }
+    const cached = await matchPage(cache, request, url) || (isFillRoute ? await findCachedFillShell(cache) : void 0);
+    if (cached) return cached;
+    const offline = await matchOfflineShell();
+    if (offline) return offline;
+    return offlineFallbackResponse();
+  }
+  async function navigationHandler(args) {
+    try {
+      return await handleNavigation(args);
+    } catch {
+      return offlineFallbackResponse();
+    }
+  }
   registerRoute(new NavigationRoute(navigationHandler));
   registerRoute(
-    ({ request }) => request.destination === "style" || request.destination === "script" || request.destination === "worker",
+    ({ url, request }) => request.method === "GET" && url.pathname.startsWith("/_next/static/"),
+    new CacheFirst({
+      cacheName: STATIC_CACHE,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 300,
+          maxAgeSeconds: 365 * 24 * 60 * 60
+        })
+      ]
+    })
+  );
+  registerRoute(
+    ({ url, request }) => !url.pathname.startsWith("/_next/static/") && (request.destination === "style" || request.destination === "script" || request.destination === "worker"),
     new StaleWhileRevalidate({
       cacheName: STATIC_CACHE,
       plugins: [
@@ -3404,7 +3482,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     })
   );
   registerRoute(
-    ({ url, request }) => request.method === "GET" && (url.pathname.startsWith("/_next/") || request.headers.get("RSC") === "1" || request.headers.get("Next-Router-Prefetch") === "1" || url.searchParams.has("_rsc")),
+    ({ url, request }) => request.method === "GET" && !url.pathname.startsWith("/_next/static/") && (url.pathname.startsWith("/_next/") || request.headers.get("RSC") === "1" || request.headers.get("Next-Router-Prefetch") === "1" || url.searchParams.has("_rsc")),
     new NetworkFirst({
       cacheName: "next-rsc-cache",
       networkTimeoutSeconds: 3,
@@ -3441,19 +3519,35 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       ]
     })
   );
-  setDefaultHandler(
-    new NetworkFirst({
-      cacheName: "default-cache",
-      networkTimeoutSeconds: 3,
-      plugins: [
-        new ExpirationPlugin({
-          maxEntries: 100,
-          maxAgeSeconds: 24 * 60 * 60
-        })
-      ]
-    })
-  );
+  var defaultGetHandler = new NetworkFirst({
+    cacheName: "default-cache",
+    networkTimeoutSeconds: 3
+  });
+  setDefaultHandler(async (options) => {
+    const method = options.request.method;
+    if (method !== "GET" && method !== "HEAD") {
+      return fetch(options.request);
+    }
+    return defaultGetHandler.handle(options);
+  });
+  setCatchHandler(async ({ request, event }) => {
+    if (request.mode === "navigate") {
+      return navigationHandler({ request, event });
+    }
+    return Response.error();
+  });
   self.addEventListener("sync", (event) => {
+    if (event.tag === "brigada-dexie-sync") {
+      event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: "BRIGADA_SYNC_WAKE" });
+          });
+        })
+      );
+    }
+  });
+  self.addEventListener("periodicsync", (event) => {
     if (event.tag === "brigada-dexie-sync") {
       event.waitUntil(
         self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
@@ -3497,14 +3591,39 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
       );
     }
   });
-  self.addEventListener("install", () => {
-    if (!self.registration.active) {
-      self.skipWaiting();
-    }
+  var INSTALL_SHELLS = ["/home", "/login", "/welcome", "/"];
+  async function warmInstallShells() {
+    const cache = await caches.open(PAGES_CACHE);
+    await Promise.all(
+      INSTALL_SHELLS.map(async (path) => {
+        try {
+          const response = await withTimeout(
+            fetch(path, { credentials: "same-origin" }),
+            NAV_NETWORK_TIMEOUT_MS
+          );
+          if (response && response.ok) await cache.put(path, response);
+        } catch {
+        }
+      })
+    );
+  }
+  self.addEventListener("install", (event) => {
+    event.waitUntil(
+      (async () => {
+        await Promise.race([
+          warmInstallShells(),
+          new Promise((resolve) => setTimeout(resolve, NAV_NETWORK_TIMEOUT_MS))
+        ]);
+        await self.skipWaiting();
+      })()
+    );
   });
   self.addEventListener("activate", (event) => {
     event.waitUntil(
       (async () => {
+        if (self.registration.navigationPreload) {
+          await self.registration.navigationPreload.enable();
+        }
         const keep = /* @__PURE__ */ new Set([
           PAGES_CACHE,
           STATIC_CACHE,

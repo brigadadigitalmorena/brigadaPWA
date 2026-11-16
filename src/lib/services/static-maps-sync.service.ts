@@ -57,9 +57,20 @@ export interface StaticMapsSyncResult {
   updated: number;
   skipped: number;
   failed: number;
+  removed: number;
   failedMaps: Array<{ mapId: number; name: string; error: string }>;
   serverEtag?: string;
   error?: string;
+}
+
+export interface SyncStaticMapsOptions {
+  /**
+   * Ignore the local publication cursor and pull the full published catalog.
+   * Used when opening Mapas / tapping "Descargar cambios" so CMS publishes
+   * (and unpublishes) are reconciled even if the delta cursor looked fresh.
+   */
+  forceFull?: boolean;
+  signal?: AbortSignal;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -176,7 +187,11 @@ async function syncOneMap(
     local.version === item.version &&
     local.manifest_etag === item.manifest_etag
   ) {
-    return 'skipped';
+    // Metadata matched, but a prior interrupted download can leave 0 features.
+    const featureCount = await staticMapsRepository.countFeatures(item.map_id);
+    if (featureCount > 0 || !item.manifest_url) {
+      return 'skipped';
+    }
   }
 
   const manifest = await downloadManifest(item, signal);
@@ -208,10 +223,16 @@ async function syncOneMap(
 }
 
 export async function syncStaticMaps(
-  signal?: AbortSignal
+  options: SyncStaticMapsOptions | AbortSignal = {}
 ): Promise<StaticMapsSyncResult> {
+  const opts: SyncStaticMapsOptions =
+    typeof AbortSignal !== 'undefined' && options instanceof AbortSignal
+      ? { signal: options }
+      : (options as SyncStaticMapsOptions);
+  const { forceFull = false, signal } = opts;
+
   try {
-    const cursor = await kvGet(MAPS_ETAG_KEY);
+    const cursor = forceFull ? null : await kvGet(MAPS_ETAG_KEY);
     const response = await getMobileMaps(cursor ?? undefined, signal);
     if (response.status === 'not-modified') {
       await recordSyncMetric('not-modified');
@@ -220,6 +241,7 @@ export async function syncStaticMaps(
         updated: 0,
         skipped: 0,
         failed: 0,
+        removed: 0,
         failedMaps: [],
         serverEtag: cursor ?? undefined,
       };
@@ -242,6 +264,17 @@ export async function syncStaticMaps(
       }
     }
 
+    // Full catalog responses (no since cursor) are authoritative: drop local
+    // maps the CMS unpublished / deleted so the PWA stops showing stale cards.
+    let removed = 0;
+    if (forceFull || cursor == null) {
+      if (failedMaps.length === 0) {
+        removed = await staticMapsRepository.pruneMapsNotIn(
+          response.data.maps.map((item) => item.map_id)
+        );
+      }
+    }
+
     if (failedMaps.length === 0) {
       await kvSet(MAPS_ETAG_KEY, response.data.server_etag);
     }
@@ -249,6 +282,8 @@ export async function syncStaticMaps(
       updated,
       skipped,
       failed: failedMaps.length,
+      removed,
+      forceFull,
     });
 
     return {
@@ -256,6 +291,7 @@ export async function syncStaticMaps(
       updated,
       skipped,
       failed: failedMaps.length,
+      removed,
       failedMaps,
       serverEtag: response.data.server_etag,
     };
@@ -268,6 +304,7 @@ export async function syncStaticMaps(
       updated: 0,
       skipped: 0,
       failed: 0,
+      removed: 0,
       failedMaps: [],
       error: error instanceof Error ? error.message : String(error),
     };

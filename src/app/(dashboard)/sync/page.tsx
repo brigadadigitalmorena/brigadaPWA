@@ -79,6 +79,7 @@ export default function SyncPage() {
     deadLetterCount,
     lastSyncedAt,
     error,
+    syncNotice,
     syncNow,
     retryFailed,
     clearDeadLetter,
@@ -165,6 +166,13 @@ export default function SyncPage() {
         </TabsContent>
 
         <TabsContent value="queue" className="space-y-5">
+          {((syncNotice && !syncNotice.confirmed) || error) && (
+            <InlineBanner
+              variant={syncNotice?.tone === 'warning' ? 'warning' : 'error'}
+              message={syncNotice?.message || error || ''}
+            />
+          )}
+
           {(deadLetterCount ?? 0) > 0 && (
             <InlineBanner
               variant="error"
@@ -218,7 +226,7 @@ export default function SyncPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <Button
-              onClick={syncNow}
+              onClick={() => syncNow('user')}
               disabled={!isOnline || isSyncing || (pendingCount === 0 && (deadLetterCount ?? 0) === 0)}
               size="mobile"
               className="w-full"
@@ -248,41 +256,50 @@ export default function SyncPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={cn(
+            syncNotice?.tone === 'error' && 'border-destructive',
+            syncNotice?.tone === 'success' && 'border-green-500/40'
+          )}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/10">
-                <CheckCircle2 className="h-7 w-7 text-green-500" />
+              <div
+                className={cn(
+                  'flex h-12 w-12 items-center justify-center rounded-xl',
+                  syncNotice?.tone === 'error' ? 'bg-destructive/10' : 'bg-green-500/10'
+                )}
+              >
+                {syncNotice?.tone === 'error' ? (
+                  <AlertCircle className="h-7 w-7 text-destructive" />
+                ) : (
+                  <CheckCircle2 className="h-7 w-7 text-green-500" />
+                )}
               </div>
               <div>
-                <span className="text-xl">Última sync</span>
+                <span className="text-xl">
+                  {syncNotice?.tone === 'error'
+                    ? 'No se envió'
+                    : syncNotice?.tone === 'warning'
+                      ? syncNotice.confirmed
+                        ? 'Enviado parcialmente'
+                        : 'Sin enviar'
+                      : syncNotice?.tone === 'success'
+                        ? 'Enviado'
+                        : 'Último confirmado'}
+                </span>
                 <CardDescription className="mt-0.5">
-                  {lastSyncedAt
-                    ? new Date(lastSyncedAt).toLocaleString()
-                    : 'Nunca'}
+                  {syncNotice
+                    ? syncNotice.message
+                    : lastSyncedAt
+                      ? new Date(lastSyncedAt).toLocaleString()
+                      : 'Aún no hay un envío confirmado por el servidor'}
                 </CardDescription>
               </div>
             </CardTitle>
           </CardHeader>
         </Card>
           </div>
-
-          {error && (
-            <Card className="border-destructive">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="h-5 w-5" />
-                  Error de sincronización
-                </CardTitle>
-                <CardDescription>{error}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={retryFailed} variant="outline" size="mobile" className="w-full">
-                  Reintentar fallidos
-                </Button>
-              </CardContent>
-            </Card>
-          )}
 
           <div className="space-y-3">
             <h2 className="text-base font-semibold">Cola de sincronización</h2>

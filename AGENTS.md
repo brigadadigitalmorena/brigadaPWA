@@ -114,7 +114,10 @@ Entidades clave: `Survey`, `Response`, `ResponseAnswer`, `LocalFile`, `SyncQueue
 - Process queue when online (`processSyncQueue` en `sync-engine.service.ts`)
 - Exponential backoff (base 30s, max 1h). Max retries: 12 uploads, 5 responses.
 - Stale upload recovery via `upload_started_at` + lease duration.
-- R2 error classification: `R2_RATE_LIMITED`, `R2_403_EXPIRED`.
+- R2 error classification: `R2_RATE_LIMITED`, `R2_403_EXPIRED`, `R2_CORS_OR_NETWORK`.
+- “Último confirmado” advances only after the server accepts at least one item. A tap on Enviar / Sincronizar ahora reports that result in place; a lock or an empty attempt does not move the clock. A stalled upload or API call gives up (12s for the API, 20s for the file) and says the send was not confirmed.
+- Auto-sync must not banner `no_session` while on `/login` (`SyncProvider` is root-level). On auth, clear sticky sync error and drain with a token.
+- Browser `Failed to fetch` on file PUT maps to `R2_CORS_OR_NETWORK` (not a raw English toast). Local uploads need API up + R2 bucket CORS for the PWA origin (`brigadaBackEnd/scripts/configure_r2_cors.py`).
 
 ### Service Worker
 
@@ -157,7 +160,7 @@ const assignments = await getMyAssignments();  // GET /mobile/surveys (assigned 
 await submitResponse(responseData);            // POST /mobile/responses
 ```
 
-Reanuda un borrador local desde `/drafts` vía `surveyResumeHref` (`resumeDraftId` + campaña/entitlement). Los ids de query ausentes deben quedar en `null` (`Number(null) === 0` rompe el fallback de Dexie). "Continuar" offline usa navegación dura (hard navigation) para que el shell de fill del SW cargue.
+Resume a local draft from `/drafts` via `surveyResumeHref` (`resumeDraftId` + campaign/entitlement). Missing query ids must stay `null` (`Number(null) === 0` breaks Dexie fallback). Offline Continuar uses a hard navigation so the SW fill shell can load. On the fill screen, a required photo counts once the file is attached, the validation notice stays on the question, and Anterior / Borrador / Siguiente rise above the mobile keyboard.
 
 ## Conventions
 
@@ -329,6 +332,22 @@ Ver `ai-context/00-overview.md#variación-respecto-a-brigadaapp`, `ai-context/gu
 
 ## Future Enhancements (tracking en `10-backlog.md`)
 
+- [x] In-app notifications inbox
+- [x] Home + daily metrics
+- [x] Submission map
+- [x] Photo annotation, in-app audio/video, barcode pattern
+- [x] GIS auto-track
+- [x] Sentry / PostHog (env-gated)
+- [x] Help, networks, report issue, theme, welcome, debug, response history
+- [x] Ayuda en sidebar/Inicio (`/help`, paridad FAQ con móvil)
+- [x] Modo Apoyo PWA (`/support`, `/support-join`) alineado a `brigadaApp/dev`
+- [x] Drafts: no banner fantasma al abrir encuesta vacía; no demote completed→draft
+- [x] Mapas: sync full al abrir/Descargar cambios + borde tema + fullscreen visor
+- [x] Perfil/sesión responsive: volver a Inicio, menú scrolleable con Cerrar visible, placeholders de contraseña
+- [x] Avatar: preview local al subir + cache-bust + visible en menú de sesión
+- [x] Reportar error: API `/issue-reports` + evidencia R2 (1–3 imágenes; no mailto/Web Share)
+- [x] Menú sesión bottom-sheet + Perfil con salir sticky/Cerrar perfil
+- [x] Storage / schema / pending-confirm banners
 - [ ] Push notifications (VAPID registration exists; needs a web push backend)
 - [x] Background sync wake (Periodic Background Sync, best-effort)
 - [ ] Background sync improvements (solo Chromium)
@@ -340,16 +359,8 @@ Ver `ai-context/00-overview.md#variación-respecto-a-brigadaapp`, `ai-context/gu
 - [x] Image compression before upload
 - [x] INE compound answer + ocr_autofill
 - [x] ZIP colonia lookup (`/mobile/zip/{code}`)
-- [x] Home + daily metrics
-- [x] Submission map
-- [x] Photo annotation, in-app audio/video, barcode pattern
-- [x] GIS auto-track
-- [x] Sentry / PostHog (env-gated)
-- [x] Help, networks, report issue, theme, welcome, debug, response history
-- [x] Storage / schema / pending-confirm banners
 - [x] Corregir respuesta from failed sync
 - [x] Profile / password / avatar
-- [x] In-app notifications inbox
 - [ ] CSP + HSTS + Permissions-Policy headers
 - [ ] Test suite real (Vitest + Playwright + CI)
 - [ ] Guardrails anti-deriva en CI

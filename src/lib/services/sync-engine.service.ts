@@ -6,6 +6,7 @@ import {
   acquireProcessLock,
   releaseProcessLock,
   forceReleaseStaleLocks,
+  reclaimInFlightQueueItems,
   getLeaseOwner,
   getLeaseDurationMs,
 } from '@/lib/db/database';
@@ -29,7 +30,9 @@ import {
   classifySubmitError,
   recordSubmitOutcome,
   normalizeConfirmDocumentPayload,
+  describeUploadError,
   SYNC_PRIORITY,
+  SYNC_TIMEOUTS,
 } from '@/lib/sync';
 import {
   classifySampleReadiness,
@@ -41,6 +44,7 @@ import {
 } from '@/lib/sync/field-session-replay-utils';
 import { getApiErrorMessage } from '@/lib/utils/api-errors';
 import { getAccessToken, loadTokensFromStorage } from '@/lib/api/client';
+import type { SyncRunResult } from '@/lib/sync/sync-run';
 
 interface SyncResult {
   success: boolean;
@@ -93,27 +97,110 @@ function resolveNumericQuestionId(
 /**
  * Process due items in the sync queue (pending + retry_wait).
  */
-export async function processSyncQueue(options?: SyncEngineOptions): Promise<void> {
+function emptyRun(
+  skippedReason?: SyncRunResult['skippedReason']
+): SyncRunResult {
+  return { attempted: 0, succeeded: 0, failed: 0, skippedReason, errors: [] };
+}
+
+function syncFailureMessage(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  const raw = err instanceof Error ? err.message : '';
+  const normalized = raw.toLowerCase();
+  if (
+    code === 'ECONNABORTED' ||
+    code === 'ERR_CANCELED' ||
+    normalized.includes('timeout') ||
+    normalized.includes('tardó demasiado') ||
+    normalized.includes('aborted')
+  ) {
+    return 'La red tardó demasiado. El envío no se confirmó y sigue pendiente.';
+  }
+  // Axios/browser network failures often surface as opaque English strings.
+  if (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network error') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed')
+  ) {
+    return 'No hay conexión con el servidor o el almacenamiento. Revisa la red e intenta de nuevo.';
+  }
+  return getApiErrorMessage(err, raw || 'Error desconocido');
+}
+
+async function fetchWithDeadline(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<globalThis.Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error('La subida tardó demasiado');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const SYNC_LOCK_NAME = 'brigada-sync-queue';
+
+/**
+ * One sender at a time. Web Locks drop when the page dies, so a reload can
+ * send immediately. The IndexedDB lock covers browsers without that API.
+ */
+async function withSyncLock<T>(fn: () => Promise<T>): Promise<T | 'busy'> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (locks?.request) {
+    let ran = false;
+    let value = undefined as T;
+    await locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock) => {
+      if (!lock) return;
+      ran = true;
+      value = await fn();
+    });
+    return ran ? value : 'busy';
+  }
+
+  await forceReleaseStaleLocks();
+  const locked = await acquireProcessLock();
+  if (!locked) return 'busy';
+  try {
+    return await fn();
+  } finally {
+    await releaseProcessLock();
+  }
+}
+
+export async function processSyncQueue(options?: SyncEngineOptions): Promise<SyncRunResult> {
   // Without a token every request is rejected by the BFF proxy before it even
   // reaches the API. Draining the queue then would only burn retries and push
   // rows into a long backoff, so wait for the session instead of failing.
   loadTokensFromStorage();
   if (!getAccessToken()) {
     options?.onProgress?.('Sesión no disponible; se reintentará al iniciar sesión');
-    return;
+    return emptyRun('no_session');
   }
 
-  await forceReleaseStaleLocks();
-
-  const locked = await acquireProcessLock();
-  if (!locked) {
+  const outcome = await withSyncLock(() => drainSyncQueue(options));
+  if (outcome === 'busy') {
     options?.onProgress?.('Otra sincronización está en curso');
-    return;
+    return emptyRun('busy');
   }
+  return outcome;
+}
 
-  try {
-    const now = new Date().toISOString();
-    const candidates = await db.sync_queue
+async function drainSyncQueue(options?: SyncEngineOptions): Promise<SyncRunResult> {
+  await forceReleaseStaleLocks();
+  await reclaimInFlightQueueItems();
+
+  const summary = emptyRun();
+  const now = new Date().toISOString();
+  const candidates = await db.sync_queue
       .filter(
         (item) =>
           (item.status === 'pending' || item.status === 'retry_wait') &&
@@ -133,6 +220,8 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
 
       const leased = await leaseItem(item);
       if (!leased) continue;
+
+      summary.attempted += 1;
 
       let result: SyncResult;
       try {
@@ -158,21 +247,26 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<voi
         recordSubmitOutcome(outcome);
         result = {
           success: false,
-          error: getApiErrorMessage(
-            err,
-            err instanceof Error ? err.message : 'Error desconocido'
-          ),
+          error: syncFailureMessage(err),
           errorCode: outcome === 'network_failure' ? 'NETWORK_FAILURE' : 'SYNC_ERROR',
         };
       }
 
       await handleSyncResult(item.id, item, result, options);
+      if (result.success) {
+        summary.succeeded += 1;
+      } else if (result.errorCode === 'IN_FLIGHT') {
+        summary.attempted -= 1;
+      } else {
+        summary.failed += 1;
+        if (result.error && summary.errors.length < 3) {
+          summary.errors.push(result.error);
+        }
+      }
     }
 
-    await recoverOrphanUploads(options);
-  } finally {
-    await releaseProcessLock();
-  }
+  await recoverOrphanUploads(options);
+  return summary;
 }
 
 async function leaseItem(item: SyncQueue): Promise<boolean> {
@@ -340,6 +434,17 @@ async function processResponseItem(
         error: 'Sesión expirada. Inicia sesión e intenta de nuevo.',
         errorCode: 'AUTH_REQUIRED',
         permanent: false,
+      };
+    }
+    if (axiosErr.response?.status === 403) {
+      return {
+        success: false,
+        error: getApiErrorMessage(
+          err,
+          'No tienes permiso para enviar esta encuesta.'
+        ),
+        errorCode: 'FORBIDDEN',
+        permanent: true,
       };
     }
     if (axiosErr.response?.status === 422 || axiosErr.response?.status === 400) {
@@ -524,11 +629,26 @@ async function processFileItem(
       return { success: false, error: 'URL de subida no disponible', errorCode: 'PRESIGN_MISSING' };
     }
 
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: fileBlob,
-      headers: { 'Content-Type': localFile.mime_type },
-    });
+    let uploadResponse: globalThis.Response;
+    try {
+      uploadResponse = await fetchWithDeadline(
+        uploadUrl,
+        {
+          method: 'PUT',
+          body: fileBlob,
+          headers: { 'Content-Type': localFile.mime_type },
+        },
+        SYNC_TIMEOUTS.FILE_PUT_MS
+      );
+    } catch (putErr) {
+      const mapped = describeUploadError(putErr);
+      recordSubmitOutcome('network_failure');
+      return {
+        success: false,
+        error: mapped.message,
+        errorCode: mapped.code,
+      };
+    }
 
     if (!uploadResponse.ok) {
       const code =
@@ -544,34 +664,56 @@ async function processFileItem(
           presigned_expires_at: undefined,
         } as Partial<LocalFile>);
       }
+      const mapped = describeUploadError(
+        new Error(`upload failed with status ${uploadResponse.status}`)
+      );
       return {
         success: false,
-        error: `Error al subir archivo: ${uploadResponse.status}`,
+        error:
+          code === 'R2_403_EXPIRED'
+            ? mapped.message
+            : code === 'R2_RATE_LIMITED'
+              ? mapped.message
+              : `Error al subir archivo: ${uploadResponse.status}`,
         errorCode: code,
       };
     }
 
-    const finalRemote = remoteUrl || uploadUrl.split('?')[0];
-    await confirmFileUpload({
-      document_id: documentId,
-      remote_url: finalRemote,
-      storage_key: storageKey,
-    });
-
-    if (localFile.id !== undefined) {
-      await db.local_files.update(localFile.id, {
-        sync_status: 'uploaded',
+    try {
+      const finalRemote = remoteUrl || uploadUrl.split('?')[0];
+      await confirmFileUpload({
         document_id: documentId,
-        storage_key: storageKey,
         remote_url: finalRemote,
-        uploaded_at: new Date().toISOString(),
-        confirmed_at: new Date().toISOString(),
-      } as Partial<LocalFile>);
-    }
+        storage_key: storageKey,
+      });
 
-    await deleteFileBlob(localFile.file_id);
-    recordSubmitOutcome('success');
-    return { success: true };
+      if (localFile.id !== undefined) {
+        await db.local_files.update(localFile.id, {
+          sync_status: 'uploaded',
+          document_id: documentId,
+          storage_key: storageKey,
+          remote_url: finalRemote,
+          uploaded_at: new Date().toISOString(),
+          confirmed_at: new Date().toISOString(),
+        } as Partial<LocalFile>);
+      }
+
+      await deleteFileBlob(localFile.file_id);
+      recordSubmitOutcome('success');
+      return { success: true };
+    } catch (confirmErr) {
+      const mapped = describeUploadError(confirmErr);
+      // Prefer API message when present; fall back to upload-oriented copy.
+      const apiMessage = getApiErrorMessage(confirmErr, '');
+      return {
+        success: false,
+        error: apiMessage || mapped.message,
+        errorCode:
+          (confirmErr as { response?: { status?: number } })?.response?.status === 401
+            ? 'AUTH_REQUIRED'
+            : mapped.code,
+      };
+    }
   } finally {
     inFlightUploads.delete(file_id);
   }
@@ -938,12 +1080,12 @@ async function loadLocalFileBlob(localFile: LocalFile): Promise<Blob> {
   throw new Error('No se encontró el contenido del archivo');
 }
 
-/** Make all retry_wait items due immediately (reconnect / manual). */
+/** Make queued items due immediately (reconnect / manual / retry_wait). */
 export async function makeRetryWaitDueNow(): Promise<void> {
   const now = new Date().toISOString();
   await db.sync_queue
     .where('status')
-    .equals('retry_wait')
+    .anyOf(['pending', 'retry_wait'])
     .modify({ next_retry_at: now, updated_at: now });
 }
 

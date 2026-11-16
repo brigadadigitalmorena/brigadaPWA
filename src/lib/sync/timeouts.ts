@@ -44,6 +44,8 @@ export const SYNC_TIMEOUTS = {
   SUBMIT_RESPONSE_MS: 8_000,
   /** Background queue response batch replay timeout. */
   QUEUE_BATCH_MS: 12_000,
+  /** Direct upload of a photo or file to storage. A stalled link must not spin forever. */
+  FILE_PUT_MS: 20_000,
   /** Optional queued client_id preflight validation timeout. */
   PREFLIGHT_VALIDATE_MS: 3_000,
   /** S-OP-5 orphan-confirm cross-check. */

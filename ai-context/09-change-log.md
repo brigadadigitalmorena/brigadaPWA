@@ -5,6 +5,31 @@
 
 ---
 
+## [2026-11-16] chore(sync): merge `origin/main` into `dev` (BD-31)
+
+Trae los hotfixes de Elias en `main` (Nov 1–15) a `dev` sin force-push y sin
+regresar el flujo de reportes de PR #11.
+
+- Merge de `origin/main` sobre rama desde `origin/dev`
+- **Conservado (dev):** `/report` → API `/issue-reports` + R2 (no mailto/Web Share)
+- **Traído (main):** Modo Apoyo / Ayuda / Redes, maps densify + sync full, perfil
+  (nombre/apellido, avatar preview, menús responsive), drafts sin banner fantasma,
+  SW nav timeout + fill shell, sync `no_session` / `R2_CORS_OR_NETWORK`, GIS/media
+  polish, gestion metric pills
+- SW: se mantiene exclusión de cache de `/api/backend/` encima del SW de main
+- `deleteDraft` conserva `deleteResponseBlobs` de dev
+
+### Conflictos relevantes
+
+| Área | Resolución |
+|------|------------|
+| `report/page.tsx`, `report-issue.service.ts` | **ours** (API/R2) |
+| INE/forms (`ine-answer`, `field-rules`, `validate-answer`) | **ours** (hardening PRs #2–#6) |
+| profile/help/networks/nav/support/auth/fill/drafts/banners/SW | **theirs** + parches menores |
+| Docs AGENTS / heatmap / pwa-cms-mobile | merge manual; report = API+R2 |
+
+---
+
 ## [2026-11-15] feat(report): issue reports con evidencia R2 (BD-25)
 
 Reemplaza `mailto:` en `/report` por el contrato unificado de backend (PR #121 / `dev`):

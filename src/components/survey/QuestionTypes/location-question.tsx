@@ -2,16 +2,48 @@ import { useState } from 'react';
 import { MapPin, LocateFixed } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { ruleNumber } from '@/lib/forms/field-rules';
 import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
 import { QuestionRendererProps } from './question-renderer';
 
+interface CapturedLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  altitude: number | null;
+}
+
+function readCaptured(value: unknown): CapturedLocation | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const latitude = Number(record.latitude ?? record.lat);
+  const longitude = Number(record.longitude ?? record.lng ?? record.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  const accuracy = Number(record.accuracy);
+  const altitude = Number(record.altitude);
+  return {
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(accuracy) ? accuracy : null,
+    altitude: Number.isFinite(altitude) ? altitude : null,
+  };
+}
+
 export function LocationQuestion({
   question,
+  value,
+  onChange,
+  disabled,
   error,
-}: Omit<QuestionRendererProps, 'onChange' | 'value' | 'disabled'>) {
-  const { location, setLocation } = useSurveyFillStore();
+}: QuestionRendererProps) {
+  const setResponseLocation = useSurveyFillStore((state) => state.setLocation);
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const captured = readCaptured(value);
+  const maxAccuracy =
+    ruleNumber(question.validation_rules, 'max_accuracy_m') ??
+    ruleNumber(question.validation_rules, 'accuracy_threshold_m');
+  const requireAltitude = question.validation_rules?.require_altitude === true;
 
   const captureLocation = () => {
     if (!navigator.geolocation) {
@@ -24,11 +56,34 @@ export function LocationQuestion({
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        const accuracy = position.coords.accuracy;
+        const altitude = position.coords.altitude;
+        if (maxAccuracy != null && accuracy > maxAccuracy) {
+          setIsCapturing(false);
+          setCaptureError(
+            `La precisión GPS debe ser menor o igual a ${Math.floor(maxAccuracy)} m`
+          );
+          return;
+        }
+        if (requireAltitude && altitude == null) {
+          setIsCapturing(false);
+          setCaptureError('Esta ubicación requiere altitud GPS');
+          return;
+        }
+
+        const answer = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          captured_at: new Date().toISOString(),
+          accuracy,
+          altitude,
+          timestamp: position.timestamp,
+        };
+        onChange(answer);
+        setResponseLocation({
+          latitude: answer.latitude,
+          longitude: answer.longitude,
+          accuracy,
+          captured_at: new Date(position.timestamp).toISOString(),
         });
         setIsCapturing(false);
       },
@@ -48,7 +103,7 @@ export function LocationQuestion({
             setCaptureError('Error al obtener la ubicación');
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 }
     );
   };
 
@@ -68,7 +123,7 @@ export function LocationQuestion({
         variant="outline"
         className="w-full h-14 flex-col gap-1"
         onClick={captureLocation}
-        disabled={isCapturing}
+        disabled={disabled || isCapturing}
       >
         {isCapturing ? (
           <LocateFixed className="h-5 w-5 animate-spin" />
@@ -80,27 +135,26 @@ export function LocationQuestion({
         </span>
       </Button>
 
-      {location && (
+      {captured && (
         <div className="rounded-lg border border-input bg-muted/50 p-3 space-y-1 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Latitud</span>
-            <span className="font-mono">{location.latitude.toFixed(6)}</span>
+            <span className="font-mono">{captured.latitude.toFixed(6)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Longitud</span>
-            <span className="font-mono">{location.longitude.toFixed(6)}</span>
+            <span className="font-mono">{captured.longitude.toFixed(6)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Precisión</span>
-            <span className="font-mono">±{Math.round(location.accuracy)} m</span>
-          </div>
+          {captured.accuracy != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Precisión</span>
+              <span className="font-mono">±{Math.round(captured.accuracy)} m</span>
+            </div>
+          )}
         </div>
       )}
 
-      {captureError && (
-        <p className="text-sm text-destructive">{captureError}</p>
-      )}
-
+      {captureError && <p className="text-sm text-destructive">{captureError}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

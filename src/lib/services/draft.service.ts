@@ -1,9 +1,47 @@
-import { db } from '@/lib/db/database';
+import { db, type Response } from '@/lib/db/database';
+import { isEmptyAnswerValue } from '@/lib/forms/validate-answer';
 import { deleteResponseBlobs } from '@/lib/services/file-blob.service';
+
+/**
+ * True when a draft has at least one non-empty answer or attached file.
+ * Used so opening a survey (autosave on hydrate) does not leave a phantom
+ * "borrador pendiente" banner until the user actually captures data.
+ */
+export function answersHaveContent(
+  answers: Record<string, unknown> | null | undefined
+): boolean {
+  if (!answers) return false;
+  return Object.values(answers).some((value) => !isEmptyAnswerValue(value));
+}
+
+export function filesHaveContent(
+  files: Record<string, unknown[] | undefined> | null | undefined
+): boolean {
+  if (!files) return false;
+  return Object.values(files).some((list) => Array.isArray(list) && list.length > 0);
+}
+
+export function draftPayloadHasContent(
+  answers: Record<string, unknown> | null | undefined,
+  files: Record<string, unknown[] | undefined> | null | undefined
+): boolean {
+  return answersHaveContent(answers) || filesHaveContent(files);
+}
+
+export function draftRowHasContent(row: Pick<Response, 'answers_json'>): boolean {
+  try {
+    const parsed = JSON.parse(row.answers_json || '{}') as Record<string, unknown>;
+    return answersHaveContent(parsed);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Discard a local draft and cascade-clean related files / queue rows.
  * Mirrors mobile `offlineSyncService.deleteDraft` + responseRepository cascade.
+ * Indexed lookups only: a full-table filter inside the write transaction can
+ * stall while a sync is also using the queue.
  */
 export async function deleteDraft(responseId: string): Promise<boolean> {
   const response = await db.responses
@@ -20,7 +58,14 @@ export async function deleteDraft(responseId: string): Promise<boolean> {
     .where('response_id')
     .equals(responseId)
     .toArray();
-  const fileIds = new Set(files.map((f) => f.file_id));
+  const entityIds = [responseId, ...files.map((file) => file.file_id)];
+  const queueGroups = await Promise.all(
+    entityIds.map((entityId) => db.sync_queue.where('entity_id').equals(entityId).toArray())
+  );
+  const queueIds = queueGroups
+    .flat()
+    .map((item) => item.id)
+    .filter((id): id is number => id !== undefined);
 
   await db.transaction(
     'rw',
@@ -29,26 +74,11 @@ export async function deleteDraft(responseId: string): Promise<boolean> {
     db.file_blobs,
     db.sync_queue,
     async () => {
-      const queueItems = await db.sync_queue
-        .filter(
-          (item) =>
-            item.entity_id === responseId ||
-            (item.entity_type === 'file' && fileIds.has(item.entity_id)) ||
-            (item.operation_type === 'UPLOAD_FILE' && fileIds.has(item.entity_id)) ||
-            (item.operation_type === 'CREATE_RESPONSE' &&
-              item.entity_id === responseId)
-        )
-        .toArray();
-
-      for (const item of queueItems) {
-        if (item.id !== undefined) {
-          await db.sync_queue.delete(item.id);
-        }
+      if (queueIds.length > 0) {
+        await db.sync_queue.bulkDelete(queueIds);
       }
-
       await db.local_files.where('response_id').equals(responseId).delete();
       await db.file_blobs.where('response_id').equals(responseId).delete();
-
       if (response.id !== undefined) {
         await db.responses.delete(response.id);
       }
@@ -57,6 +87,30 @@ export async function deleteDraft(responseId: string): Promise<boolean> {
 
   await deleteResponseBlobs(responseId).catch(() => undefined);
   return true;
+}
+
+/**
+ * Remove empty draft shells left by hydrate autosave / abandoned opens.
+ * Files alone count as content; banner cleanup drops drafts with neither.
+ */
+export async function purgeEmptyDrafts(): Promise<number> {
+  const drafts = await db.responses.where('status').equals('draft').toArray();
+  let removed = 0;
+
+  for (const draft of drafts) {
+    if (draftRowHasContent(draft)) continue;
+
+    const fileCount = await db.local_files
+      .where('response_id')
+      .equals(draft.response_id)
+      .count();
+    if (fileCount > 0) continue;
+
+    const deleted = await deleteDraft(draft.response_id);
+    if (deleted) removed += 1;
+  }
+
+  return removed;
 }
 
 export async function reopenForCorrection(

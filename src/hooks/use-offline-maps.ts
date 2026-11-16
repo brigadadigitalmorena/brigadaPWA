@@ -36,17 +36,22 @@ export function useOfflineMaps(selectedMapId?: number | null) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<StaticMapsSyncResult | null>(null);
 
-  const sync = useCallback(async () => {
-    if (isSyncing) return null;
-    setIsSyncing(true);
-    try {
-      const result = await syncStaticMaps();
-      setSyncResult(result);
-      return result;
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isSyncing]);
+  const sync = useCallback(
+    async (options?: { forceFull?: boolean }) => {
+      if (isSyncing) return null;
+      setIsSyncing(true);
+      try {
+        const result = await syncStaticMaps({
+          forceFull: options?.forceFull ?? false,
+        });
+        setSyncResult(result);
+        return result;
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    [isSyncing]
+  );
 
   return {
     maps: maps ?? [],

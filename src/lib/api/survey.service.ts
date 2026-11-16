@@ -22,7 +22,7 @@ import {
   GEO_ERROR_MESSAGES,
   matchEntitlement,
 } from '@/lib/campaigns/scope';
-import { isAcceptedBatchStatus } from '@/lib/sync';
+import { isAcceptedBatchStatus, SYNC_TIMEOUTS } from '@/lib/sync';
 
 export interface QuestionAnswerCreate {
   question_id: number;
@@ -38,6 +38,12 @@ export interface SurveyResponseCreate {
   version_id: number;
   schema_hash?: string | null;
   location?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    timestamp?: string;
+  } | null;
+  submission_location?: {
     latitude: number;
     longitude: number;
     accuracy?: number;
@@ -100,6 +106,40 @@ export interface DocumentConfirmRequest {
 }
 
 type GeoEntitlement = Pick<Assignment, 'geo_enforcement' | 'area_names'>;
+
+/** Same budget the mobile app uses for the fix attached to every submit. */
+export const SUBMIT_LOCATION_TIMEOUT_MS = 20_000;
+
+/**
+ * High-accuracy fix for the response payload. A denial or timeout keeps the
+ * last known point instead of blocking the save.
+ */
+export function captureSubmitLocation(
+  existing: LocationData | null,
+): Promise<LocationData | null> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    return Promise.resolve(existing);
+  }
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? 0,
+          captured_at: new Date(position.timestamp).toISOString(),
+        });
+      },
+      () => resolve(existing),
+      {
+        enableHighAccuracy: true,
+        timeout: SUBMIT_LOCATION_TIMEOUT_MS,
+        maximumAge: 0,
+      },
+    );
+  });
+}
 
 /**
  * Capture GPS when the campaign enforces block-mode geo with configured areas.
@@ -248,7 +288,7 @@ export async function submitBatchResponses(
   const response = await apiClient.post<{
     results?: BatchResponseResult[];
     status?: string;
-  }>('/mobile/responses/batch', batch);
+  }>('/mobile/responses/batch', batch, { timeout: SYNC_TIMEOUTS.QUEUE_BATCH_MS });
   return response.data;
 }
 
@@ -273,6 +313,7 @@ export async function getPresignedUploadUrl(
   const response = await apiClient.post<DocumentUploadResponse>(
     '/mobile/documents/upload',
     request,
+    { timeout: SYNC_TIMEOUTS.QUEUE_BATCH_MS },
   );
   return response.data;
 }
@@ -280,7 +321,9 @@ export async function getPresignedUploadUrl(
 export async function confirmFileUpload(
   request: DocumentConfirmRequest,
 ): Promise<unknown> {
-  const response = await apiClient.post<unknown>('/mobile/documents/confirm', request);
+  const response = await apiClient.post<unknown>('/mobile/documents/confirm', request, {
+    timeout: SYNC_TIMEOUTS.QUEUE_BATCH_MS,
+  });
   return response.data;
 }
 
@@ -390,17 +433,20 @@ export function buildSurveyResponseCreate(
     );
   }
 
+  const submissionLocation = location
+    ? {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        timestamp: location.captured_at,
+      }
+    : null;
+
   return {
     client_id: responseId,
     version_id: versionId,
-    location: location
-      ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          timestamp: location.captured_at,
-        }
-      : null,
+    location: submissionLocation,
+    submission_location: submissionLocation,
     started_at: metadata.started_at,
     completed_at: metadata.completed_at || now,
     device_info: {

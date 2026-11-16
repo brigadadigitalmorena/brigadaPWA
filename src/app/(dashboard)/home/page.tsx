@@ -3,32 +3,61 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ClipboardList, FilePenLine, MapPinned, RefreshCw } from 'lucide-react';
+import {
+  ClipboardList,
+  FilePenLine,
+  Handshake,
+  LifeBuoy,
+  MapPinned,
+  RefreshCw,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/auth.context';
 import { useSync } from '@/contexts/sync.context';
 import { db } from '@/lib/db/database';
 import { getDailyMetrics } from '@/lib/api/metrics.service';
 import { countCompletedToday, type DailyMetrics } from '@/lib/metrics/daily-metrics';
 import { captureEvent } from '@/lib/observability/client';
+import { draftRowHasContent } from '@/lib/services/draft.service';
 import { PageHeader } from '@/components/common/page-header';
 import { DailyMetricsCard } from '@/components/home/daily-metrics-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const LINKS = [
+const BASE_LINKS = [
   { href: '/surveys', label: 'Encuestas', icon: ClipboardList },
   { href: '/drafts', label: 'Borradores', icon: FilePenLine },
   { href: '/sync', label: 'Mis envíos', icon: RefreshCw },
   { href: '/sync/map', label: 'Mapa de envíos', icon: MapPinned },
+  { href: '/help', label: 'Ayuda', icon: LifeBuoy },
 ];
 
 export default function HomePage() {
+  const { isSupport } = useAuth();
   const { isOnline, pendingCount } = useSync();
   const [remote, setRemote] = useState<DailyMetrics | null>(null);
+  const LINKS = isSupport
+    ? BASE_LINKS
+    : [
+        ...BASE_LINKS,
+        { href: '/support', label: 'Apoyo', icon: Handshake },
+      ];
   const responses = useLiveQuery(() => db.responses.toArray(), []);
   const drafts =
-    useLiveQuery(
-      () => db.responses.where('status').equals('draft').toArray(),
-      []
-    ) ?? [];
+    useLiveQuery(async () => {
+      const rows = await db.responses.where('status').equals('draft').toArray();
+      const kept: typeof rows = [];
+      for (const row of rows) {
+        if (draftRowHasContent(row)) {
+          kept.push(row);
+          continue;
+        }
+        const fileCount = await db.local_files
+          .where('response_id')
+          .equals(row.response_id)
+          .count();
+        if (fileCount > 0) kept.push(row);
+      }
+      return kept;
+    }, []) ?? [];
 
   useEffect(() => {
     captureEvent('screen.home.opened', {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { StaticMapFeature } from '@/lib/db/database';
 import {
@@ -10,11 +10,13 @@ import {
 } from '@/lib/maps/geojson';
 import { createBasemapStyle, resizeMapWhenReady } from '@/lib/maps/basemap-style';
 import { Button } from '@/components/ui/button';
-import { LocateFixed, X } from 'lucide-react';
+import { LocateFixed, Maximize2, Minimize2, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface StaticMapViewerProps {
   mapName: string;
   features: StaticMapFeature[];
+  className?: string;
 }
 
 type SelectedFeature = {
@@ -35,7 +37,9 @@ const SOURCE_DATA: Array<{
 export default function StaticMapViewer({
   mapName,
   features,
+  className,
 }: StaticMapViewerProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import('maplibre-gl').Map | null>(null);
   const geolocateRef = useRef<import('maplibre-gl').GeolocateControl | null>(null);
@@ -43,10 +47,21 @@ export default function StaticMapViewer({
   const [selected, setSelected] = useState<SelectedFeature | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [nativeFullscreen, setNativeFullscreen] = useState(false);
 
   const collection = useMemo(() => featureCollectionFromRows(features), [features]);
   const buckets = useMemo(() => splitByGeometry(collection), [collection]);
   const bbox = useMemo(() => bboxForFeatureCollection(collection), [collection]);
+
+  const resizeMap = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Layout changes (overlay / fullscreen) need a tick before MapLibre measures.
+    window.requestAnimationFrame(() => {
+      map.resize();
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -232,7 +247,7 @@ export default function StaticMapViewer({
     }
   }, [buckets, mapReady]);
 
-  const fitFeatures = () => {
+  const fitFeatures = useCallback(() => {
     const map = mapRef.current;
     if (!map || !bbox) return;
     const [west, south, east, north] = bbox;
@@ -247,15 +262,37 @@ export default function StaticMapViewer({
         { padding: 48, maxZoom: 16, duration: 500 }
       );
     }
-  };
+  }, [bbox]);
 
   useEffect(() => {
     if (!mapReady || !bbox) return;
     const timer = window.setTimeout(fitFeatures, 50);
     return () => window.clearTimeout(timer);
-    // Fit once whenever the downloaded geometry changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, bbox]);
+  }, [mapReady, bbox, fitFeatures]);
+
+  useEffect(() => {
+    resizeMap();
+  }, [isExpanded, nativeFullscreen, resizeMap]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const active = document.fullscreenElement === shellRef.current;
+      setNativeFullscreen(active);
+      if (!active) setIsExpanded(false);
+      resizeMap();
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [resizeMap]);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isExpanded]);
 
   const clearSelection = () => {
     const map = mapRef.current;
@@ -269,16 +306,62 @@ export default function StaticMapViewer({
     setSelected(null);
   };
 
+  const exitExpanded = async () => {
+    if (document.fullscreenElement && shellRef.current) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // fall through to CSS overlay close
+      }
+    }
+    setIsExpanded(false);
+    setNativeFullscreen(false);
+    resizeMap();
+  };
+
+  const enterExpanded = async () => {
+    setIsExpanded(true);
+    const el = shellRef.current;
+    if (el && typeof el.requestFullscreen === 'function') {
+      try {
+        await el.requestFullscreen();
+        setNativeFullscreen(true);
+      } catch {
+        // iOS / restricted browsers: keep CSS overlay fullscreen.
+        setNativeFullscreen(false);
+      }
+    }
+    resizeMap();
+  };
+
+  const toggleExpanded = () => {
+    if (isExpanded || nativeFullscreen) {
+      void exitExpanded();
+      return;
+    }
+    void enterExpanded();
+  };
+
+  const expanded = isExpanded || nativeFullscreen;
+
   return (
-    <div className="space-y-3">
+    <div
+      ref={shellRef}
+      className={cn(
+        'space-y-3 bg-background',
+        expanded &&
+          'fixed inset-0 z-50 flex flex-col space-y-0 p-3 sm:p-4 safe-area-top safe-area-bottom',
+        className
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="font-semibold">{mapName}</h2>
+        <div className="min-w-0">
+          <h2 className="truncate font-semibold">{mapName}</h2>
           <p className="text-sm text-muted-foreground">
             {features.length.toLocaleString('es-MX')} elementos · geometría offline
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={fitFeatures}>
             Ajustar
           </Button>
@@ -289,12 +372,36 @@ export default function StaticMapViewer({
             onClick={() => geolocateRef.current?.trigger()}
           >
             <LocateFixed className="h-4 w-4" />
-            Mi ubicación
+            <span className="hidden xs:inline sm:inline">Mi ubicación</span>
+          </Button>
+          <Button
+            type="button"
+            variant={expanded ? 'default' : 'outline'}
+            size="sm"
+            onClick={toggleExpanded}
+            aria-pressed={expanded}
+            aria-label={expanded ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          >
+            {expanded ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">
+              {expanded ? 'Salir' : 'Pantalla completa'}
+            </span>
           </Button>
         </div>
       </div>
 
-      <div className="relative h-[55vh] min-h-80 overflow-hidden rounded-xl border bg-slate-100">
+      <div
+        className={cn(
+          'relative min-h-0 overflow-hidden rounded-xl border bg-slate-100',
+          expanded
+            ? 'flex-1 min-h-[50dvh]'
+            : 'h-[min(70dvh,40rem)] min-h-72 sm:min-h-[28rem]'
+        )}
+      >
         <div ref={containerRef} className="absolute inset-0" aria-label={mapName} />
         {error && (
           <div className="absolute inset-0 grid place-items-center bg-background/90 p-6 text-center text-sm text-destructive">
