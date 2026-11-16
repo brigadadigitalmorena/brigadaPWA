@@ -1,9 +1,4 @@
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  Circle,
-} from 'lucide-react';
+import { Check, ChevronDown, Circle } from 'lucide-react';
 import type {
   GestionTrackingRow,
   ManagementStatus,
@@ -12,17 +7,20 @@ import {
   buildFolioDisplay,
   formatGestionDate,
   getSourceSummary,
+  resolveProblemMotivo,
   STATUS_BADGE_CLASSES,
 } from '@/lib/gestion/display';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { ProblemMotivoBanner } from './problem-motivo-banner';
 
 interface GestionCardProps {
   row: GestionTrackingRow;
   selected: boolean;
   statusLabels: Record<ManagementStatus, string>;
   onSelect: () => void;
+  onViewHistory?: () => void;
   mobileDetail?: React.ReactNode;
 }
 
@@ -46,10 +44,12 @@ export function GestionCard({
   selected,
   statusLabels,
   onSelect,
+  onViewHistory,
   mobileDetail,
 }: GestionCardProps) {
   const sourceSummary = getSourceSummary(row.source_values);
   const activeStep = statusStep(row.management_status);
+  const problemMotivo = resolveProblemMotivo(row);
 
   return (
     <Card
@@ -100,10 +100,12 @@ export function GestionCard({
         </p>
 
         {row.management_status === 'problema' ? (
-          <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-xs font-medium text-red-700 dark:text-red-300">
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-            Esta gestión tiene un problema reportado
-          </div>
+          <ProblemMotivoBanner
+            className="mt-3"
+            motivo={problemMotivo}
+            truncate
+            onViewHistory={onViewHistory}
+          />
         ) : (
           <div
             className="mt-4 grid grid-cols-3 gap-1"

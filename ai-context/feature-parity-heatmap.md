@@ -124,6 +124,7 @@
 | Gestión detail + comments | █ | █ | — |
 | Gestión metrics | █ | ░ | **PWA SUPERIOR** |
 | Status timeline | █ | █ | — |
+| Banner `problema` + `problem_motivo` | █ (BD-29) | █ / en curso (BD-28) | — |
 
 ### 9. UI/UX
 

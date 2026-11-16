@@ -1,3 +1,5 @@
+'use client';
+
 import { CalendarClock, FileText, Hash, MessageSquare, Route } from 'lucide-react';
 import type {
   GestionTrackingRow,
@@ -6,6 +8,7 @@ import type {
 import {
   buildFolioDisplay,
   formatGestionDateTime,
+  resolveProblemMotivo,
   STATUS_BADGE_CLASSES,
 } from '@/lib/gestion/display';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +19,18 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import { CommentThread } from './comment-thread';
+import { ProblemMotivoBanner } from './problem-motivo-banner';
 import { StatusTimeline } from './status-timeline';
+
+export type GestionDetailTab = 'info' | 'history' | 'comments';
 
 interface GestionDetailProps {
   row: GestionTrackingRow;
   statusLabels: Record<ManagementStatus, string>;
   isOnline: boolean;
+  /** Controlled tab (e.g. history from banner “Ver más”). */
+  activeTab?: GestionDetailTab;
+  onTabChange?: (tab: GestionDetailTab) => void;
 }
 
 function DetailRow({
@@ -48,7 +57,16 @@ export function GestionDetail({
   row,
   statusLabels,
   isOnline,
+  activeTab = 'info',
+  onTabChange,
 }: GestionDetailProps) {
+  const problemMotivo = resolveProblemMotivo(row);
+  const isProblema = row.management_status === 'problema';
+
+  const handleTabChange = (value: string) => {
+    onTabChange?.(value as GestionDetailTab);
+  };
+
   return (
     <div className="min-w-0">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -66,7 +84,15 @@ export function GestionDetail({
         </Badge>
       </div>
 
-      <Tabs defaultValue="info">
+      {isProblema && (
+        <ProblemMotivoBanner
+          className="mb-4"
+          motivo={problemMotivo}
+          onViewHistory={() => handleTabChange('history')}
+        />
+      )}
+
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid h-11 w-full grid-cols-3">
           <TabsTrigger value="info" className="min-h-10">
             <FileText aria-hidden />

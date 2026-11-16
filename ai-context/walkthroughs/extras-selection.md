@@ -12,6 +12,7 @@ Encuestas **temporales** (`survey_type = extra`) o con **fecha de cierre** (`end
 Solo **seguimiento de solicitudes ya enviadas** (`GET /mobile/gestiones/tracking`).
 
 - Folio, estatus, comentarios, historial
+- Estado `problema`: banner con `problem_motivo` (motivo del último cambio a Problema); “Ver más” abre Historial
 - **No** lista encuestas disponibles para llenar
 - Empty state: completar una encuesta de gestión desde Encuestas primero
 

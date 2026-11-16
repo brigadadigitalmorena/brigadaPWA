@@ -154,7 +154,7 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Auth: `/mobile/login`, `/mobile/token/refresh`, `/mobile/me`, perfil/avatar/password
 - Encuestas: `/mobile/surveys`, latest version, `/mobile/responses/batch`, presign documents
 - Sync: `/mobile/sync-status`, freshness/delta según motor
-- Gestiones: `/mobile/gestiones/tracking`, comments
+- Gestiones: `/mobile/gestiones/tracking` (incluye `problem_motivo` derivado), comments
 - Mapas: `/mobile/maps`, tiles OSM manifest (proxy Next dedicado)
 - Notificaciones in-app: `/mobile/notifications*`
 - ZIP: `/mobile/zip-lookup/{code}`

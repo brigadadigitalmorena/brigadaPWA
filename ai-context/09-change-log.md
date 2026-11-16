@@ -5,6 +5,24 @@
 
 ---
 
+## [2026-11-16] feat(gestiones): mostrar problem_motivo en tracking (BD-29)
+
+Paridad de campo con App / backend PR #122 (`problem_motivo` derivado en
+`GET /mobile/gestiones/tracking`).
+
+- Tipo + normalizer: `GestionTrackingRow.problem_motivo` (null-safe; cache offline
+  sin el campo deriva desde `status_history`)
+- Banner de problema en lista y detalle con motivo (line-clamp-2 + “Ver más” →
+  pestaña Historial); legacy sin motivo mantiene copy genérico + CTA
+- Docs: heatmap gestiones actualizado
+
+### Edge cases
+
+- Filas cacheadas pre-campo no rompen; motivo se reconstruye del historial si hay note
+- `problem_motivo: null` (legacy API) → banner genérico, sin crash
+
+---
+
 ## [2026-11-16] chore(sync): merge `origin/main` into `dev` (BD-31)
 
 Trae los hotfixes de Elias en `main` (Nov 1–15) a `dev` sin force-push y sin
@@ -27,7 +45,6 @@ regresar el flujo de reportes de PR #11.
 | INE/forms (`ine-answer`, `field-rules`, `validate-answer`) | **ours** (hardening PRs #2–#6) |
 | profile/help/networks/nav/support/auth/fill/drafts/banners/SW | **theirs** + parches menores |
 | Docs AGENTS / heatmap / pwa-cms-mobile | merge manual; report = API+R2 |
-
 ---
 
 ## [2026-11-15] feat(report): issue reports con evidencia R2 (BD-25)

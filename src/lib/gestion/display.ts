@@ -78,6 +78,14 @@ export function buildFolioDisplay(row: GestionTrackingRow): string {
   return `Ref. ${row.request_id.slice(0, 8)}`;
 }
 
+/** Canonical problema motivo for UI (API field, null-safe). */
+export function resolveProblemMotivo(
+  row: Pick<GestionTrackingRow, 'problem_motivo'>
+): string | null {
+  const direct = row.problem_motivo?.trim();
+  return direct || null;
+}
+
 const TECHNICAL_SOURCE_KEYS = new Set([
   '_uid',
   'id',
