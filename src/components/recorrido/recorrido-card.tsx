@@ -89,13 +89,13 @@ export function RecorridoCard() {
             </CardDescription>
           </div>
           <Button
-            variant={session ? 'destructive' : 'default'}
+            variant={session ? 'destructive' : 'outline'}
             size="sm"
-            className="md:h-12 md:min-w-32 md:rounded-xl md:px-6 md:text-base"
+            className="shrink-0 md:h-11 md:min-w-28 md:rounded-xl md:px-5 md:text-sm"
             disabled={busy}
             onClick={session ? handleEnd : handleStart}
           >
-            {session ? 'Finalizar' : 'Iniciar'}
+            {session ? 'Finalizar' : 'Iniciar recorrido'}
           </Button>
         </div>
       </CardHeader>

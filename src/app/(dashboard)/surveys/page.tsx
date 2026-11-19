@@ -70,6 +70,27 @@ function formatShortDate(iso?: string | null): string | null {
   return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 }
 
+function operativeLine(
+  campaignName: string | null,
+  surveyTitle: string
+): string | null {
+  const label = (campaignName ?? '').trim();
+  const title = surveyTitle.trim();
+  if (!label) return null;
+  if (!title) return label;
+  if (label === title) return null;
+  const separators = [' — ', ' – ', ' - ', ' | '];
+  for (const sep of separators) {
+    if (label.endsWith(`${sep}${title}`)) {
+      return label.slice(0, -(sep.length + title.length)).trim() || null;
+    }
+    if (label.startsWith(`${title}${sep}`)) {
+      return label.slice(title.length + sep.length).trim() || null;
+    }
+  }
+  return label;
+}
+
 function dateMs(iso?: string | null): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime();
@@ -392,10 +413,11 @@ export default function SurveysPage() {
           const isFollowUp = generatesFollowUp(survey);
           const isPriority = !isCompleted && isPriorityEntitlement(survey);
           const priority = isPriority ? prioritySurveyBadge(survey) : null;
-          const startLabel = formatShortDate(survey.starts_at) ?? 'Sin inicio';
-          const endLabel = formatShortDate(survey.ends_at) ?? 'Sin fin';
+          const startLabel = formatShortDate(survey.starts_at);
+          const endLabel = formatShortDate(survey.ends_at);
           const tone = urgencyTone(survey.ends_at, isCompleted);
           const assignedLabel = formatShortDate(survey.assigned_at);
+          const operative = operativeLine(campaignLabel(survey), survey.survey_title);
 
           return (
             <Card
@@ -414,9 +436,10 @@ export default function SurveysPage() {
                   <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
                     <Badge
                       className={cn(
+                        'font-medium',
                         isCompleted
-                          ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20'
-                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                          ? 'border-green-600/30 bg-green-500/15 text-green-800 dark:text-green-300'
+                          : 'border-amber-600/35 bg-amber-500/15 text-amber-900 dark:text-amber-200'
                       )}
                       variant="outline"
                     >
@@ -434,7 +457,7 @@ export default function SurveysPage() {
                     {isFollowUp && (
                       <Badge
                         variant="outline"
-                        className="gap-1 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20"
+                        className="gap-1 border-sky-600/30 bg-sky-500/15 font-medium text-sky-800 dark:text-sky-300"
                       >
                         <GitBranch className="h-3 w-3" aria-hidden />
                         Gestión
@@ -443,35 +466,47 @@ export default function SurveysPage() {
                   </div>
                 </div>
                 <CardDescription className="space-y-2 pt-1">
-                  <div className="flex items-start gap-2 text-sm text-foreground/80">
-                    <CalendarRange className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                    <span className="leading-snug">
-                      <span className="text-muted-foreground">Inicio</span>{' '}
-                      {startLabel}
-                      <span className="mx-1.5 text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">Fin</span>{' '}
-                      <span
-                        className={cn(
-                          tone === 'soon' &&
-                            'font-medium text-amber-700 dark:text-amber-400',
-                          tone === 'overdue' &&
-                            'font-medium text-red-700 dark:text-red-400'
+                  {(startLabel || endLabel) && (
+                    <div className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <CalendarRange className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                      <span className="leading-snug">
+                        {startLabel && (
+                          <>
+                            <span className="text-slate-500">Inicio</span>{' '}
+                            {startLabel}
+                          </>
                         )}
-                      >
-                        {endLabel}
+                        {startLabel && endLabel && (
+                          <span className="mx-1.5 text-slate-400">·</span>
+                        )}
+                        {endLabel && (
+                          <>
+                            <span className="text-slate-500">Fin</span>{' '}
+                            <span
+                              className={cn(
+                                tone === 'soon' &&
+                                  'font-medium text-amber-700 dark:text-amber-400',
+                                tone === 'overdue' &&
+                                  'font-medium text-red-700 dark:text-red-400'
+                              )}
+                            >
+                              {endLabel}
+                            </span>
+                          </>
+                        )}
                       </span>
-                    </span>
-                  </div>
+                    </div>
+                  )}
                   {assignedLabel && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
                       <span>Disponible: {assignedLabel}</span>
                     </div>
                   )}
-                  {campaignLabel(survey) && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 flex-shrink-0" />
-                      <span>{campaignLabel(survey)}</span>
+                  {operative && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <Users className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      <span>{operative}</span>
                     </div>
                   )}
                   {survey.area_names && survey.area_names.length > 0 && (

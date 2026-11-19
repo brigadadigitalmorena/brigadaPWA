@@ -35,11 +35,16 @@ export function BottomNav() {
       />
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur md:hidden safe-area-bottom"
-        style={{ height: 'var(--bottom-nav-height)' }}
+        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background md:hidden"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
         aria-label="Navegación principal"
       >
-        <div className="flex h-full items-stretch px-1">
+        <div
+          className="flex items-stretch px-1"
+          style={{ height: 'var(--bottom-nav-height)' }}
+        >
           {primaryItems.map((item) => {
             const Icon = item.icon;
             const active = item.isActive(pathname);
@@ -52,7 +57,7 @@ export function BottomNav() {
                   'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors touch-target',
                   active
                     ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'text-slate-600 hover:text-foreground dark:text-slate-300'
                 )}
               >
                 <div
@@ -79,13 +84,13 @@ export function BottomNav() {
             type="button"
             aria-label="Más opciones"
             aria-expanded={moreOpen}
-            aria-haspopup="menu"
+            aria-haspopup="dialog"
             onClick={() => setMoreOpen((open) => !open)}
             className={cn(
               'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors touch-target',
               moreActive || moreOpen
                 ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-slate-600 hover:text-foreground dark:text-slate-300'
             )}
           >
             <div

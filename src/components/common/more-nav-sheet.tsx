@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,8 @@ interface MoreNavSheetProps {
   draftCount: number;
 }
 
+const CLOSE_MS = 200;
+
 export function MoreNavSheet({
   open,
   onOpenChange,
@@ -23,6 +25,22 @@ export function MoreNavSheet({
   const pathname = usePathname();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const [rendered, setRendered] = useState(open);
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      return;
+    }
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) setRendered(false);
+    }, CLOSE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -32,12 +50,17 @@ export function MoreNavSheet({
     };
 
     window.addEventListener('keydown', onKeyDown);
-    panelRef.current?.querySelector('a')?.focus();
+    const focusTimer = window.setTimeout(() => {
+      panelRef.current?.querySelector('a')?.focus();
+    }, 20);
 
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.clearTimeout(focusTimer);
+    };
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  if (!rendered) return null;
 
   return (
     <div className="md:hidden">
@@ -45,71 +68,86 @@ export function MoreNavSheet({
         type="button"
         tabIndex={-1}
         aria-label="Cerrar menú"
-        className="fixed inset-x-0 top-0 z-40 bg-black/45"
+        className={cn(
+          'fixed inset-x-0 top-0 z-40 bg-black/50 transition-opacity duration-200',
+          open ? 'opacity-100' : 'opacity-0'
+        )}
         style={{
-          bottom: 'var(--bottom-nav-chrome)',
+          bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))',
         }}
         onClick={() => onOpenChange(false)}
       />
 
       <div
         ref={panelRef}
-        role="menu"
+        role="dialog"
+        aria-modal="true"
         aria-labelledby={titleId}
-        className="fixed z-50 flex max-h-[min(70dvh,28rem)] w-[min(17.5rem,calc(100vw-1.25rem))] flex-col items-stretch gap-2 overflow-y-auto pr-2"
+        className={cn(
+          'fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out',
+          open ? 'translate-y-0' : 'translate-y-full'
+        )}
         style={{
-          right: 0,
-          bottom: 'calc(var(--bottom-nav-chrome) + 0.35rem)',
+          bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))',
         }}
       >
+        <div className="flex justify-center pt-2 pb-1">
+          <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
+        </div>
         <h2 id={titleId} className="sr-only">
           Más opciones
         </h2>
 
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = item.isActive(pathname);
-          const showDraftBadge = item.badge === 'drafts' && draftCount > 0;
+        <nav
+          aria-label="Más opciones"
+          className="max-h-[min(70dvh,28rem)] space-y-1 overflow-y-auto px-3 pb-3"
+        >
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = item.isActive(pathname);
+            const showDraftBadge = item.badge === 'drafts' && draftCount > 0;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              role="menuitem"
-              onClick={() => onOpenChange(false)}
-              className={cn(
-                'flex items-center gap-3 rounded-xl border px-3 py-2.5 shadow-md transition-colors touch-target',
-                active
-                  ? 'border-primary/30 bg-primary/10 text-primary'
-                  : 'border-border bg-background text-foreground hover:bg-accent'
-              )}
-            >
-              <span
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => onOpenChange(false)}
                 className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-                  active ? 'bg-primary/15' : 'bg-muted'
+                  'flex items-center gap-3 rounded-xl px-3 py-3 transition-colors touch-target',
+                  active
+                    ? 'bg-[color-mix(in_oklch,var(--primary)_16%,var(--background))] text-foreground'
+                    : 'bg-background text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
                 )}
               >
-                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-              </span>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-semibold">
-                    {item.label}
+                <span
+                  className={cn(
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                    active
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
+                  )}
+                >
+                  <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+                </span>
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-base font-semibold text-foreground">
+                      {item.label}
+                    </span>
+                    {showDraftBadge ? (
+                      <Badge variant="default" className="h-5 min-w-5 px-1.5">
+                        {draftCount}
+                      </Badge>
+                    ) : null}
                   </span>
-                  {showDraftBadge ? (
-                    <Badge variant="default" className="h-5 min-w-5 px-1.5">
-                      {draftCount}
-                    </Badge>
-                  ) : null}
+                  <span className="block truncate text-sm text-slate-500 dark:text-slate-400">
+                    {item.description}
+                  </span>
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {item.description}
-                </span>
-              </span>
-            </Link>
-          );
-        })}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );

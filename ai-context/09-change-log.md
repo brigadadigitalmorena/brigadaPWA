@@ -5,6 +5,35 @@
 
 ---
 
+## [2026-11-19] fix(pwa): ChunkLoadError del layout y setState antes de montar
+
+Los scripts de arranque (color scheme y redirect `/` → `/home|/login`) salen de
+`next/script` inline y viven en `public/*.js`. Eso evita que el chunk
+`app/layout.js` haga timeout en HMR. `theme-color` solo actualiza meta tags
+(sin fetch/blob del manifiesto). El sheet de Más cancela el timeout de cierre
+si se desmonta.
+
+---
+
+## [2026-11-19] fix(pwa): Más en bottom sheet y barra de sistema del tema
+
+El menú Más vuelve a un sheet de ancho completo (fondo opaco, ítem activo
+sólido, descripciones slate). La bottom nav usa safe-area y contraste más
+fuerte. `theme-color` actualiza los meta de la barra de sistema para que
+Android no se quede en rosa.
+
+---
+
+## [2026-11-19] fix(surveys): orden por iconos y tarjetas sin texto vacío
+
+El orden de Encuestas vuelve a una fila compacta de botones con iconos
+(`title` y `aria-label` en español). El criterio activo se lee debajo
+(p. ej. “Fecha de fin: más próxima primero”); un segundo toque invierte el
+sentido. Las tarjetas ocultan “Sin inicio / Sin fin” y no repiten el título
+en la línea de operativo.
+
+---
+
 ## [2026-11-19] fix(pwa): barras de sistema siguen el color de la app
 
 `theme-color` (barra de estado y de navegación en Android/PWA) deja de estar

@@ -99,13 +99,20 @@ export function getChromeColor(schemeId: string, isDark: boolean): string {
   return isDark ? scheme.swatchDark : scheme.swatchLight;
 }
 
+function upsertMeta(name: string, content: string) {
+  const metas = document.querySelectorAll(`meta[name="${name}"]`);
+  if (metas.length === 0) {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', name);
+    meta.setAttribute('content', content);
+    document.head.appendChild(meta);
+    return;
+  }
+  metas.forEach((meta) => meta.setAttribute('content', content));
+}
+
 export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
-  let meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) {
-    meta = document.createElement('meta');
-    meta.setAttribute('name', 'theme-color');
-    document.head.appendChild(meta);
-  }
-  meta.setAttribute('content', color);
+  upsertMeta('theme-color', color);
+  upsertMeta('msapplication-navbutton-color', color);
 }

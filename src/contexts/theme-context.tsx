@@ -61,6 +61,10 @@ function ColorSchemeProvider({ children }: { children: ReactNode }) {
     if (!isValidColorScheme(schemeId)) return;
     setColorSchemeState(schemeId);
     applyColorSchemeAttr(schemeId);
+    const isDark =
+      typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('dark');
+    applyThemeColorMeta(getChromeColor(schemeId, isDark));
     try {
       localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, schemeId);
     } catch {
