@@ -5,6 +5,14 @@
 
 ---
 
+## [2026-11-19] fix(pwa): quitar next/script del layout
+
+`beforeInteractive` disparaba “setState on a component that hasn't mounted”
+y el timeout del chunk `app/layout.js`. Los scripts de color y redirect
+quedan como `<script src>` nativos al inicio del body.
+
+---
+
 ## [2026-11-19] fix(pwa): la barra de sistema sigue el color al cambiar de esquema
 
 Chrome/Samsung no retinta la barra si solo se edita el meta. Ahora se
