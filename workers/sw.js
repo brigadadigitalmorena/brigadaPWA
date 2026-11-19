@@ -10,7 +10,7 @@ import { ExpirationPlugin } from 'workbox-expiration';
 
 const PAGES_CACHE = 'pages-cache-v5';
 const STATIC_CACHE = 'static-resources-cache-v4';
-const IMAGES_CACHE = 'images-cache-v4';
+const IMAGES_CACHE = 'images-cache-v5';
 const API_CACHE = 'api-cache-v4';
 // Shared with offline-tiles.service.ts so explicitly downloaded packs are also
 // visible to normal MapLibre requests intercepted by this worker.
@@ -21,13 +21,27 @@ const TILE_MANIFEST_CACHE = 'tile-manifest-cache-v1';
 // used to be precached with revision:null, which intercepted navigations before
 // the handler below and, on a cache miss, rejected the fetch. Chrome then shows
 // "Esta página no está disponible" with Recargar; a second load works.
-const precacheUrls = ['/offline.html', '/manifest.json'];
+const precacheUrls = ['/offline.html'];
 const injected = self.__WB_MANIFEST || [];
 const precacheEntries = [
   ...injected,
   ...precacheUrls.map((url) => ({ url, revision: null })),
 ];
 precacheAndRoute(precacheEntries);
+
+registerRoute(
+  ({ url }) => url.pathname === '/manifest.json',
+  new NetworkFirst({
+    cacheName: 'manifest-cache-v1',
+    networkTimeoutSeconds: 3,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 4,
+        maxAgeSeconds: 60,
+      }),
+    ],
+  })
+);
 
 // Cap every document fetch, including navigation preload. Awaiting preload
 // without a limit left the installed app on the splash / "Cargando..." until

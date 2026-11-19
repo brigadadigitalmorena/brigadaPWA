@@ -68,6 +68,7 @@ export function UserAvatar({
           src={src!}
           alt=""
           className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
           onError={() => setFailedSrc(src)}
         />
       ) : name ? (

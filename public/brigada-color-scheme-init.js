@@ -57,6 +57,19 @@
       node.removeAttribute('media');
       node.setAttribute('content', color);
     });
+    try {
+      document.cookie =
+        'brigada-pwa-chrome=' +
+        encodeURIComponent(color) +
+        ';path=/;max-age=31536000;samesite=lax';
+    } catch (cookieError) {}
+    var manifest = document.querySelector('link[rel="manifest"]');
+    if (manifest) {
+      manifest.setAttribute(
+        'href',
+        '/manifest.json?theme_color=' + encodeURIComponent(color)
+      );
+    }
   } catch (error) {
     // FOUC fallback: data-color-scheme="pink" on <html>
   }

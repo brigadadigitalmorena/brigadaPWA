@@ -91,7 +91,8 @@ async function proxyRequest(
   };
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    fetchOptions.body = await request.text();
+    // arrayBuffer keeps multipart photo uploads intact; text() corrupts JPEG/PNG.
+    fetchOptions.body = await request.arrayBuffer();
   }
 
   const fetchWithTimeout = async (targetUrl: string) => {

@@ -5,6 +5,16 @@
 
 ---
 
+## [2026-11-19] fix(pwa): barra de sistema, Más opaco y foto de perfil
+
+La barra de Android lee `theme_color` del manifiesto (no solo el meta).
+`/manifest.json` ahora es dinámico (query + cookie) y el SW deja de
+precachearlo. El sheet de Más usa fondo blanco/zinc opaco. El proxy de
+Next reenvía el body como `arrayBuffer` para no corromper JPEG al subir
+avatar; la preview local se queda en pantalla tras elegir la foto.
+
+---
+
 ## [2026-11-19] fix(pwa): ChunkLoadError del layout y setState antes de montar
 
 Los scripts de arranque (color scheme y redirect `/` → `/home|/login`) salen de

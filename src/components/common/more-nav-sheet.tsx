@@ -69,7 +69,7 @@ export function MoreNavSheet({
         tabIndex={-1}
         aria-label="Cerrar menú"
         className={cn(
-          'fixed inset-x-0 top-0 z-40 bg-black/50 transition-opacity duration-200',
+          'fixed inset-x-0 top-0 z-40 bg-black/70 transition-opacity duration-200',
           open ? 'opacity-100' : 'opacity-0'
         )}
         style={{
@@ -84,11 +84,12 @@ export function MoreNavSheet({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          'fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out',
+          'fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-white opacity-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out dark:bg-zinc-950',
           open ? 'translate-y-0' : 'translate-y-full'
         )}
         style={{
           bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))',
+          backgroundColor: 'var(--background)',
         }}
       >
         <div className="flex justify-center pt-2 pb-1">
@@ -115,8 +116,8 @@ export function MoreNavSheet({
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-3 py-3 transition-colors touch-target',
                   active
-                    ? 'bg-[color-mix(in_oklch,var(--primary)_16%,var(--background))] text-foreground'
-                    : 'bg-background text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-slate-100 text-foreground dark:bg-zinc-800'
+                    : 'bg-white text-foreground hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-800'
                 )}
               >
                 <span

@@ -22,6 +22,13 @@ const ACCEPTED_TYPES = new Set([
 ]);
 const MAX_BYTES = 5 * 1024 * 1024;
 
+function isAcceptedImage(file: File): boolean {
+  if (ACCEPTED_TYPES.has(file.type)) return true;
+  // Android often sends an empty MIME type from the gallery picker.
+  if (!file.type) return /\.(jpe?g|png|webp)$/i.test(file.name);
+  return false;
+}
+
 export default function ProfilePage() {
   const { user, setUser } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -83,7 +90,7 @@ export default function ProfilePage() {
   };
 
   const handleAvatar = async (file: File) => {
-    if (!ACCEPTED_TYPES.has(file.type)) {
+    if (!isAcceptedImage(file)) {
       toast.error('Usa una imagen JPEG, PNG o WebP.');
       return;
     }
@@ -102,16 +109,8 @@ export default function ProfilePage() {
       const next = await uploadAvatar(file);
       setUser(next);
       toast.success('Foto de perfil actualizada');
-      // Keep the local preview until the remote URL paints; then drop it so
-      // subsequent loads use the persisted avatar_url.
-      if (next.avatar_url) {
-        const remote = new Image();
-        remote.onload = () => clearPreview();
-        remote.onerror = () => {
-          // Remote URL failed (CDN/R2). Keep local preview for this session.
-        };
-        remote.src = next.avatar_url;
-      }
+      // Keep the local blob on screen for this visit. The header/menu use
+      // avatar_url; do not drop the preview if the remote URL is slow/blocked.
     } catch (error) {
       clearPreview();
       toast.error(getApiErrorMessage(error, 'No se pudo subir la foto.'));
@@ -155,7 +154,7 @@ export default function ProfilePage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];

@@ -35,9 +35,10 @@ export function BottomNav() {
       />
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden dark:bg-zinc-950"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          backgroundColor: 'var(--background)',
         }}
         aria-label="Navegación principal"
       >

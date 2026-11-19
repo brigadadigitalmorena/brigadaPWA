@@ -111,8 +111,31 @@ function upsertMeta(name: string, content: string) {
   metas.forEach((meta) => meta.setAttribute('content', content));
 }
 
+const CHROME_COOKIE = 'brigada-pwa-chrome';
+
+function syncManifestLink(color: string) {
+  const href = `/manifest.json?theme_color=${encodeURIComponent(color)}`;
+  document.querySelectorAll('link[rel="manifest"]').forEach((node) => {
+    if (!(node instanceof HTMLLinkElement)) return;
+    try {
+      if (new URL(node.href, window.location.origin).href === new URL(href, window.location.origin).href) {
+        return;
+      }
+    } catch {
+      // Fall through and rewrite.
+    }
+    node.setAttribute('href', href);
+  });
+}
+
 export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
   upsertMeta('theme-color', color);
   upsertMeta('msapplication-navbutton-color', color);
+  try {
+    document.cookie = `${CHROME_COOKIE}=${encodeURIComponent(color)};path=/;max-age=31536000;samesite=lax`;
+  } catch {
+    // Private mode.
+  }
+  syncManifestLink(color);
 }

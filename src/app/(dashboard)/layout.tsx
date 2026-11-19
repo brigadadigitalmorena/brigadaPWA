@@ -66,7 +66,7 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col overflow-hidden">
         <SupportModeBanner />
         <header
-          className="flex items-center justify-between border-b bg-background px-4 pr-5 safe-area-top md:pr-6"
+          className="flex items-center justify-between border-b bg-white px-4 pr-5 safe-area-top md:pr-6 dark:bg-zinc-950"
           style={{ height: 'var(--header-height)' }}
         >
           <div className="flex min-w-0 items-center gap-2">

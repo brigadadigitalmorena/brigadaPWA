@@ -3269,17 +3269,30 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   // workers/sw.js
   var PAGES_CACHE = "pages-cache-v5";
   var STATIC_CACHE = "static-resources-cache-v4";
-  var IMAGES_CACHE = "images-cache-v4";
+  var IMAGES_CACHE = "images-cache-v5";
   var API_CACHE = "api-cache-v4";
   var OFFLINE_TILE_CACHE = "brigada-offline-tiles-v1";
   var TILE_MANIFEST_CACHE = "tile-manifest-cache-v1";
-  var precacheUrls = ["/offline.html", "/manifest.json"];
+  var precacheUrls = ["/offline.html"];
   var injected = self.__WB_MANIFEST || [];
   var precacheEntries = [
     ...injected,
     ...precacheUrls.map((url) => ({ url, revision: null }))
   ];
   precacheAndRoute(precacheEntries);
+  registerRoute(
+    ({ url }) => url.pathname === "/manifest.json",
+    new NetworkFirst({
+      cacheName: "manifest-cache-v1",
+      networkTimeoutSeconds: 3,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 4,
+          maxAgeSeconds: 60
+        })
+      ]
+    })
+  );
   var NAV_NETWORK_TIMEOUT_MS = 4e3;
   async function findCachedFillShell(cache) {
     const shell = await cache.match("/surveys/__fill_shell__");
