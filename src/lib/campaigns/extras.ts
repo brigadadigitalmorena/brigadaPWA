@@ -1,6 +1,7 @@
 /**
- * Prioritarias screen — selection and urgency helpers.
- * Includes survey_type extra (temporal) and rows with ends_at. Gestion surveys: /surveys.
+ * Priority highlight helpers for Encuestas (`/surveys`).
+ * Extra / temporal surveys and rows with ends_at are pinned and tinted in the list.
+ * Gestion surveys stay unhighlighted.
  *
  * @see ai-context/walkthroughs/extras-selection.md
  */
@@ -27,7 +28,7 @@ export function isPrioritySurveyType(
 /** @deprecated Use isPrioritySurveyType */
 export const isExtraSurveyType = isPrioritySurveyType;
 
-/** True when the entitlement should appear on /extras (Prioritarias). */
+/** True when the entitlement should be highlighted as prioritaria in /surveys. */
 export function isPriorityEntitlement(row: PrioritySurveyRow): boolean {
   if (
     row.entitlement_status === 'completed' ||

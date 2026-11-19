@@ -11,7 +11,6 @@ import {
   RefreshCw,
   LogOut,
   FileEdit,
-  Zap,
   Workflow,
   Map,
   Navigation,
@@ -62,13 +61,6 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
       icon: FileEdit,
       module: 'drafts',
       isActive: (path: string) => path.startsWith('/drafts'),
-    },
-    {
-      label: 'Prioritarias',
-      href: '/extras',
-      icon: Zap,
-      module: 'extras',
-      isActive: (path: string) => path.startsWith('/extras'),
     },
     {
       label: 'Gestión',

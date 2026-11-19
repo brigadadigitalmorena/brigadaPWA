@@ -5,6 +5,27 @@
 
 ---
 
+## [2026-11-19] fix(recorridos): selección visible y mapa a pantalla completa
+
+Al elegir un recorrido, la tarjeta usa borde de 2px (color del tema) y el
+visor hace scroll hasta el mapa. El mapa replica el control de pantalla
+completa de Mapas (overlay + Fullscreen API). En móvil la lista es chips
+horizontales para que el mapa quede a la vista.
+
+---
+
+## [2026-11-19] feat(surveys): unificar Prioritarias dentro de Encuestas
+
+La pantalla `/extras` y su entrada de menú (sidebar + Más) se eliminan. Las
+encuestas extra o con fecha de cierre siguen en `/surveys`, pinneadas arriba
+si están pendientes, con barra/tinte y badge por urgencia (Urgente / Pronto /
+Prioritaria). Gestión no se resalta. `/extras` redirige a `/surveys`.
+
+- Criterio: `isPriorityEntitlement` en `src/lib/campaigns/extras.ts`
+- Nav: `nav-items.ts`, `sidebar.tsx`; SW ya no precachea `/extras`
+
+---
+
 ## [2026-11-16] chore(sync): merge `origin/main` into `dev` (BD-31)
 
 Trae los hotfixes de Elias en `main` (Nov 1–15) a `dev` sin force-push y sin

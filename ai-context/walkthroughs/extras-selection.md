@@ -1,10 +1,12 @@
-# Pantallas Prioritarias y Gestión (PWA)
+# Prioritarias y Gestión (PWA)
 
-## Prioritarias (`/extras`)
+## Prioritarias (resalte en `/surveys`)
 
-Encuestas **temporales** (`survey_type = extra`) o con **fecha de cierre** (`ends_at`).
+Ya no hay pantalla `/extras`. Las encuestas **temporales** (`survey_type = extra`) o con **fecha de cierre** (`ends_at`) se listan en **Encuestas** y se resaltan (barra, tinte y badge por urgencia).
 
-- Excluye gestión y encuestas normales abiertas
+- Excluye gestión, completadas y revocadas
+- Pendientes prioritarias se pinnean al tope de la lista (el toolbar de Orden sigue aplicando dentro de cada grupo)
+- `/extras` redirige a `/surveys` (bookmarks / SW viejo)
 - Para iniciar encuestas de gestión → **Encuestas** (`/surveys`)
 
 ## Gestión (`/tracking`)

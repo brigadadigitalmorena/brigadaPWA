@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { MapPin, Navigation, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useTheme } from '@/contexts/theme-context';
 import { db } from '@/lib/db/database';
 import type { FieldSession, FieldSessionSample } from '@/lib/db/database';
 import {
@@ -24,6 +25,8 @@ import {
   type FieldSessionHistoryItem,
   type FieldSessionTrackResponse,
 } from '@/lib/api/field-session.service';
+import { getColorScheme } from '@/lib/color-schemes';
+import { cn } from '@/lib/utils';
 
 function formatDistance(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${Math.round(value)} m`;
@@ -117,7 +120,26 @@ export default function RecorridosPage() {
     );
   }, [localSessions, remoteSessions]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const viewerSectionRef = useRef<HTMLDivElement>(null);
+  const { colorScheme, theme, mounted: themeMounted } = useTheme();
   const effectiveSelectedId = selectedId ?? sessions[0]?.client_id ?? null;
+
+  const accentColor = (() => {
+    const scheme = getColorScheme(colorScheme);
+    if (!scheme) return undefined;
+    if (!themeMounted) return scheme.swatchLight;
+    return theme === 'dark' ? scheme.swatchDark : scheme.swatchLight;
+  })();
+
+  const selectSession = (clientId: string) => {
+    setSelectedId(clientId);
+    window.requestAnimationFrame(() => {
+      viewerSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
 
   const selected =
     sessions.find((session) => session.client_id === effectiveSelectedId) ?? null;
@@ -254,57 +276,83 @@ export default function RecorridosPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-          <div className="space-y-3">
-            {sessions.map((session) => (
-              <button
-                key={session.client_id}
-                type="button"
-                onClick={() => setSelectedId(session.client_id)}
-                className="w-full text-left"
-              >
-                <Card
-                  className={
-                    effectiveSelectedId === session.client_id
-                      ? 'border-primary ring-1 ring-primary/20'
-                      : ''
-                  }
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-sm">
+        <div className="grid gap-4 lg:grid-cols-[minmax(13rem,22%)_minmax(0,1fr)] lg:items-start lg:gap-5">
+          <section className="min-w-0 space-y-2">
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                Recorridos
+              </h2>
+              <span className="text-xs text-muted-foreground">{sessions.length}</span>
+            </div>
+            <div
+              className={cn(
+                'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                'lg:flex-col lg:overflow-visible lg:pb-0'
+              )}
+            >
+              {sessions.map((session) => {
+                const selectedSession = effectiveSelectedId === session.client_id;
+                return (
+                  <button
+                    key={session.client_id}
+                    type="button"
+                    onClick={() => selectSession(session.client_id)}
+                    aria-pressed={selectedSession}
+                    className={cn(
+                      'shrink-0 rounded-xl border-2 bg-card text-left transition-[border-color,box-shadow,background-color] duration-200',
+                      'w-[min(78vw,18rem)] p-3 lg:w-full',
+                      selectedSession
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-transparent hover:bg-muted/40'
+                    )}
+                    style={
+                      selectedSession && accentColor
+                        ? {
+                            borderColor: accentColor,
+                            boxShadow: `0 0 0 1px ${accentColor}33`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold leading-snug">
                         {new Date(session.started_at).toLocaleDateString('es-MX', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric',
                         })}
-                      </CardTitle>
+                      </p>
                       <Badge
                         variant={session.status === 'active' ? 'default' : 'secondary'}
+                        className="shrink-0 text-[10px]"
                       >
                         {session.status === 'active' ? 'Activo' : 'Finalizado'}
                       </Badge>
                     </div>
-                    <CardDescription>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {new Date(session.started_at).toLocaleTimeString('es-MX', {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}{' '}
                       · {formatDuration(session.started_at, session.ended_at)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex justify-between text-xs text-muted-foreground">
-                    <span>{formatDistance(session.distance_m)}</span>
-                    <span>{session.sample_count} puntos</span>
-                    <span>{session.server_id ? 'Sincronizado' : 'Local'}</span>
-                  </CardContent>
-                </Card>
-              </button>
-            ))}
-          </div>
+                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                      <span>{formatDistance(session.distance_m)}</span>
+                      <span>{session.sample_count} pts</span>
+                      <span>{session.server_id ? 'Sincronizado' : 'Local'}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
           {selected && (
-            <Card className="overflow-hidden">
+            <Card
+              ref={viewerSectionRef}
+              id="recorrido-visor"
+              className="min-w-0 scroll-mt-20 overflow-hidden lg:sticky lg:top-2"
+            >
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -328,6 +376,12 @@ export default function RecorridosPage() {
               </CardHeader>
               <CardContent>
                 <RecorridoMap
+                  key={selected.client_id}
+                  title={`Recorrido ${new Date(selected.started_at).toLocaleDateString('es-MX', {
+                    day: '2-digit',
+                    month: 'short',
+                  })}`}
+                  subtitle={`${formatDistance(selected.distance_m)} · ${displayedSamples.length} muestras`}
                   samples={displayedSamples}
                   responses={
                     remoteTrack
@@ -345,7 +399,7 @@ export default function RecorridosPage() {
                         )
                       : linkedResponses
                   }
-                  className="h-[480px]"
+                  className="h-[min(70dvh,40rem)] min-h-72 sm:min-h-[28rem]"
                 />
                 <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
                   <span>

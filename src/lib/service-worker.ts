@@ -49,7 +49,6 @@ export async function registerServiceWorker() {
         '/maps',
         '/recorridos',
         '/drafts',
-        '/extras',
         '/offline.html',
       ],
     });

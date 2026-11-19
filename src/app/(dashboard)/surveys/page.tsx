@@ -6,6 +6,11 @@ import { toast } from 'sonner';
 import { getMyEntitlements } from '@/lib/api/survey.service';
 import type { Assignment } from '@/lib/types';
 import { campaignLabel, surveyFillHref } from '@/lib/campaigns/scope';
+import {
+  isPriorityEntitlement,
+  prioritySurveyBadge,
+  type PriorityUrgency,
+} from '@/lib/campaigns/extras';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +38,7 @@ import {
   CircleDot,
   ArrowUp,
   ArrowDown,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -119,6 +125,38 @@ function typeRank(survey: AssignedSurvey): number {
   return generatesFollowUp(survey) ? 0 : 1;
 }
 
+function pendingPriorityRank(survey: AssignedSurvey): number {
+  return isPriorityEntitlement(survey) ? 0 : 1;
+}
+
+function priorityCardTone(level: PriorityUrgency): string {
+  switch (level) {
+    case 'high':
+      return 'border-l-[3px] border-l-red-500 bg-red-500/5 ring-red-500/25';
+    case 'medium':
+      return 'border-l-[3px] border-l-amber-500 bg-amber-500/5 ring-amber-500/25';
+    default:
+      return 'border-l-[3px] border-l-primary bg-primary/5 ring-primary/20';
+  }
+}
+
+function priorityBadgeLabel(level: PriorityUrgency): string {
+  if (level === 'high') return 'Urgente';
+  if (level === 'medium') return 'Pronto';
+  return 'Prioritaria';
+}
+
+function priorityBadgeTone(level: PriorityUrgency): string {
+  switch (level) {
+    case 'high':
+      return 'gap-1 bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/25';
+    case 'medium':
+      return 'gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25';
+    default:
+      return 'gap-1 bg-primary/10 text-primary border-primary/25';
+  }
+}
+
 function sortSurveys(
   list: AssignedSurvey[],
   key: SortKey,
@@ -126,6 +164,9 @@ function sortSurveys(
 ): AssignedSurvey[] {
   const sorted = [...list];
   sorted.sort((a, b) => {
+    const pin = pendingPriorityRank(a) - pendingPriorityRank(b);
+    if (pin !== 0) return pin;
+
     let result = 0;
     switch (key) {
       case 'ends_at':
@@ -421,6 +462,8 @@ export default function SurveysPage() {
         {sortedSurveys.map((survey) => {
           const isCompleted = survey.entitlement_status === 'completed';
           const isFollowUp = generatesFollowUp(survey);
+          const isPriority = !isCompleted && isPriorityEntitlement(survey);
+          const priority = isPriority ? prioritySurveyBadge(survey) : null;
           const startLabel = formatShortDate(survey.starts_at) ?? 'Sin inicio';
           const endLabel = formatShortDate(survey.ends_at) ?? 'Sin fin';
           const tone = urgencyTone(survey.ends_at, isCompleted);
@@ -431,7 +474,8 @@ export default function SurveysPage() {
               key={survey.entitlement_id}
               className={cn(
                 'overflow-hidden transition-shadow hover:shadow-md',
-                isCompleted && 'opacity-80'
+                isCompleted && 'opacity-80',
+                priority && priorityCardTone(priority.level)
               )}
             >
               <CardHeader className="pb-3">
@@ -450,6 +494,15 @@ export default function SurveysPage() {
                     >
                       {isCompleted ? 'Completada' : 'Pendiente'}
                     </Badge>
+                    {priority && (
+                      <Badge
+                        variant="outline"
+                        className={priorityBadgeTone(priority.level)}
+                      >
+                        <Zap className="h-3 w-3" aria-hidden />
+                        {priorityBadgeLabel(priority.level)}
+                      </Badge>
+                    )}
                     {isFollowUp && (
                       <Badge
                         variant="outline"

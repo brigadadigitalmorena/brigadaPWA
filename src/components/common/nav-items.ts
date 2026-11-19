@@ -8,7 +8,6 @@ import {
   MapPinned,
   Route,
   Share2,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { EnviosIcon } from '@/components/common/icons/envios-icon';
@@ -93,16 +92,6 @@ export const NAV_ITEMS: NavItem[] = [
     badge: 'drafts',
   },
   {
-    label: 'Prioritarias',
-    href: '/extras',
-    icon: Zap,
-    module: 'extras',
-    isActive: (path) => path.startsWith('/extras'),
-    placement: 'more',
-    sidebarGroup: 'trabajo',
-    description: 'Encuestas urgentes o adicionales',
-  },
-  {
     label: 'Gestión',
     href: '/tracking',
     icon: ListChecks,
@@ -158,7 +147,6 @@ export const NAV_ITEMS: NavItem[] = [
 const PRIMARY_ORDER = ['/home', '/surveys', '/maps', '/recorridos'] as const;
 const MORE_ORDER = [
   '/drafts',
-  '/extras',
   '/tracking',
   '/networks',
   '/sync',

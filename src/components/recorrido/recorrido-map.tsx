@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+import { Button } from '@/components/ui/button';
 import type { FieldSessionSample } from '@/lib/db/database';
 import { createBasemapStyle, resizeMapWhenReady } from '@/lib/maps/basemap-style';
+import { cn } from '@/lib/utils';
 
 interface RecorridoMapProps {
   samples: FieldSessionSample[];
@@ -15,6 +18,8 @@ interface RecorridoMapProps {
     status: string;
   }>;
   className?: string;
+  title?: string;
+  subtitle?: string;
 }
 
 type Coord = [number, number];
@@ -41,8 +46,22 @@ export function RecorridoMap({
   samples,
   responses = [],
   className,
+  title = 'Ruta del recorrido',
+  subtitle,
 }: RecorridoMapProps) {
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<import('maplibre-gl').Map | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [nativeFullscreen, setNativeFullscreen] = useState(false);
+
+  const resizeMap = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    window.requestAnimationFrame(() => {
+      map.resize();
+    });
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -57,7 +76,6 @@ export function RecorridoMap({
     if (positioned.length === 0) return;
 
     let cancelled = false;
-    let map: import('maplibre-gl').Map | null = null;
     let detachResize: (() => void) | undefined;
 
     void (async () => {
@@ -83,12 +101,13 @@ export function RecorridoMap({
       }
       if (currentSegment.length >= 2) segments.push(currentSegment);
       const bounds = boundsFor(coords);
-      map = new maplibregl.Map({
+      const map = new maplibregl.Map({
         container: containerRef.current,
         style: createBasemapStyle(),
         center: coords[0],
         zoom: 15,
       });
+      mapRef.current = map;
       detachResize = resizeMapWhenReady(map);
       map.addControl(
         new maplibregl.NavigationControl({ showCompass: false }),
@@ -96,7 +115,6 @@ export function RecorridoMap({
       );
 
       map.on('load', () => {
-        if (!map) return;
         map.addSource('route', {
           type: 'geojson',
           data: {
@@ -192,21 +210,140 @@ export function RecorridoMap({
     return () => {
       cancelled = true;
       detachResize?.();
-      map?.remove();
+      mapRef.current?.remove();
+      mapRef.current = null;
     };
   }, [responses, samples]);
 
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const active = document.fullscreenElement === shellRef.current;
+      setNativeFullscreen(active);
+      if (!active) setIsExpanded(false);
+      resizeMap();
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [resizeMap]);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isExpanded]);
+
+  const exitExpanded = async () => {
+    if (document.fullscreenElement && shellRef.current) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // CSS overlay still closes.
+      }
+    }
+    setIsExpanded(false);
+    setNativeFullscreen(false);
+    resizeMap();
+  };
+
+  const enterExpanded = async () => {
+    setIsExpanded(true);
+    const el = shellRef.current;
+    if (el && typeof el.requestFullscreen === 'function') {
+      try {
+        await el.requestFullscreen();
+        setNativeFullscreen(true);
+      } catch {
+        setNativeFullscreen(false);
+      }
+    }
+    resizeMap();
+  };
+
+  const toggleExpanded = () => {
+    if (isExpanded || nativeFullscreen) {
+      void exitExpanded();
+      return;
+    }
+    void enterExpanded();
+  };
+
+  const expanded = isExpanded || nativeFullscreen;
   const hasPoints = samples.some(
     (sample) => sample.latitude != null && sample.longitude != null
   );
 
   return (
-    <div className={className}>
+    <div
+      ref={shellRef}
+      className={cn(
+        'flex min-h-0 flex-col gap-2 bg-background',
+        expanded &&
+          'fixed inset-0 z-50 gap-3 p-3 sm:p-4 safe-area-top safe-area-bottom',
+        !expanded && className
+      )}
+    >
+      {expanded ? (
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{title}</p>
+            {subtitle ? (
+              <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={toggleExpanded}
+            aria-pressed
+            aria-label="Salir de pantalla completa"
+          >
+            <Minimize2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Salir</span>
+          </Button>
+        </div>
+      ) : null}
       {hasPoints ? (
-        <div ref={containerRef} className="h-full min-h-64 w-full rounded-lg" />
+        <div
+          className={cn(
+            'relative min-h-0 overflow-hidden rounded-xl border bg-slate-100',
+            expanded ? 'flex-1 min-h-[50dvh]' : 'h-full min-h-64'
+          )}
+        >
+          <div ref={containerRef} className="absolute inset-0" />
+          {!expanded ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="absolute left-2 top-2 z-10 shadow-sm"
+              onClick={toggleExpanded}
+              aria-pressed={false}
+              aria-label="Pantalla completa"
+            >
+              <Maximize2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Pantalla completa</span>
+            </Button>
+          ) : null}
+        </div>
       ) : (
-        <div className="flex min-h-64 items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
+        <div className="relative flex min-h-64 flex-1 items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground">
           Aún no hay puntos GPS para mostrar.
+          {!expanded ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="absolute left-2 top-2 z-10 shadow-sm"
+              onClick={toggleExpanded}
+              aria-label="Pantalla completa"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          ) : null}
         </div>
       )}
     </div>
