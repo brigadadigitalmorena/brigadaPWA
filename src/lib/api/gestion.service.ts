@@ -34,6 +34,8 @@ export interface GestionTrackingRow {
   id_attributes: string[];
   source_values: Record<string, string>;
   status_history: GestionStatusHistoryEntry[];
+  /** Derived by API: latest history note for to_status=problema. Null on legacy. */
+  problem_motivo: string | null;
 }
 
 export interface GestionComment {
@@ -54,13 +56,35 @@ function asFiniteNumber(value: unknown): number | null {
   return null;
 }
 
-function normalizeGestionTrackingRow(row: unknown): GestionTrackingRow | null {
+function deriveProblemMotivoFromHistory(
+  history: GestionStatusHistoryEntry[] | undefined
+): string | null {
+  if (!history?.length) return null;
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const entry = history[i];
+    if (entry?.to_status !== 'problema') continue;
+    const note = entry.note?.trim();
+    return note || null;
+  }
+  return null;
+}
+
+export function normalizeGestionTrackingRow(
+  row: unknown
+): GestionTrackingRow | null {
   if (!row || typeof row !== 'object') return null;
   const source = row as Partial<GestionTrackingRow> & {
     assignment_id?: unknown;
     assignment_status?: unknown;
   };
   if (typeof source.request_id !== 'string') return null;
+  const status_history = source.status_history ?? [];
+  const apiMotivo =
+    typeof source.problem_motivo === 'string'
+      ? source.problem_motivo.trim() || null
+      : source.problem_motivo === null
+        ? null
+        : undefined;
   return {
     request_id: source.request_id,
     entitlement_id:
@@ -84,7 +108,12 @@ function normalizeGestionTrackingRow(row: unknown): GestionTrackingRow | null {
     closed_at: source.closed_at ?? null,
     id_attributes: source.id_attributes ?? [],
     source_values: source.source_values ?? {},
-    status_history: source.status_history ?? [],
+    status_history,
+    // Prefer API field; fall back to history for older offline cache rows.
+    problem_motivo:
+      apiMotivo !== undefined
+        ? apiMotivo
+        : deriveProblemMotivoFromHistory(status_history),
   };
 }
 

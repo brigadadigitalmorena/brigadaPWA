@@ -5,6 +5,7 @@ import { GitBranch, Loader2, RefreshCw } from 'lucide-react';
 import {
   getGestionTrackingRows,
   getManagementStatusLabels,
+  normalizeGestionTrackingRow,
   type GestionTrackingRow,
 } from '@/lib/api/gestion.service';
 import { normalizeStatusLabels } from '@/lib/gestion/display';
@@ -20,7 +21,10 @@ import {
   type GestionStatusFilter,
 } from '@/components/gestion/gestion-filters';
 import { GestionCard } from '@/components/gestion/gestion-card';
-import { GestionDetail } from '@/components/gestion/gestion-detail';
+import {
+  GestionDetail,
+  type GestionDetailTab,
+} from '@/components/gestion/gestion-detail';
 import { useSync } from '@/contexts/sync.context';
 import { kvGet, kvSet } from '@/lib/db/database';
 import { isModuleEnabled } from '@/lib/services/app-config.service';
@@ -29,29 +33,11 @@ const CACHE_KEY = 'gestion_tracking_cache';
 
 function normalizeCachedRows(value: string): GestionTrackingRow[] {
   try {
-    const parsed = JSON.parse(value) as Partial<GestionTrackingRow>[];
+    const parsed = JSON.parse(value) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter((row) => typeof row.request_id === 'string')
-      .map((row) => ({
-        request_id: row.request_id as string,
-        entitlement_id: row.entitlement_id ?? null,
-        campaign_id: row.campaign_id ?? null,
-        survey_id: Number(row.survey_id ?? 0),
-        survey_title: row.survey_title || 'Gestión',
-        tracking_id: row.tracking_id || '',
-        folio_seq: Number(row.folio_seq ?? 0),
-        entitlement_status: row.entitlement_status || 'active',
-        inactive_reason: row.inactive_reason ?? null,
-        management_status: row.management_status || 'pendiente',
-        comments: row.comments || '',
-        created_at: row.created_at || new Date(0).toISOString(),
-        updated_at: row.updated_at ?? null,
-        closed_at: row.closed_at ?? null,
-        id_attributes: row.id_attributes ?? [],
-        source_values: row.source_values ?? {},
-        status_history: row.status_history ?? [],
-      }));
+      .map(normalizeGestionTrackingRow)
+      .filter((row): row is GestionTrackingRow => row != null);
   } catch {
     return [];
   }
@@ -71,8 +57,14 @@ export default function TrackingPage() {
     if (typeof window === 'undefined') return null;
     return new URLSearchParams(window.location.search).get('requestId');
   });
+  const [detailTab, setDetailTab] = useState<GestionDetailTab>('info');
   const [statusLabels, setStatusLabels] = useState(normalizeStatusLabels());
   const deepLinkScrolled = useRef(false);
+
+  const openHistoryFor = useCallback((requestId: string) => {
+    setSelectedId(requestId);
+    setDetailTab('history');
+  }, []);
 
   const enabled = isModuleEnabled('tracking', isOnline);
 
@@ -312,16 +304,24 @@ export default function TrackingPage() {
                   row={row}
                   selected={selectedId === row.request_id}
                   statusLabels={statusLabels}
-                  onSelect={() =>
-                    setSelectedId((current) =>
-                      current === row.request_id ? null : row.request_id
-                    )
-                  }
+                  onSelect={() => {
+                    if (selectedId === row.request_id) {
+                      setSelectedId(null);
+                      return;
+                    }
+                    setDetailTab('info');
+                    setSelectedId(row.request_id);
+                  }}
+                  onViewHistory={() => openHistoryFor(row.request_id)}
                   mobileDetail={
                     <GestionDetail
                       row={row}
                       statusLabels={statusLabels}
                       isOnline={isOnline}
+                      activeTab={
+                        selectedId === row.request_id ? detailTab : 'info'
+                      }
+                      onTabChange={setDetailTab}
                     />
                   }
                 />
@@ -337,6 +337,8 @@ export default function TrackingPage() {
                     row={selectedRow}
                     statusLabels={statusLabels}
                     isOnline={isOnline}
+                    activeTab={detailTab}
+                    onTabChange={setDetailTab}
                   />
                 ) : (
                   <p className="py-12 text-center text-sm text-muted-foreground">
