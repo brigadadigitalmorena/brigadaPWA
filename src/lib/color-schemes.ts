@@ -127,8 +127,17 @@ function syncManifestLink(color: string) {
   document.head.appendChild(next);
 }
 
+function isInstalledPwa() {
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    nav.standalone === true
+  );
+}
+
 export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
+  const painted = document.documentElement.dataset.chromeColor || '';
   // Chrome/Samsung only reliably retint the system bars when the
   // theme-color node is replaced, not when its content attribute changes.
   replaceMeta('theme-color', color);
@@ -139,4 +148,14 @@ export function applyThemeColorMeta(color: string) {
     // Private mode.
   }
   syncManifestLink(color);
+  // The Android nav bar latches the theme-color from the first HTML.
+  // A reload lets the server paint the new color before Chrome draws the bar.
+  if (
+    isInstalledPwa() &&
+    painted &&
+    painted.toLowerCase() !== color.toLowerCase()
+  ) {
+    document.documentElement.dataset.chromeColor = color;
+    window.location.reload();
+  }
 }

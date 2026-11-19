@@ -5,6 +5,15 @@
 
 ---
 
+## [2026-11-19] fix(pwa): la barra de Android toma el color del HTML inicial
+
+Chrome pinta la barra de navegación con el `theme-color` del primer HTML
+(`#FF1B8D` fijo). Ahora ese meta y el manifiesto salen del color guardado.
+En la PWA instalada, cambiar de esquema recarga una vez para que la barra
+no se quede en el color anterior.
+
+---
+
 ## [2026-11-19] fix(pwa): quitar next/script del layout
 
 `beforeInteractive` disparaba “setState on a component that hasn't mounted”

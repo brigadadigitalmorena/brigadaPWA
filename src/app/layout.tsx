@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { normalizeHexColor } from '@/lib/pwa-manifest';
 import { AuthProvider } from '@/contexts/auth.context';
 import { SyncProvider } from '@/contexts/sync.context';
 import { ThemeProvider } from '@/contexts/theme-context';
@@ -18,31 +20,48 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
-  title: 'Brigada PWA',
-  description: 'Progressive Web App for Brigada Digital',
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    title: 'Brigada',
-    statusBarStyle: 'default',
-  },
-};
+async function chromeColor(): Promise<string> {
+  const jar = await cookies();
+  return normalizeHexColor(jar.get('brigada-pwa-chrome')?.value) ?? '#FF1B8D';
+}
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
-  interactiveWidget: 'resizes-content',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const color = await chromeColor();
+  return {
+    title: 'Brigada PWA',
+    description: 'Progressive Web App for Brigada Digital',
+    manifest: `/manifest.json?theme_color=${encodeURIComponent(color)}`,
+    appleWebApp: {
+      capable: true,
+      title: 'Brigada',
+      statusBarStyle: 'default',
+    },
+  };
+}
 
-export default function RootLayout({
+export async function generateViewport(): Promise<Viewport> {
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+    interactiveWidget: 'resizes-content',
+    themeColor: await chromeColor(),
+  };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const color = await chromeColor();
   return (
-    <html lang="es" suppressHydrationWarning data-color-scheme="pink">
+    <html
+      lang="es"
+      suppressHydrationWarning
+      data-color-scheme="pink"
+      data-chrome-color={color}
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
