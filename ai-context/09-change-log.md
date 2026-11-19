@@ -5,6 +5,40 @@
 
 ---
 
+## [2026-11-19] fix(pwa): barras de sistema siguen el color de la app
+
+`theme-color` (barra de estado y de navegación en Android/PWA) deja de estar
+fijo en rosa y toma el swatch del esquema elegido, también en modo oscuro.
+
+## [2026-11-19] fix(surveys): iconos de orden más claros con tooltip
+
+Los filtros de Encuestas usan iconos distintos (fin, inicio, campaña, título,
+estado, tipo). Al pasar el cursor o enfocar se muestra un cartel con el
+criterio, y debajo se lee el orden activo.
+
+---
+
+## [2026-11-19] fix(gestion): jerarquía visual y menos duplicación lista/detalle
+
+Insignias Pendiente/En proceso en ámbar (verde resuelta, rojo problema). El
+stepper solo colorea pasos alcanzados; el resto queda gris. Las tarjetas
+tienen borde izquierdo por estado y ring al seleccionar. Folios y fechas van
+en slate. KPIs en 0 se desaturan. El detalle ya no repite título/folio/estado;
+Tracking ID y Referencia se unifican si coinciden; fechas pasan a Historial.
+Cerrar sesión del sidebar separa ícono y texto.
+
+---
+
+## [2026-11-19] feat(pwa): buscar recorridos y menú Más en lista rectangular
+
+En Recorridos hay un campo de búsqueda (fecha, hora, estado, distancia,
+local/sincronizado). El botón Más de la bottom nav abre un speed-dial encima
+del tab, con filas rectangulares (no círculos) para Borradores, Gestión, Redes,
+Envíos, Ayuda y Apoyo. El tab Más pasa a chevron hacia arriba mientras está
+abierto.
+
+---
+
 ## [2026-11-19] fix(recorridos): selección visible y mapa a pantalla completa
 
 Al elegir un recorrido, la tarjeta usa borde de 2px (color del tema) y el

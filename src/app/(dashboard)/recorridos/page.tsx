@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { MapPin, Navigation, RefreshCw } from 'lucide-react';
+import { MapPin, Navigation, RefreshCw, Search, X } from 'lucide-react';
 import Link from 'next/link';
 
 import { PageHeader } from '@/components/common/page-header';
 import { RecorridoMap } from '@/components/recorrido/recorrido-map';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -26,20 +27,12 @@ import {
   type FieldSessionTrackResponse,
 } from '@/lib/api/field-session.service';
 import { getColorScheme } from '@/lib/color-schemes';
+import {
+  formatDistance,
+  formatDuration,
+  matchesRecorridoQuery,
+} from '@/lib/recorrido/session-search';
 import { cn } from '@/lib/utils';
-
-function formatDistance(value: number): string {
-  return value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${Math.round(value)} m`;
-}
-
-function formatDuration(startedAt: string, endedAt?: string): string {
-  const elapsed =
-    new Date(endedAt ?? new Date().toISOString()).getTime() -
-    new Date(startedAt).getTime();
-  const minutes = Math.max(0, Math.round(elapsed / 60_000));
-  const hours = Math.floor(minutes / 60);
-  return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
-}
 
 function historyItemToLocal(item: FieldSessionHistoryItem): FieldSession {
   return {
@@ -120,8 +113,13 @@ export default function RecorridosPage() {
     );
   }, [localSessions, remoteSessions]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const viewerSectionRef = useRef<HTMLDivElement>(null);
   const { colorScheme, theme, mounted: themeMounted } = useTheme();
+  const filteredSessions = useMemo(
+    () => sessions.filter((session) => matchesRecorridoQuery(session, searchQuery)),
+    [searchQuery, sessions]
+  );
   const effectiveSelectedId = selectedId ?? sessions[0]?.client_id ?? null;
 
   const accentColor = (() => {
@@ -282,7 +280,38 @@ export default function RecorridosPage() {
               <h2 className="text-sm font-semibold text-muted-foreground">
                 Recorridos
               </h2>
-              <span className="text-xs text-muted-foreground">{sessions.length}</span>
+              <span className="text-xs text-muted-foreground">
+                {searchQuery.trim()
+                  ? `${filteredSessions.length} de ${sessions.length}`
+                  : sessions.length}
+              </span>
+            </div>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                type="search"
+                placeholder="Buscar recorrido"
+                aria-label="Buscar recorrido"
+                inputSize="mobile"
+                className="pr-10 pl-10"
+              />
+              {searchQuery ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Limpiar búsqueda"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X aria-hidden />
+                </Button>
+              ) : null}
             </div>
             <div
               className={cn(
@@ -290,7 +319,12 @@ export default function RecorridosPage() {
                 'lg:flex-col lg:overflow-visible lg:pb-0'
               )}
             >
-              {sessions.map((session) => {
+              {filteredSessions.length === 0 ? (
+                <p className="w-full rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+                  Ningún recorrido coincide con “{searchQuery.trim()}”.
+                </p>
+              ) : null}
+              {filteredSessions.map((session) => {
                 const selectedSession = effectiveSelectedId === session.client_id;
                 return (
                   <button

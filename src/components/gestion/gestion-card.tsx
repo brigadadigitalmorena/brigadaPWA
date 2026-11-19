@@ -11,8 +11,10 @@ import type {
 import {
   buildFolioDisplay,
   formatGestionDate,
-  getSourceSummary,
+  getSourceEntries,
   STATUS_BADGE_CLASSES,
+  STATUS_LEFT_BORDER,
+  STATUS_SELECTED_CLASSES,
 } from '@/lib/gestion/display';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,14 +50,24 @@ export function GestionCard({
   onSelect,
   mobileDetail,
 }: GestionCardProps) {
-  const sourceSummary = getSourceSummary(row.source_values);
+  const sourceEntries = getSourceEntries(row.source_values, {
+    idAttributes: row.id_attributes,
+    limit: 3,
+  }).filter((entry) => {
+    const key = entry.key.toLowerCase();
+    if (key === 'survey_id') return false;
+    if (key === 'survey_title' && entry.value === row.survey_title) return false;
+    return true;
+  });
   const activeStep = statusStep(row.management_status);
+  const resolved = row.management_status === 'resuelto';
 
   return (
     <Card
       className={cn(
-        'overflow-hidden transition-colors',
-        selected && 'border-primary bg-primary/[0.025]'
+        'overflow-hidden border-l-4 py-0 transition-colors',
+        STATUS_LEFT_BORDER[row.management_status],
+        selected && STATUS_SELECTED_CLASSES[row.management_status]
       )}
     >
       <button
@@ -66,10 +78,10 @@ export function GestionCard({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="line-clamp-2 font-semibold leading-snug">
+            <p className="line-clamp-2 font-semibold leading-snug text-foreground">
               {row.survey_title}
             </p>
-            <p className="mt-1 text-sm font-medium text-primary">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {buildFolioDisplay(row)}
             </p>
           </div>
@@ -82,7 +94,7 @@ export function GestionCard({
             </Badge>
             <ChevronDown
               className={cn(
-                'h-4 w-4 text-muted-foreground transition-transform lg:hidden',
+                'h-4 w-4 text-slate-400 transition-transform lg:hidden',
                 selected && 'rotate-180'
               )}
               aria-hidden
@@ -90,12 +102,21 @@ export function GestionCard({
           </div>
         </div>
 
-        {sourceSummary && (
-          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-            {sourceSummary}
-          </p>
+        {sourceEntries.length > 0 && (
+          <dl className="mt-2 space-y-1">
+            {sourceEntries.map((entry) => (
+              <div key={entry.key} className="flex gap-1.5 text-sm">
+                <dt className="shrink-0 text-slate-500 dark:text-slate-400">
+                  {entry.label}:
+                </dt>
+                <dd className="min-w-0 truncate text-slate-600 dark:text-slate-300">
+                  {entry.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Capturada {formatGestionDate(row.created_at)}
         </p>
 
@@ -110,23 +131,29 @@ export function GestionCard({
             aria-label={`Progreso: ${STEPS[activeStep].label}`}
           >
             {STEPS.map((step, index) => {
-              const completed = index <= activeStep;
+              const reached = index <= activeStep;
               return (
                 <div key={step.key} className="relative text-center">
                   {index > 0 && (
                     <span
                       className={cn(
                         'absolute right-1/2 top-2 h-0.5 w-full',
-                        index <= activeStep ? 'bg-primary' : 'bg-border'
+                        index <= activeStep
+                          ? resolved
+                            ? 'bg-green-600'
+                            : 'bg-amber-500'
+                          : 'bg-slate-200 dark:bg-slate-700'
                       )}
                     />
                   )}
                   <span
                     className={cn(
                       'relative mx-auto flex h-4 w-4 items-center justify-center rounded-full',
-                      completed
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
+                      reached
+                        ? resolved
+                          ? 'bg-green-600 text-white'
+                          : 'bg-amber-500 text-white'
+                        : 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500'
                     )}
                   >
                     {index < activeStep ? (
@@ -138,9 +165,9 @@ export function GestionCard({
                   <span
                     className={cn(
                       'mt-1 block text-[10px]',
-                      completed
-                        ? 'font-medium text-foreground'
-                        : 'text-muted-foreground'
+                      reached
+                        ? 'font-medium text-slate-700 dark:text-slate-200'
+                        : 'text-slate-400 dark:text-slate-500'
                     )}
                   >
                     {step.label}

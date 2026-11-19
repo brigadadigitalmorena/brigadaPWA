@@ -14,30 +14,24 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { RecorridoCard } from '@/components/recorrido/recorrido-card';
 import { SkeletonSurveyCard } from '@/components/ui/skeleton';
 import {
+  SurveySortToolbar,
+  SORT_OPTIONS,
+  type SortDir,
+  type SortKey,
+} from '@/components/survey/survey-sort-toolbar';
+import {
   ClipboardList,
   Play,
   Calendar,
-  CalendarClock,
-  CalendarPlus,
   CalendarRange,
   Users,
   RefreshCw,
   GitBranch,
-  Type,
-  CircleDot,
-  ArrowUp,
-  ArrowDown,
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -48,15 +42,6 @@ import {
 
 interface AssignedSurvey extends Assignment {}
 
-type SortKey =
-  | 'ends_at'
-  | 'starts_at'
-  | 'assigned_at'
-  | 'title'
-  | 'status'
-  | 'type';
-
-type SortDir = 'asc' | 'desc';
 type UrgencyTone = 'ok' | 'soon' | 'overdue';
 
 const SORT_STORAGE_KEY = 'brigada.surveys.sort';
@@ -69,19 +54,6 @@ const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {
   status: 'asc',
   type: 'asc',
 };
-
-const SORT_OPTIONS: Array<{
-  key: SortKey;
-  label: string;
-  icon: typeof CalendarClock;
-}> = [
-  { key: 'ends_at', label: 'Ordenar por fecha de fin', icon: CalendarClock },
-  { key: 'starts_at', label: 'Ordenar por fecha de inicio', icon: CalendarPlus },
-  { key: 'assigned_at', label: 'Ordenar por fecha de campaña', icon: Calendar },
-  { key: 'title', label: 'Ordenar por título', icon: Type },
-  { key: 'status', label: 'Ordenar por estado', icon: CircleDot },
-  { key: 'type', label: 'Ordenar por tipo (gestión primero)', icon: GitBranch },
-];
 
 function fillHref(survey: AssignedSurvey): string {
   return surveyFillHref(survey);
@@ -408,55 +380,11 @@ export default function SurveysPage() {
 
       <RecorridoCard />
 
-      <div className="sticky top-0 z-10 -mx-1 border-b bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <TooltipProvider delay={300}>
-          <div
-            className="flex items-center gap-1 overflow-x-auto pb-0.5"
-            role="toolbar"
-            aria-label="Ordenar encuestas"
-          >
-            <span className="mr-1 shrink-0 text-xs font-medium text-muted-foreground">
-              Orden
-            </span>
-            {SORT_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const active = sortKey === option.key;
-              const DirIcon = sortDir === 'asc' ? ArrowUp : ArrowDown;
-              const ariaLabel = active
-                ? `${option.label}, ${sortDir === 'asc' ? 'ascendente' : 'descendente'}. Tocá de nuevo para invertir.`
-                : option.label;
-              return (
-                <Tooltip key={option.key}>
-                  <TooltipTrigger
-                    type="button"
-                    aria-label={ariaLabel}
-                    aria-pressed={active}
-                    onClick={() => handleSort(option.key)}
-                    className={cn(
-                      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors',
-                      'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                      active
-                        ? 'border-transparent bg-primary text-primary-foreground shadow-sm'
-                        : 'border-border bg-background text-foreground hover:bg-muted'
-                    )}
-                  >
-                    <span className="relative inline-flex items-center justify-center">
-                      <Icon className="h-5 w-5" aria-hidden />
-                      {active && (
-                        <DirIcon
-                          className="absolute -bottom-1.5 -right-1.5 h-3 w-3"
-                          aria-hidden
-                        />
-                      )}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">{option.label}</TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </div>
-        </TooltipProvider>
-      </div>
+      <SurveySortToolbar
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={handleSort}
+      />
 
       <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
         {sortedSurveys.map((survey) => {

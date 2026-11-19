@@ -169,12 +169,14 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
         <div className="p-4">
           <Button
             variant="outline"
-            size="lg"
-            className="w-full justify-start gap-3 h-12 text-base"
+            size="mobile"
+            className="h-12 w-full min-w-0 justify-start px-3"
             onClick={handleLogout}
           >
-            <LogOut size={22} />
-            <span>Cerrar sesión</span>
+            <span className="flex min-w-0 items-center gap-3">
+              <LogOut className="h-5 w-5 shrink-0" aria-hidden />
+              <span className="truncate">Cerrar sesión</span>
+            </span>
           </Button>
         </div>
       </div>

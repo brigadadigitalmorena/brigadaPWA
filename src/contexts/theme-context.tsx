@@ -15,7 +15,9 @@ import {
 import {
   COLOR_SCHEME_STORAGE_KEY,
   DEFAULT_COLOR_SCHEME,
+  applyThemeColorMeta,
   colorSchemes,
+  getChromeColor,
   isValidColorScheme,
   type ColorSchemeMeta,
 } from '@/lib/color-schemes';
@@ -79,6 +81,17 @@ function ColorSchemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
+function ChromeColorSync() {
+  const { colorScheme, theme, mounted } = useTheme();
+
+  useEffect(() => {
+    if (!mounted) return;
+    applyThemeColorMeta(getChromeColor(colorScheme, theme === 'dark'));
+  }, [colorScheme, mounted, theme]);
+
+  return null;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <NextThemesProvider
@@ -88,7 +101,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
       storageKey="brigada-pwa-theme"
     >
-      <ColorSchemeProvider>{children}</ColorSchemeProvider>
+      <ColorSchemeProvider>
+        <ChromeColorSync />
+        {children}
+      </ColorSchemeProvider>
     </NextThemesProvider>
   );
 }

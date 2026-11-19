@@ -68,23 +68,31 @@ export function GestionMetrics({
             className={cn(
               'flex min-h-16 items-center gap-3 rounded-xl border bg-card px-3 py-2 text-left transition-colors',
               'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              active ? colors.active : colors.idle
+              active ? colors.active : colors.idle,
+              !active && item.value === 0 && 'opacity-60 grayscale-[0.35]'
             )}
           >
             <Icon
-              className={cn('h-5 w-5 shrink-0', colors.icon)}
+              className={cn(
+                'h-5 w-5 shrink-0',
+                item.value === 0 && !active
+                  ? 'text-slate-400 dark:text-slate-500'
+                  : colors.icon
+              )}
               aria-hidden
             />
             <span>
               <span
                 className={cn(
                   'block text-xl font-semibold leading-none',
-                  colors.value
+                  item.value === 0 && !active
+                    ? 'text-slate-400 dark:text-slate-500'
+                    : colors.value
                 )}
               >
                 {item.value}
               </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
+              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
                 {item.label}
               </span>
             </span>

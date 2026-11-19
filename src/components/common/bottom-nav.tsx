@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Ellipsis } from 'lucide-react';
+import { ChevronUp, Ellipsis } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSync } from '@/contexts/sync.context';
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +79,7 @@ export function BottomNav() {
             type="button"
             aria-label="Más opciones"
             aria-expanded={moreOpen}
-            aria-haspopup="dialog"
+            aria-haspopup="menu"
             onClick={() => setMoreOpen((open) => !open)}
             className={cn(
               'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors touch-target',
@@ -90,11 +90,18 @@ export function BottomNav() {
           >
             <div
               className={cn(
-                'flex items-center justify-center rounded-xl px-3 py-1 transition-colors',
-                (moreActive || moreOpen) && 'bg-primary/10'
+                'flex items-center justify-center px-3 py-1 transition-colors',
+                moreOpen
+                  ? 'rounded-full bg-primary text-primary-foreground'
+                  : 'rounded-xl',
+                !moreOpen && (moreActive ? 'bg-primary/10' : '')
               )}
             >
-              <Ellipsis size={22} strokeWidth={moreActive || moreOpen ? 2.5 : 2} />
+              {moreOpen ? (
+                <ChevronUp size={22} strokeWidth={2.5} />
+              ) : (
+                <Ellipsis size={22} strokeWidth={moreActive ? 2.5 : 2} />
+              )}
             </div>
             <span
               className={cn(

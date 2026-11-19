@@ -90,3 +90,22 @@ export function isValidColorScheme(id: string): boolean {
 export function getColorScheme(id: string): ColorSchemeMeta | undefined {
   return colorSchemes.find((s) => s.id === id);
 }
+
+/** Status / nav bar color for the installed PWA chrome. */
+export function getChromeColor(schemeId: string, isDark: boolean): string {
+  const scheme =
+    getColorScheme(schemeId) ?? getColorScheme(DEFAULT_COLOR_SCHEME);
+  if (!scheme) return '#FF1B8D';
+  return isDark ? scheme.swatchDark : scheme.swatchLight;
+}
+
+export function applyThemeColorMeta(color: string) {
+  if (typeof document === 'undefined') return;
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', color);
+}

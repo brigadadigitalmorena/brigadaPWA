@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   title: 'Brigada PWA',
   description: 'Progressive Web App for Brigada Digital',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'Brigada',
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {
@@ -47,7 +52,7 @@ export default function RootLayout({
           id="brigada-color-scheme-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k=${JSON.stringify(COLOR_SCHEME_STORAGE_KEY)};var v=localStorage.getItem(k);var ids=['pink','blue','purple','green','orange','red','darkElegant','indigo','teal'];if(v&&ids.indexOf(v)!==-1){document.documentElement.setAttribute('data-color-scheme',v);}}catch(e){}})();`,
+            __html: `(function(){try{var k=${JSON.stringify(COLOR_SCHEME_STORAGE_KEY)};var v=localStorage.getItem(k);var ids=['pink','blue','purple','green','orange','red','darkElegant','indigo','teal'];if(v&&ids.indexOf(v)!==-1){document.documentElement.setAttribute('data-color-scheme',v);}var light={pink:'#FF1B8D',blue:'#0284C7',purple:'#7C3AED',green:'#16A34A',orange:'#EA580C',red:'#DC2626',darkElegant:'#111827',indigo:'#4F46E5',teal:'#14B8A6'};var dark={pink:'#FF4DA6',blue:'#38BDF8',purple:'#A78BFA',green:'#4ADE80',orange:'#FB923C',red:'#F87171',darkElegant:'#F3F4F6',indigo:'#818CF8',teal:'#2DD4BF'};var theme=localStorage.getItem('brigada-pwa-theme');var isDark=theme==='dark'||(theme!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var scheme=v&&ids.indexOf(v)!==-1?v:'pink';var color=(isDark?dark:light)[scheme]||'#FF1B8D';var meta=document.querySelector('meta[name="theme-color"]');if(!meta){meta=document.createElement('meta');meta.setAttribute('name','theme-color');document.head.appendChild(meta);}meta.setAttribute('content',color);}catch(e){}})();`,
           }}
         />
         <Script

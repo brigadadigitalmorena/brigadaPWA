@@ -154,14 +154,14 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Auth: `/mobile/login`, `/mobile/token/refresh`, `/mobile/me`, perfil/avatar/password
 - Encuestas: `/mobile/surveys`, latest version, `/mobile/responses/batch`, presign documents
 - Sync: `/mobile/sync-status`, freshness/delta según motor
-- Gestiones: `/mobile/gestiones/tracking`, comments
+- Gestiones: `/mobile/gestiones/tracking`, comments. Lista con borde de estado, stepper ámbar/verde vs gris, y detalle sin repetir folio/título; Tracking ID y Referencia se unifican si son iguales.
 - Mapas: `/mobile/maps`, tiles OSM manifest (proxy Next dedicado)
 - Notificaciones in-app: `/mobile/notifications*`
 - ZIP: `/mobile/zip-lookup/{code}`
-- Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar. Lista con borde de selección (como Mapas); al tocar un recorrido el visor hace scroll al mapa y permite pantalla completa.
+- Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar. Lista con borde de selección (como Mapas), barra de búsqueda y, al tocar un recorrido, el visor hace scroll al mapa y permite pantalla completa.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
 - Redes: `GET /public/app-config` → `social_links` (`/networks`). El proxy de Next deja pasar `public/app-config` sin token (el cliente no manda `Authorization` en `/public/`). La lista se cachea en `localStorage`. El QR se genera en el cliente a partir de `url`, igual que en móvil. UI: cards sin URL cruda, botón Compartir primario + iconos Abrir/QR, icono de plataforma.
-- Bottom nav móvil: 5 slots (Inicio, Encuestas, Mapas, Recorridos, **Más**). Borradores / Gestión / Redes / Envíos / Ayuda / Apoyo viven en el sheet `MoreNavSheet`. Las prioritarias se resaltan dentro de Encuestas (`/surveys`); `/extras` redirige ahí.
+- Bottom nav móvil: 5 slots (Inicio, Encuestas, Mapas, Recorridos, **Más**). Al abrir Más, las opciones salen en lista rectangular encima del tab (speed-dial, no círculos). Borradores / Gestión / Redes / Envíos / Ayuda / Apoyo. Las prioritarias se resaltan dentro de Encuestas (`/surveys`); `/extras` redirige ahí.
 - Ayuda: `/help` FAQ estático (paridad con móvil `app/help.tsx`: tips, mismas secciones, correo de soporte). Visible en sidebar, Inicio y menú de usuario (en móvil la entrada está en Perfil).
 - Modo Apoyo: `/support` (dueño: crear/listar/QR/revocar/reactivar/duplicar) y `/support-join` (helper por código, paridad con `support-mode.tsx` + `support-join.tsx` de `brigadaApp/dev`). Banner en sesión helper. API `/mobile/support/*`.
 - Reporte: `/report` crea vía `POST /issue-reports` con evidencia R2 obligatoria (1–3 imágenes); el móvil aún usa MailComposer (BD-24)
