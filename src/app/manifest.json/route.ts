@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildPwaManifest, isHexColor } from '@/lib/pwa-manifest';
+import { buildPwaManifest, normalizeHexColor } from '@/lib/pwa-manifest';
 
 export const dynamic = 'force-dynamic';
 
 export function GET(request: NextRequest) {
-  const fromQuery = request.nextUrl.searchParams.get('theme_color');
-  const fromCookie = request.cookies.get('brigada-pwa-chrome')?.value;
-  const color = isHexColor(fromQuery)
-    ? fromQuery
-    : isHexColor(fromCookie)
-      ? fromCookie
-      : '#FF1B8D';
+  const color =
+    normalizeHexColor(request.nextUrl.searchParams.get('theme_color')) ??
+    normalizeHexColor(request.cookies.get('brigada-pwa-chrome')?.value) ??
+    '#FF1B8D';
 
   return NextResponse.json(buildPwaManifest(color), {
     headers: {

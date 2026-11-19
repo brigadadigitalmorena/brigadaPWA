@@ -51,8 +51,22 @@ export const PWA_MANIFEST_ICONS = [
 
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
+export function normalizeHexColor(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  let raw = value.trim();
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // already decoded
+  }
+  if (!raw.startsWith('#')) raw = `#${raw}`;
+  return HEX_COLOR.test(raw) ? raw : null;
+}
+
 export function isHexColor(value: string | null | undefined): value is string {
-  return Boolean(value && HEX_COLOR.test(value));
+  return normalizeHexColor(value) !== null;
 }
 
 export function buildPwaManifest(themeColor: string) {

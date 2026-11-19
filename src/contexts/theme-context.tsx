@@ -90,7 +90,18 @@ function ChromeColorSync() {
 
   useEffect(() => {
     if (!mounted) return;
-    applyThemeColorMeta(getChromeColor(colorScheme, theme === 'dark'));
+    const apply = () =>
+      applyThemeColorMeta(getChromeColor(colorScheme, theme === 'dark'));
+    apply();
+    const onShow = () => {
+      if (document.visibilityState === 'visible') apply();
+    };
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('pageshow', apply);
+    return () => {
+      document.removeEventListener('visibilitychange', onShow);
+      window.removeEventListener('pageshow', apply);
+    };
   }, [colorScheme, mounted, theme]);
 
   return null;

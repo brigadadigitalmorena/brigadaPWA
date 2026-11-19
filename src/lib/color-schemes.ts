@@ -99,41 +99,42 @@ export function getChromeColor(schemeId: string, isDark: boolean): string {
   return isDark ? scheme.swatchDark : scheme.swatchLight;
 }
 
-function upsertMeta(name: string, content: string) {
-  const metas = document.querySelectorAll(`meta[name="${name}"]`);
-  if (metas.length === 0) {
-    const meta = document.createElement('meta');
-    meta.setAttribute('name', name);
-    meta.setAttribute('content', content);
-    document.head.appendChild(meta);
-    return;
-  }
-  metas.forEach((meta) => meta.setAttribute('content', content));
-}
-
 const CHROME_COOKIE = 'brigada-pwa-chrome';
 
+function replaceMeta(name: string, content: string) {
+  document
+    .querySelectorAll(`meta[name="${name}"]`)
+    .forEach((node) => node.remove());
+  const meta = document.createElement('meta');
+  meta.setAttribute('name', name);
+  meta.setAttribute('content', content);
+  document.head.appendChild(meta);
+}
+
 function syncManifestLink(color: string) {
-  const href = `/manifest.json?theme_color=${encodeURIComponent(color)}`;
-  document.querySelectorAll('link[rel="manifest"]').forEach((node) => {
-    if (!(node instanceof HTMLLinkElement)) return;
-    try {
-      if (new URL(node.href, window.location.origin).href === new URL(href, window.location.origin).href) {
-        return;
-      }
-    } catch {
-      // Fall through and rewrite.
-    }
-    node.setAttribute('href', href);
-  });
+  const href = `/manifest.json?theme_color=${encodeURIComponent(color)}&v=${Date.now()}`;
+  const next = document.createElement('link');
+  next.setAttribute('rel', 'manifest');
+  next.setAttribute('href', href);
+  const existing = document.querySelectorAll('link[rel="manifest"]');
+  if (existing.length > 0) {
+    existing[0].replaceWith(next);
+    existing.forEach((node, index) => {
+      if (index > 0) node.remove();
+    });
+    return;
+  }
+  document.head.appendChild(next);
 }
 
 export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
-  upsertMeta('theme-color', color);
-  upsertMeta('msapplication-navbutton-color', color);
+  // Chrome/Samsung only reliably retint the system bars when the
+  // theme-color node is replaced, not when its content attribute changes.
+  replaceMeta('theme-color', color);
+  replaceMeta('msapplication-navbutton-color', color);
   try {
-    document.cookie = `${CHROME_COOKIE}=${encodeURIComponent(color)};path=/;max-age=31536000;samesite=lax`;
+    document.cookie = `${CHROME_COOKIE}=${color};path=/;max-age=31536000;samesite=lax`;
   } catch {
     // Private mode.
   }

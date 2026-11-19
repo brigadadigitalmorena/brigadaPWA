@@ -5,6 +5,14 @@
 
 ---
 
+## [2026-11-19] fix(pwa): la barra de sistema sigue el color al cambiar de esquema
+
+Chrome/Samsung no retinta la barra si solo se edita el meta. Ahora se
+reemplaza el nodo `theme-color`, se regenera el `<link rel="manifest">`
+con cache-bust y se reaplica al volver a primer plano.
+
+---
+
 ## [2026-11-19] fix(pwa): barra de sistema, Más opaco y foto de perfil
 
 La barra de Android lee `theme_color` del manifiesto (no solo el meta).
