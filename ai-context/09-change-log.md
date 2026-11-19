@@ -5,6 +5,14 @@
 
 ---
 
+## [2026-11-19] fix(pwa): quitar scripts del árbol de React
+
+`<script>` dentro del layout y el script de `next-themes` hacían que React 19
+avisara y que el chunk `app/layout.js` no cargara. El arranque se inserta
+con `preinit` y el modo claro/oscuro ya no renderiza un script.
+
+---
+
 ## [2026-11-19] fix(pwa): la barra de Android toma el color del HTML inicial
 
 Chrome pinta la barra de navegación con el `theme-color` del primer HTML

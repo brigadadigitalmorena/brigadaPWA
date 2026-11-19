@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
+import { preinit } from 'react-dom';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { normalizeHexColor } from '@/lib/pwa-manifest';
@@ -55,6 +56,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const color = await chromeColor();
+  // Hoisted by React into <head>. A <script> child of the layout is not
+  // executed on the client and makes the layout chunk fail to load.
+  preinit('/brigada-color-scheme-init.js', { as: 'script' });
+  preinit('/brigada-boot-redirect.js', { as: 'script' });
   return (
     <html
       lang="es"
@@ -65,9 +70,6 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Native tags: next/script beforeInteractive updates state during render and times out the layout chunk. */}
-        <script src="/brigada-color-scheme-init.js" />
-        <script src="/brigada-boot-redirect.js" />
         <ThemeProvider>
           <AuthProvider>
             <SyncProvider>

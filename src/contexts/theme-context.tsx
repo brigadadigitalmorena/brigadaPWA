@@ -9,10 +9,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  ThemeProvider as NextThemesProvider,
-  useTheme as useNextTheme,
-} from 'next-themes';
-import {
   COLOR_SCHEME_STORAGE_KEY,
   DEFAULT_COLOR_SCHEME,
   applyThemeColorMeta,
@@ -21,6 +17,10 @@ import {
   isValidColorScheme,
   type ColorSchemeMeta,
 } from '@/lib/color-schemes';
+
+const THEME_STORAGE_KEY = 'brigada-pwa-theme';
+type ThemeMode = 'light' | 'dark' | 'system';
+type ResolvedTheme = 'light' | 'dark';
 
 function applyColorSchemeAttr(schemeId: string) {
   if (typeof document === 'undefined') return;
@@ -85,13 +85,91 @@ function ColorSchemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function ChromeColorSync() {
-  const { colorScheme, theme, mounted } = useTheme();
+function systemPrefersDark(): boolean {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function readStoredMode(): ThemeMode {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
+  } catch {
+    // ignore
+  }
+  return 'system';
+}
+
+function resolveMode(mode: ThemeMode): ResolvedTheme {
+  if (mode === 'system') return systemPrefersDark() ? 'dark' : 'light';
+  return mode;
+}
+
+function applyDarkClass(isDark: boolean) {
+  document.documentElement.classList.toggle('dark', isDark);
+  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+}
+
+interface ModeContextValue {
+  theme: ResolvedTheme;
+  setTheme: (theme: ResolvedTheme) => void;
+  mounted: boolean;
+}
+
+const ModeContext = createContext<ModeContextValue | undefined>(undefined);
+
+function ModeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<ResolvedTheme>('light');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!mounted) return;
+    const resolved = resolveMode(readStoredMode());
+    setThemeState(resolved);
+    applyDarkClass(resolved === 'dark');
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => {
+      if (readStoredMode() !== 'system') return;
+      const resolved = media.matches ? 'dark' : 'light';
+      setThemeState(resolved);
+      applyDarkClass(resolved === 'dark');
+    };
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
+  const setTheme = useCallback((next: ResolvedTheme) => {
+    setThemeState(next);
+    applyDarkClass(next === 'dark');
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  return (
+    <ModeContext.Provider value={{ theme, setTheme, mounted }}>
+      {children}
+    </ModeContext.Provider>
+  );
+}
+
+function ChromeColorSync() {
+  const mode = useContext(ModeContext);
+  const colorSchemeCtx = useContext(ColorSchemeContext);
+
+  useEffect(() => {
+    if (!mode?.mounted) return;
     const apply = () =>
-      applyThemeColorMeta(getChromeColor(colorScheme, theme === 'dark'));
+      applyThemeColorMeta(
+        getChromeColor(
+          colorSchemeCtx?.colorScheme ?? DEFAULT_COLOR_SCHEME,
+          mode.theme === 'dark'
+        )
+      );
     apply();
     const onShow = () => {
       if (document.visibilityState === 'visible') apply();
@@ -102,46 +180,37 @@ function ChromeColorSync() {
       document.removeEventListener('visibilitychange', onShow);
       window.removeEventListener('pageshow', apply);
     };
-  }, [colorScheme, mounted, theme]);
+  }, [colorSchemeCtx?.colorScheme, mode?.mounted, mode?.theme]);
 
   return null;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-      storageKey="brigada-pwa-theme"
-    >
+    <ModeProvider>
       <ColorSchemeProvider>
         <ChromeColorSync />
         {children}
       </ColorSchemeProvider>
-    </NextThemesProvider>
+    </ModeProvider>
   );
 }
 
 export function useTheme() {
-  const { theme, setTheme, resolvedTheme } = useNextTheme();
+  const mode = useContext(ModeContext);
   const colorSchemeCtx = useContext(ColorSchemeContext);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const theme = mode?.theme ?? 'light';
+  const setTheme = mode?.setTheme ?? (() => undefined);
 
   const toggleTheme = () => {
-    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   return {
-    theme: (resolvedTheme ?? 'light') as 'light' | 'dark',
+    theme,
     setTheme,
     toggleTheme,
-    mounted,
+    mounted: mode?.mounted ?? false,
     colorScheme: colorSchemeCtx?.colorScheme ?? DEFAULT_COLOR_SCHEME,
     availableSchemes: colorSchemeCtx?.availableSchemes ?? colorSchemes,
     setColorScheme:

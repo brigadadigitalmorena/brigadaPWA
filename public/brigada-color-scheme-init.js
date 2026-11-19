@@ -44,6 +44,8 @@
       (theme !== 'light' &&
         window.matchMedia &&
         window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', !!isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     var scheme = value && ids.indexOf(value) !== -1 ? value : 'pink';
     var color = (isDark ? dark : light)[scheme] || '#FF1B8D';
     document.querySelectorAll('meta[name="theme-color"]').forEach(function (node) {
