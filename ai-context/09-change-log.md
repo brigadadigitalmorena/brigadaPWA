@@ -5,6 +5,30 @@
 
 ---
 
+## [2026-11-20] fix(pwa): el primer toque de la barra cambia de vista
+
+El primer click arrancaba la navegación, pero un refresco del perfil, la
+cola o el teclado la cancelaba y la pantalla anterior se quedaba. La barra
+marca la opción al click, la vista nueva aparece enseguida con un esqueleto
+y esas actualizaciones ya no repintan el router.
+
+---
+
+## [2026-11-20] fix(pwa): la foto de perfil se actualiza en otros equipos
+
+El navegador guardaba la dirección vieja de la foto. Al abrir la app y al
+volver a la pestaña se vuelve a leer el perfil, así que se ve la foto nueva.
+
+---
+
+## [2026-11-20] fix(pwa): no quitar las metas que renderiza Next
+
+El arranque borraba `theme-color` y el link del manifiesto. Al cambiar de
+página React intentaba `removeChild` sobre un nodo que ya no tenía padre.
+Ahora solo se actualiza el atributo.
+
+---
+
 ## [2026-11-20] fix(pwa): la pregunta sigue visible con el teclado
 
 La encuesta medía el alto completo de la pantalla, así que al abrir el

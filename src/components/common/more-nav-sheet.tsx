@@ -87,8 +87,11 @@ export function MoreNavSheet({
               <Link
                 key={item.href}
                 href={item.href}
-                onPointerDown={() => onItemPress(item.href)}
-                onClick={() => onOpenChange(false)}
+                scroll={false}
+                onClick={() => {
+                  onItemPress(item.href);
+                  onOpenChange(false);
+                }}
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-3 py-3 touch-target',
                   active

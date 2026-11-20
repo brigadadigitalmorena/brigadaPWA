@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth.context';
 import { Sidebar } from '@/components/common/sidebar';
@@ -17,7 +17,26 @@ import { registerWebPush } from '@/lib/services/web-push.service';
 import { registerPeriodicSync } from '@/lib/services/periodic-sync';
 import { purgeEmptyDrafts } from '@/lib/services/draft.service';
 import { DraftCountProvider } from '@/components/common/draft-count';
+import { NAV_ITEMS } from '@/components/common/nav-items';
 import { useKeyboardViewport } from '@/hooks/use-keyboard-inset';
+
+function FillShell({ children }: { children: React.ReactNode }) {
+  const { height: viewportHeight } = useKeyboardViewport();
+
+  return (
+    <div
+      className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background"
+      style={
+        viewportHeight
+          ? { height: viewportHeight, maxHeight: viewportHeight }
+          : undefined
+      }
+    >
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
+      <ObservabilityBootstrap />
+    </div>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -27,9 +46,10 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const prefetched = useRef(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   const isFillRoute = pathname.includes('/fill');
-  const { height: viewportHeight } = useKeyboardViewport();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -45,6 +65,19 @@ export default function DashboardLayout({
     void purgeEmptyDrafts();
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated || prefetched.current) return;
+    if (process.env.NODE_ENV !== 'production') return;
+    prefetched.current = true;
+    NAV_ITEMS.forEach((item, index) => {
+      window.setTimeout(() => router.prefetch(item.href), 400 + index * 120);
+    });
+  }, [isAuthenticated, router]);
+
   if (isLoading) {
     return <LoadingState message="Cargando..." minHeight="min-h-screen" />;
   }
@@ -54,19 +87,7 @@ export default function DashboardLayout({
   }
 
   if (isFillRoute) {
-    return (
-      <div
-        className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background"
-        style={
-          viewportHeight
-            ? { height: viewportHeight, maxHeight: viewportHeight }
-            : undefined
-        }
-      >
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
-        <ObservabilityBootstrap />
-      </div>
-    );
+    return <FillShell>{children}</FillShell>;
   }
 
   return (
@@ -94,7 +115,10 @@ export default function DashboardLayout({
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(var(--bottom-nav-chrome)+1rem)] md:pb-6">
+          <main
+            ref={mainRef}
+            className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(var(--bottom-nav-chrome)+1rem)] md:pb-6"
+          >
             <div className="mb-4">
               <FieldStatusBanners />
             </div>

@@ -9,6 +9,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db/database';
 import { draftRowHasContent } from '@/lib/services/draft.service';
+import { StableTree } from '@/components/common/stable-tree';
 const DraftCountContext = createContext<number | null>(null);
 
 async function countMeaningfulDrafts(): Promise<number> {
@@ -41,7 +42,9 @@ export function DraftCountProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => draftCount, [draftCount]);
 
   return (
-    <DraftCountContext.Provider value={value}>{children}</DraftCountContext.Provider>
+    <DraftCountContext.Provider value={value}>
+      <StableTree>{children}</StableTree>
+    </DraftCountContext.Provider>
   );
 }
 

@@ -66,7 +66,8 @@ export function BottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
-                onPointerDown={() => setPressedHref(item.href)}
+                scroll={false}
+                onClick={() => setPressedHref(item.href)}
                 className={cn(
                   'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 touch-target',
                   active

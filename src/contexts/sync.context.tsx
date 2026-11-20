@@ -24,6 +24,7 @@ import { fieldSessionService } from '@/lib/services/field-session.service';
 import { getAccessToken, loadTokensFromStorage } from '@/lib/api/client';
 import { useAuth } from '@/contexts/auth.context';
 import { toast } from 'sonner';
+import { StableTree } from '@/components/common/stable-tree';
 
 function hasAccessSession(): boolean {
   loadTokensFromStorage();
@@ -353,7 +354,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <SyncContext.Provider value={value}>{children}</SyncContext.Provider>
+    <SyncContext.Provider value={value}>
+      <StableTree>{children}</StableTree>
+    </SyncContext.Provider>
   );
 }
 

@@ -37,6 +37,7 @@ import {
   writeSupportSession,
   type StoredSupportSession,
 } from '@/lib/support/session-storage';
+import { StableTree } from '@/components/common/stable-tree';
 
 export interface SupportJoinResult {
   access_token: string;
@@ -126,6 +127,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.getItem('brigada_refresh_token'),
           isAuthenticated: true,
           isLoading: false,
+        });
+        // The photo may have changed on another device. Replace the cached profile.
+        void refreshUserApi().then((fresh) => {
+          if (!fresh) return;
+          setState((prev) => ({ ...prev, user: fresh }));
         });
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
@@ -269,11 +275,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     if (readSupportSession()) return;
+    if (!isAuthenticated()) return;
     const user = await refreshUserApi();
     if (user) {
       setState((prev) => ({ ...prev, user }));
     }
   }, []);
+
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState === 'visible') void refreshUser();
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, [refreshUser]);
 
   const setUser = useCallback((user: User) => {
     persistUser(user);
@@ -310,7 +325,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={value}>
+      <StableTree>{children}</StableTree>
+    </AuthContext.Provider>
   );
 }
 

@@ -101,30 +101,33 @@ export function getChromeColor(schemeId: string, isDark: boolean): string {
 
 const CHROME_COOKIE = 'brigada-pwa-chrome';
 
-function replaceMeta(name: string, content: string) {
-  document
-    .querySelectorAll(`meta[name="${name}"]`)
-    .forEach((node) => node.remove());
-  const meta = document.createElement('meta');
-  meta.setAttribute('name', name);
-  meta.setAttribute('content', content);
-  document.head.appendChild(meta);
+function updateMeta(name: string, content: string) {
+  const node = document.querySelector(`meta[name="${name}"]`);
+  if (!node) {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', name);
+    meta.setAttribute('content', content);
+    document.head.appendChild(meta);
+    return;
+  }
+  if (node.getAttribute('content') !== content) {
+    node.setAttribute('content', content);
+  }
 }
 
 function syncManifestLink(color: string) {
   const href = `/manifest.json?theme_color=${encodeURIComponent(color)}&v=${Date.now()}`;
-  const next = document.createElement('link');
-  next.setAttribute('rel', 'manifest');
-  next.setAttribute('href', href);
-  const existing = document.querySelectorAll('link[rel="manifest"]');
-  if (existing.length > 0) {
-    existing[0].replaceWith(next);
-    existing.forEach((node, index) => {
-      if (index > 0) node.remove();
-    });
+  const existing = document.querySelector('link[rel="manifest"]');
+  if (!existing) {
+    const next = document.createElement('link');
+    next.setAttribute('rel', 'manifest');
+    next.setAttribute('href', href);
+    document.head.appendChild(next);
     return;
   }
-  document.head.appendChild(next);
+  const current = existing.getAttribute('href') ?? '';
+  if (current.includes(encodeURIComponent(color))) return;
+  existing.setAttribute('href', href);
 }
 
 function isInstalledPwa() {
@@ -138,10 +141,10 @@ function isInstalledPwa() {
 export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
   const painted = document.documentElement.dataset.chromeColor || '';
-  // Chrome/Samsung only reliably retint the system bars when the
-  // theme-color node is replaced, not when its content attribute changes.
-  replaceMeta('theme-color', color);
-  replaceMeta('msapplication-navbutton-color', color);
+  // Keep the nodes Next rendered. Removing them makes the next navigation
+  // call removeChild on a parent that is already null.
+  updateMeta('theme-color', color);
+  updateMeta('msapplication-navbutton-color', color);
   try {
     document.cookie = `${CHROME_COOKIE}=${color};path=/;max-age=31536000;samesite=lax`;
   } catch {

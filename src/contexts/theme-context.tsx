@@ -18,6 +18,7 @@ import {
   isValidColorScheme,
   type ColorSchemeMeta,
 } from '@/lib/color-schemes';
+import { StableTree } from '@/components/common/stable-tree';
 
 const THEME_STORAGE_KEY = 'brigada-pwa-theme';
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -83,7 +84,9 @@ function ColorSchemeProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ColorSchemeContext.Provider value={value}>{children}</ColorSchemeContext.Provider>
+    <ColorSchemeContext.Provider value={value}>
+      <StableTree>{children}</StableTree>
+    </ColorSchemeContext.Provider>
   );
 }
 
@@ -158,7 +161,9 @@ function ModeProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ModeContext.Provider value={value}>{children}</ModeContext.Provider>
+    <ModeContext.Provider value={value}>
+      <StableTree>{children}</StableTree>
+    </ModeContext.Provider>
   );
 }
 

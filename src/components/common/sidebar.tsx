@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth.context';
 import { User } from '@/lib/types';
@@ -33,6 +34,11 @@ interface SidebarProps {
 export function Sidebar({ user, currentPath }: SidebarProps) {
   const { logout, isSupport } = useAuth();
   const { isOnline } = useSync();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [currentPath]);
 
   const allMenuItems: Array<{
     label: string;
@@ -142,15 +148,18 @@ export function Sidebar({ user, currentPath }: SidebarProps) {
         <nav className="flex-1 p-4 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = item.isActive(currentPath);
+            const isActive = pendingHref
+              ? item.href === pendingHref
+              : item.isActive(currentPath);
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                scroll={false}
+                onClick={() => setPendingHref(item.href)}
                 className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl text-base
-                  transition-colors touch-target
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-base touch-target
                   ${isActive
                     ? 'bg-primary text-primary-foreground font-medium shadow-sm'
                     : 'hover:bg-accent'

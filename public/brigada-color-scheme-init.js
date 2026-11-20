@@ -48,25 +48,29 @@
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     var scheme = value && ids.indexOf(value) !== -1 ? value : 'pink';
     var color = (isDark ? dark : light)[scheme] || '#FF1B8D';
-    document.querySelectorAll('meta[name="theme-color"]').forEach(function (node) {
-      node.remove();
-    });
-    var meta = document.createElement('meta');
-    meta.setAttribute('name', 'theme-color');
-    meta.setAttribute('content', color);
-    document.head.appendChild(meta);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    if (meta.getAttribute('content') !== color) {
+      meta.setAttribute('content', color);
+    }
     try {
       document.cookie =
         'brigada-pwa-chrome=' + color + ';path=/;max-age=31536000;samesite=lax';
     } catch (cookieError) {}
-    var manifestHref =
-      '/manifest.json?theme_color=' + encodeURIComponent(color) + '&v=' + Date.now();
+    var encoded = encodeURIComponent(color);
     var manifest = document.querySelector('link[rel="manifest"]');
     if (manifest) {
-      var next = document.createElement('link');
-      next.setAttribute('rel', 'manifest');
-      next.setAttribute('href', manifestHref);
-      manifest.replaceWith(next);
+      var currentHref = manifest.getAttribute('href') || '';
+      if (currentHref.indexOf(encoded) === -1) {
+        manifest.setAttribute(
+          'href',
+          '/manifest.json?theme_color=' + encoded + '&v=' + Date.now()
+        );
+      }
     }
   } catch (error) {
     // FOUC fallback: data-color-scheme="pink" on <html>
