@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
 import { ChevronLeft, ChevronRight, Navigation, Save } from 'lucide-react';
-import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
+import { useKeyboardViewport } from '@/hooks/use-keyboard-inset';
 import { isAxiosError } from 'axios';
 
 import { useSurveyFillStore } from '@/lib/store/survey-fill.store';
@@ -36,6 +36,7 @@ import { parseOptionalScopeId } from '@/lib/campaigns/scope';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
 import { SurveyFillHeader } from '@/components/survey/survey-fill-header';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LoadingState } from '@/components/common/loading-state';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -92,7 +93,8 @@ function SurveyFillPageContent() {
 
   const { isOnline, syncNow } = useSync();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const keyboardInset = useKeyboardInset();
+  const { height: viewportHeight, inset: keyboardInset } = useKeyboardViewport();
+  const compact = viewportHeight !== null && viewportHeight < 560;
   const { confirm, confirmDialog } = useConfirmDialog();
 
   // Form Engine v2 — keeps visibility/constraints aligned with mobile
@@ -496,6 +498,23 @@ function SurveyFillPageContent() {
     router.push('/surveys');
   };
 
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches('input, textarea, select, [contenteditable="true"]')) return;
+      window.setTimeout(() => {
+        target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }, 60);
+    };
+
+    form.addEventListener('focusin', onFocusIn);
+    return () => form.removeEventListener('focusin', onFocusIn);
+  }, [isOpening, isLoading, currentQuestionIndex]);
+
   if (isOpening || isLoading) {
     return <LoadingState message="Cargando encuesta..." />;
   }
@@ -605,7 +624,14 @@ function SurveyFillPageContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen min-h-screen bg-muted/20">
+    <div
+      className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-muted/20"
+      style={
+        viewportHeight
+          ? { height: viewportHeight, maxHeight: viewportHeight }
+          : undefined
+      }
+    >
       <SurveyFillHeader
         surveyTitle={surveyTitle}
         campaignName={campaignNameFromUrl}
@@ -615,6 +641,7 @@ function SurveyFillPageContent() {
         sections={version.sections}
         currentSectionIndex={currentSectionIndex}
         onGoToSection={goToSection}
+        compact={compact}
         fieldSession={
           activeFieldSession
             ? {
@@ -625,7 +652,7 @@ function SurveyFillPageContent() {
         }
       />
 
-      {showSectionHeader && currentEntry && (
+      {showSectionHeader && currentEntry && !compact && (
         <div className="px-4 pt-4 pb-2">
           <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
             <h2 className="text-xl font-semibold text-foreground">
@@ -643,11 +670,11 @@ function SurveyFillPageContent() {
       <form
         ref={formRef}
         onSubmit={handleSubmit(() => handleNext())}
-        className="flex-1 overflow-y-auto px-4 py-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3"
       >
         {shownQuestion && (
-          <div className="bg-card rounded-xl border border-border p-5 shadow-sm min-h-[50vh] flex flex-col justify-center">
-            <div className="flex items-start gap-3 mb-4">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+            <div className="flex items-start gap-3">
               <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
                 {currentQuestionIndex + 1}
               </span>
@@ -725,25 +752,26 @@ function SurveyFillPageContent() {
           </div>
         )}
 
-        <div className="h-4" />
+        <div className="h-2" />
       </form>
 
       <div
-        className="z-30 border-t bg-background/95 backdrop-blur px-3 py-3 safe-area-bottom"
-        style={
-          keyboardInset > 0
-            ? { position: 'fixed', left: 0, right: 0, bottom: keyboardInset }
-            : { position: 'sticky', bottom: 0 }
-        }
+        className={cn(
+          'z-30 shrink-0 border-t bg-background px-3 py-2',
+          keyboardInset === 0 && 'pb-[max(0.5rem,env(safe-area-inset-bottom))]'
+        )}
       >
-        <div className="flex items-center gap-2">
+        <div className="mx-auto flex w-full max-w-lg items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="lg"
             onClick={handleExit}
             disabled={isSubmitting}
-            className="h-14 min-w-0 flex-1 gap-1 px-3 text-base"
+            className={cn(
+              'min-w-0 flex-1 gap-1 px-3 text-base',
+              compact ? 'h-12' : 'h-14'
+            )}
           >
             <ChevronLeft className="h-5 w-5 shrink-0" />
             {isFirstQuestion ? 'Salir' : 'Anterior'}
@@ -755,7 +783,7 @@ function SurveyFillPageContent() {
             onClick={handleSaveDraft}
             disabled={isSubmitting}
             aria-label="Guardar borrador"
-            className="h-14 shrink-0 gap-1.5 px-3 text-sm"
+            className={cn('shrink-0 gap-1.5 px-3 text-sm', compact ? 'h-12' : 'h-14')}
           >
             <Save className="size-5 shrink-0" strokeWidth={2} />
             Borrador
@@ -764,7 +792,10 @@ function SurveyFillPageContent() {
           <Button
             type="button"
             size="lg"
-            className="h-14 min-w-0 flex-1 gap-1 px-3 text-base"
+            className={cn(
+              'min-w-0 flex-1 gap-1 px-3 text-base',
+              compact ? 'h-12' : 'h-14'
+            )}
             onClick={handleNext}
             disabled={isSubmitting}
           >

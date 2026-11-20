@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { AlertTriangle, ChevronRight, FileEdit, CloudOff } from 'lucide-react';
 import { useSync } from '@/contexts/sync.context';
-import { useDraftCount } from '@/components/common/use-draft-count';
+import { useDraftCount } from '@/components/common/draft-count';
 import { InlineBanner } from '@/components/ui/inline-banner';
 import { Button } from '@/components/ui/button';
 import { RecorridoBanner } from '@/components/banners/recorrido-banner';

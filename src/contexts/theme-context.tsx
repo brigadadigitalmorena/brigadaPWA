@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react';
@@ -72,16 +73,17 @@ function ColorSchemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const value = useMemo(
+    () => ({
+      colorScheme,
+      availableSchemes: colorSchemes,
+      setColorScheme,
+    }),
+    [colorScheme, setColorScheme]
+  );
+
   return (
-    <ColorSchemeContext.Provider
-      value={{
-        colorScheme,
-        availableSchemes: colorSchemes,
-        setColorScheme,
-      }}
-    >
-      {children}
-    </ColorSchemeContext.Provider>
+    <ColorSchemeContext.Provider value={value}>{children}</ColorSchemeContext.Provider>
   );
 }
 
@@ -150,10 +152,13 @@ function ModeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const value = useMemo(
+    () => ({ theme, setTheme, mounted }),
+    [theme, setTheme, mounted]
+  );
+
   return (
-    <ModeContext.Provider value={{ theme, setTheme, mounted }}>
-      {children}
-    </ModeContext.Provider>
+    <ModeContext.Provider value={value}>{children}</ModeContext.Provider>
   );
 }
 
@@ -196,27 +201,37 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const noopSetTheme = (_theme: ResolvedTheme) => undefined;
+const noopSetColorScheme = (_schemeId: string) => undefined;
+
 export function useTheme() {
   const mode = useContext(ModeContext);
   const colorSchemeCtx = useContext(ColorSchemeContext);
   const theme = mode?.theme ?? 'light';
-  const setTheme = mode?.setTheme ?? (() => undefined);
-
-  const toggleTheme = () => {
+  const setTheme = mode?.setTheme ?? noopSetTheme;
+  const setColorScheme = colorSchemeCtx?.setColorScheme ?? noopSetColorScheme;
+  const toggleTheme = useCallback(() => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
+  }, [setTheme, theme]);
 
-  return {
-    theme,
-    setTheme,
-    toggleTheme,
-    mounted: mode?.mounted ?? false,
-    colorScheme: colorSchemeCtx?.colorScheme ?? DEFAULT_COLOR_SCHEME,
-    availableSchemes: colorSchemeCtx?.availableSchemes ?? colorSchemes,
-    setColorScheme:
-      colorSchemeCtx?.setColorScheme ??
-      ((_id: string) => {
-        /* no-op outside provider */
-      }),
-  };
+  return useMemo(
+    () => ({
+      theme,
+      setTheme,
+      toggleTheme,
+      mounted: mode?.mounted ?? false,
+      colorScheme: colorSchemeCtx?.colorScheme ?? DEFAULT_COLOR_SCHEME,
+      availableSchemes: colorSchemeCtx?.availableSchemes ?? colorSchemes,
+      setColorScheme,
+    }),
+    [
+      theme,
+      setTheme,
+      toggleTheme,
+      mode?.mounted,
+      colorSchemeCtx?.colorScheme,
+      colorSchemeCtx?.availableSchemes,
+      setColorScheme,
+    ]
+  );
 }

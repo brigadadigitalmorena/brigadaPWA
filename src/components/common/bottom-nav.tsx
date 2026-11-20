@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronUp, Ellipsis } from 'lucide-react';
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useSync } from '@/contexts/sync.context';
 import { Badge } from '@/components/ui/badge';
 import { MoreNavSheet } from '@/components/common/more-nav-sheet';
-import { useDraftCount } from '@/components/common/use-draft-count';
+import { useDraftCount } from '@/components/common/draft-count';
 import {
   getMoreNavItems,
   getPrimaryNavItems,
@@ -20,10 +20,18 @@ export function BottomNav() {
   const { isOnline } = useSync();
   const draftCount = useDraftCount();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [pressedHref, setPressedHref] = useState<string | null>(null);
 
   const primaryItems = getPrimaryNavItems(isOnline);
   const moreItems = getMoreNavItems(isOnline);
-  const moreActive = isMoreRouteActive(pathname, isOnline);
+  const morePressed =
+    pressedHref !== null && moreItems.some((item) => item.href === pressedHref);
+  const moreActive =
+    morePressed || (pressedHref === null && isMoreRouteActive(pathname, isOnline));
+
+  useEffect(() => {
+    setPressedHref(null);
+  }, [pathname]);
 
   return (
     <>
@@ -32,6 +40,7 @@ export function BottomNav() {
         onOpenChange={setMoreOpen}
         items={moreItems}
         draftCount={draftCount}
+        onItemPress={setPressedHref}
       />
 
       <nav
@@ -48,14 +57,18 @@ export function BottomNav() {
         >
           {primaryItems.map((item) => {
             const Icon = item.icon;
-            const active = item.isActive(pathname);
+            const active =
+              pressedHref !== null
+                ? item.href === pressedHref
+                : item.isActive(pathname);
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onPointerDown={() => setPressedHref(item.href)}
                 className={cn(
-                  'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors touch-target',
+                  'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 touch-target',
                   active
                     ? 'text-primary'
                     : 'text-slate-600 hover:text-foreground dark:text-slate-300'
@@ -63,7 +76,7 @@ export function BottomNav() {
               >
                 <div
                   className={cn(
-                    'flex items-center justify-center rounded-xl px-3 py-1 transition-colors',
+                    'flex items-center justify-center rounded-xl px-3 py-1',
                     active && 'bg-primary/10'
                   )}
                 >
@@ -88,7 +101,7 @@ export function BottomNav() {
             aria-haspopup="dialog"
             onClick={() => setMoreOpen((open) => !open)}
             className={cn(
-              'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors touch-target',
+              'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 touch-target',
               moreActive || moreOpen
                 ? 'text-primary'
                 : 'text-slate-600 hover:text-foreground dark:text-slate-300'
@@ -96,7 +109,7 @@ export function BottomNav() {
           >
             <div
               className={cn(
-                'flex items-center justify-center px-3 py-1 transition-colors',
+                'flex items-center justify-center px-3 py-1',
                 moreOpen
                   ? 'rounded-full bg-primary text-primary-foreground'
                   : 'rounded-xl',

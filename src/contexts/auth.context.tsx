@@ -4,6 +4,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useCallback,
 } from 'react';
@@ -61,6 +62,7 @@ interface AuthContextType extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const EMPTY_SUPPORT_CAPABILITIES: SupportCapability[] = [];
 
 function supportLocalUserId(creatorUserId?: number | null): number {
   return typeof creatorUserId === 'number' && creatorUserId > 0
@@ -278,24 +280,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, user }));
   }, []);
 
+  const supportCapabilities =
+    supportSession?.allowedCapabilities ?? EMPTY_SUPPORT_CAPABILITIES;
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      ...state,
+      login,
+      loginAsSupport,
+      logout,
+      refreshUser,
+      setUser,
+      isSupport: supportSession !== null,
+      supportSessionId: supportSession?.sessionId ?? null,
+      collectedByName: supportSession?.helperName ?? null,
+      supportCreatorName: supportSession?.creatorName ?? null,
+      supportCapabilities,
+    }),
+    [
+      state,
+      login,
+      loginAsSupport,
+      logout,
+      refreshUser,
+      setUser,
+      supportSession,
+      supportCapabilities,
+    ]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        ...state,
-        login,
-        loginAsSupport,
-        logout,
-        refreshUser,
-        setUser,
-        isSupport: Boolean(supportSession),
-        supportSessionId: supportSession?.sessionId ?? null,
-        collectedByName: supportSession?.helperName ?? null,
-        supportCreatorName: supportSession?.creatorName ?? null,
-        supportCapabilities: supportSession?.allowedCapabilities ?? [],
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
 }
 

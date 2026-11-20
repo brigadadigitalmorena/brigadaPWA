@@ -4,6 +4,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useCallback,
   useRef,
@@ -319,24 +320,40 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, [syncNow]);
 
+  const deadLetterCount = deadLetterLive || extraStats.deadLetter;
+  const retryWaitCount = extraStats.retryWait;
+
+  const value = useMemo<SyncContextType>(
+    () => ({
+      isOnline,
+      isSyncing,
+      pendingCount,
+      deadLetterCount,
+      retryWaitCount,
+      lastSyncedAt,
+      error,
+      syncNotice,
+      syncNow,
+      retryFailed,
+      clearDeadLetter,
+    }),
+    [
+      isOnline,
+      isSyncing,
+      pendingCount,
+      deadLetterCount,
+      retryWaitCount,
+      lastSyncedAt,
+      error,
+      syncNotice,
+      syncNow,
+      retryFailed,
+      clearDeadLetter,
+    ]
+  );
+
   return (
-    <SyncContext.Provider
-      value={{
-        isOnline,
-        isSyncing,
-        pendingCount,
-        deadLetterCount: deadLetterLive || extraStats.deadLetter,
-        retryWaitCount: extraStats.retryWait,
-        lastSyncedAt,
-        error,
-        syncNotice,
-        syncNow,
-        retryFailed,
-        clearDeadLetter,
-      }}
-    >
-      {children}
-    </SyncContext.Provider>
+    <SyncContext.Provider value={value}>{children}</SyncContext.Provider>
   );
 }
 

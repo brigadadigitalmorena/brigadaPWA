@@ -2,30 +2,51 @@
 
 import { useEffect, useState } from 'react';
 
+export interface KeyboardViewport {
+  /** Pixels covered by the on-screen keyboard. 0 when the layout already shrunk. */
+  inset: number;
+  /** Visible height in CSS pixels, or null before the first measurement. */
+  height: number | null;
+}
+
 /**
- * Pixels covered by the on-screen keyboard.
- * Stays 0 when the layout viewport already shrinks with the keyboard.
+ * Tracks the visible viewport so a screen can shrink with the keyboard
+ * instead of keeping a 100vh box that hides the focused field.
  */
-export function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0);
+export function useKeyboardViewport(): KeyboardViewport {
+  const [state, setState] = useState<KeyboardViewport>({ inset: 0, height: null });
 
   useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-
     const update = () => {
-      const covered = window.innerHeight - viewport.height - viewport.offsetTop;
-      setInset(covered > 80 ? Math.round(covered) : 0);
+      const viewport = window.visualViewport;
+      const height = Math.round(viewport?.height ?? window.innerHeight);
+      const covered = viewport
+        ? window.innerHeight - viewport.height - viewport.offsetTop
+        : 0;
+      const next = {
+        height,
+        inset: covered > 80 ? Math.round(covered) : 0,
+      };
+      setState((prev) =>
+        prev.height === next.height && prev.inset === next.inset ? prev : next
+      );
     };
 
     update();
-    viewport.addEventListener('resize', update);
-    viewport.addEventListener('scroll', update);
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
     return () => {
-      viewport.removeEventListener('resize', update);
-      viewport.removeEventListener('scroll', update);
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
     };
   }, []);
 
-  return inset;
+  return state;
+}
+
+/** @deprecated Use useKeyboardViewport. Kept so existing callers stay valid. */
+export function useKeyboardInset(): number {
+  return useKeyboardViewport().inset;
 }

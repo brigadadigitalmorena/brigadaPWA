@@ -151,6 +151,19 @@ async function proxyRequest(
     if (value) responseHeaders.set(headerName, value);
   }
 
+  // 204/205/304 reject a body in the Fetch Response constructor. A 304 from
+  // /mobile/maps means "catalog unchanged"; the client treats that status as success.
+  if (
+    backendResponse.status === 204 ||
+    backendResponse.status === 205 ||
+    backendResponse.status === 304
+  ) {
+    return new NextResponse(null, {
+      status: backendResponse.status,
+      headers: responseHeaders,
+    });
+  }
+
   const body = await backendResponse.arrayBuffer();
   return new NextResponse(body, {
     status: backendResponse.status,

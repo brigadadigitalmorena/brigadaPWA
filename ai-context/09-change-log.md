@@ -5,6 +5,32 @@
 
 ---
 
+## [2026-11-20] fix(pwa): la pregunta sigue visible con el teclado
+
+La encuesta medía el alto completo de la pantalla, así que al abrir el
+teclado el recuadro quedaba fuera. Ahora usa el alto visible, el
+encabezado se compacta y el campo enfocado se mantiene a la vista.
+
+---
+
+## [2026-11-20] fix(pwa): el proxy deja pasar el 304 de mapas
+
+`/mobile/maps` responde 304 cuando el catálogo no cambió. El proxy metía
+ese estado en `NextResponse` con cuerpo y la petición terminaba en 500.
+Los estados sin cuerpo se reenvían vacíos. El envoltorio que saltaba
+renders al navegar provocaba `removeChild` de null y se quitó.
+
+---
+
+## [2026-11-20] perf(pwa): el toque no espera al chrome
+
+Un cambio en la cola de sync repintaba todo el shell, el menú Más
+esperaba 200 ms y los diálogos desenfocaban el fondo. El valor de Auth,
+Sync y Tema queda memoizado, el conteo de borradores es uno solo, Más y
+las listas se abren al instante, y la barra marca la pestaña en el toque.
+
+---
+
 ## [2026-11-19] fix(pwa): quitar scripts del árbol de React
 
 `<script>` dentro del layout y el script de `next-themes` hacían que React 19

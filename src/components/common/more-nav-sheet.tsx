@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -10,37 +10,21 @@ import type { NavItem } from '@/components/common/nav-items';
 interface MoreNavSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onItemPress: (href: string) => void;
   items: NavItem[];
   draftCount: number;
 }
 
-const CLOSE_MS = 200;
-
 export function MoreNavSheet({
   open,
   onOpenChange,
+  onItemPress,
   items,
   draftCount,
 }: MoreNavSheetProps) {
   const pathname = usePathname();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const [rendered, setRendered] = useState(open);
-
-  useEffect(() => {
-    if (open) {
-      setRendered(true);
-      return;
-    }
-    let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      if (!cancelled) setRendered(false);
-    }, CLOSE_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -50,17 +34,14 @@ export function MoreNavSheet({
     };
 
     window.addEventListener('keydown', onKeyDown);
-    const focusTimer = window.setTimeout(() => {
-      panelRef.current?.querySelector('a')?.focus();
-    }, 20);
+    panelRef.current?.querySelector('a')?.focus();
 
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      window.clearTimeout(focusTimer);
     };
   }, [open, onOpenChange]);
 
-  if (!rendered) return null;
+  if (!open) return null;
 
   return (
     <div className="md:hidden">
@@ -68,10 +49,7 @@ export function MoreNavSheet({
         type="button"
         tabIndex={-1}
         aria-label="Cerrar menú"
-        className={cn(
-          'fixed inset-x-0 top-0 z-40 bg-black/70 transition-opacity duration-200',
-          open ? 'opacity-100' : 'opacity-0'
-        )}
+        className="fixed inset-x-0 top-0 z-40 bg-black"
         style={{
           bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))',
         }}
@@ -83,10 +61,7 @@ export function MoreNavSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={cn(
-          'fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-white opacity-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out dark:bg-zinc-950',
-          open ? 'translate-y-0' : 'translate-y-full'
-        )}
+        className="fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-white opacity-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:bg-zinc-950"
         style={{
           bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))',
           backgroundColor: 'var(--background)',
@@ -112,9 +87,10 @@ export function MoreNavSheet({
               <Link
                 key={item.href}
                 href={item.href}
+                onPointerDown={() => onItemPress(item.href)}
                 onClick={() => onOpenChange(false)}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-3 transition-colors touch-target',
+                  'flex items-center gap-3 rounded-xl px-3 py-3 touch-target',
                   active
                     ? 'bg-slate-100 text-foreground dark:bg-zinc-800'
                     : 'bg-white text-foreground hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-800'
