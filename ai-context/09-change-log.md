@@ -5,6 +5,49 @@
 
 ---
 
+## [2026-11-23] fix(pwa): UX de Mis Encuestas (orden, recorrido, tarjetas)
+
+El orden de la lista pasa a un `<select>` con el criterio visible (sin íconos
+ambiguos). La tarjeta de Recorrido distingue mejor activo/inactivo y deja la
+nota web/Android secundaria. Las tarjetas de encuesta separan estado vs tipo,
+compactan metadatos y mantienen botones ≥44px. El header móvil gana aire, el
+badge “En línea” refuerza contraste y “Actualizar” vuelve a mostrarse en móvil.
+
+---
+
+## [2026-11-23] feat(pwa): buscador por nombre en Mapas
+
+La lista de mapas descargados filtra por nombre sin cambiar el grid
+lista+visor. En móvil el input queda encima de los chips horizontales; en
+desktop, encima de la columna. El contador muestra coincidencias y hay
+acción para limpiar si no hay resultados.
+
+---
+
+## [2026-11-23] fix(pwa): Entrar en bienvenida abre el login
+
+El botón solo hacía `router.replace` en un `onClick`. Si el JS del cliente no
+hidrataba (o la navegación suave se cancelaba), la pantalla se veía bien pero
+Entrar no hacía nada. En móvil un `Link` de Next seguía colgando el fetch RSC
+y dejaba el Suspense de `/login` en “Cargando…”. Ahora Entrar fuerza carga
+completa (`location.assign('/login')`) con `<a href>` de respaldo, y si ya hay
+sesión el login también va a `/home` con navegación dura.
+
+---
+
+## [2026-11-23] fix(pwa): el esquema de color tiñe también las barras inferiores
+
+Elegir otro estilo cambiaba la barra de estado, pero la navegación inferior
+seguía blanca y la franja del sistema parecía no responder. El encabezado,
+la barra de pestañas, el sheet de Más y el encabezado de encuesta ahora usan
+`--chrome-surface` (mezcla de `--primary` con `--background`), y el `body`
+toma ese mismo tono para que el área gestual de Android acompañe al esquema.
+La barra de navegación del sistema en Chrome instalado se fija al instalar el
+WebAPK: el meta y el manifiesto siguen actualizándose, pero ese cambio puede
+requerir reinstalar o una versión de Chrome que lo repinte en caliente.
+
+---
+
 ## [2026-11-20] fix(pwa): el primer toque de la barra cambia de vista
 
 El primer click arrancaba la navegación, pero un refresco del perfil, la

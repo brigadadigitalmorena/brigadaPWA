@@ -36,7 +36,7 @@ export function SurveyFillHeader({
   const roundedProgress = Math.round(progress);
 
   return (
-    <header className="sticky top-0 z-20 text-secondary-foreground safe-area-top [background-color:color-mix(in_oklch,var(--primary)_16%,var(--background))]">
+    <header className="sticky top-0 z-20 bg-chrome-surface text-secondary-foreground safe-area-top">
       <div
         className={cn(
           'flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-4',

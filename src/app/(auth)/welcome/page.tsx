@@ -1,24 +1,32 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import type { MouseEvent } from 'react';
 import { ClipboardList, MapPinned, WifiOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const SEEN_KEY = 'brigada_welcome_seen';
 
-export default function WelcomePage() {
-  const router = useRouter();
-
-  const continueToLogin = () => {
+function goToLogin(event: MouseEvent<HTMLAnchorElement>) {
+  event.preventDefault();
+  try {
     localStorage.setItem(SEEN_KEY, '1');
-    router.replace('/login');
-  };
+  } catch {
+    // Private mode / blocked storage — still allow login.
+  }
+  // Hard navigation: Next <Link> soft/RSC nav can hang on mobile and leave
+  // the login Suspense on "Cargando...". Same idea as redirectToLoginOnce.
+  window.location.assign('/login');
+}
 
+export default function WelcomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-6 p-6">
       <div>
         <p className="text-sm font-medium text-primary">Brigada Digital</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Encuestas de campo, también sin señal</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">
+          Encuestas de campo, también sin señal
+        </h1>
       </div>
       <ul className="space-y-4 text-sm">
         <li className="flex gap-3">
@@ -34,9 +42,14 @@ export default function WelcomePage() {
           <span>Mapas, recorridos y ubicación siguen disponibles para el trabajo en territorio.</span>
         </li>
       </ul>
-      <Button type="button" size="mobile" onClick={continueToLogin}>
+      {/* Plain <a> fallback if JS never hydrates; onClick forces a full load. */}
+      <a
+        href="/login"
+        onClick={goToLogin}
+        className={cn(buttonVariants({ size: 'mobile' }), 'w-full')}
+      >
         Entrar
-      </Button>
+      </a>
     </main>
   );
 }

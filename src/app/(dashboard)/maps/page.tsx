@@ -1,14 +1,15 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState } from 'react';
-import { Map, RefreshCw, Shapes } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Map, RefreshCw, Search, Shapes, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useOfflineMaps } from '@/hooks/use-offline-maps';
 import { useSync } from '@/contexts/sync.context';
 import { useTheme } from '@/contexts/theme-context';
@@ -44,6 +45,7 @@ export default function MapsPage() {
   const { isOnline } = useSync();
   const { colorScheme, theme, mounted: themeMounted } = useTheme();
   const [selectedMapId, setSelectedMapId] = useState<number | null>(null);
+  const [mapQuery, setMapQuery] = useState('');
   const [tileManifest, setTileManifest] = useState<OsmTileManifest | null>(null);
   const [tileStatuses, setTileStatuses] = useState<
     Record<string, OfflineTilePackStatus>
@@ -52,6 +54,14 @@ export default function MapsPage() {
   const offlineMaps = useOfflineMaps(selectedMapId);
   const viewerSectionRef = useRef<HTMLDivElement>(null);
   const didAutoSync = useRef(false);
+
+  const filteredMaps = useMemo(() => {
+    const query = mapQuery.trim().toLocaleLowerCase('es');
+    if (!query) return offlineMaps.maps;
+    return offlineMaps.maps.filter((map) =>
+      map.name.toLocaleLowerCase('es').includes(query)
+    );
+  }, [mapQuery, offlineMaps.maps]);
 
   const accentColor = (() => {
     const scheme = getColorScheme(colorScheme);
@@ -294,73 +304,120 @@ export default function MapsPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(13rem,22%)_minmax(0,1fr)] lg:items-start lg:gap-5">
           {/* Mobile: horizontal chips. Desktop: compact vertical list. */}
-          <section className="min-w-0 space-y-2">
+          <section className="min-w-0 space-y-2" aria-label="Mapas descargados">
             <div className="flex items-center justify-between gap-2 px-0.5">
               <h2 className="text-sm font-semibold text-muted-foreground">
                 Mapas descargados
               </h2>
-              <span className="text-xs text-muted-foreground">
-                {offlineMaps.maps.length}
+              <span className="text-xs text-muted-foreground" aria-live="polite">
+                {mapQuery.trim()
+                  ? `${filteredMaps.length}/${offlineMaps.maps.length}`
+                  : offlineMaps.maps.length}
               </span>
             </div>
 
-            <div
-              className={cn(
-                'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-                'lg:flex-col lg:overflow-visible lg:pb-0'
-              )}
-            >
-              {offlineMaps.maps.map((map) => {
-                const selected = map.map_id === activeMapId;
-                const count = offlineMaps.featureCounts.get(map.map_id) ?? 0;
-                return (
-                  <button
-                    key={map.map_id}
-                    type="button"
-                    onClick={() => selectMap(map.map_id)}
-                    aria-pressed={selected}
-                    className={cn(
-                      'shrink-0 rounded-xl border-2 bg-card text-left transition-[border-color,box-shadow,background-color] duration-200',
-                      'w-[min(78vw,18rem)] p-3 lg:w-full lg:p-3',
-                      selected
-                        ? 'bg-primary/5 shadow-sm'
-                        : 'border-transparent hover:bg-muted/40'
-                    )}
-                    style={
-                      selected && accentColor
-                        ? {
-                            borderColor: accentColor,
-                            boxShadow: `0 0 0 1px ${accentColor}33`,
-                          }
-                        : undefined
-                    }
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-semibold leading-snug">
-                        {map.name}
-                      </p>
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
-                        v{map.version}
-                      </Badge>
-                    </div>
-                    {map.description ? (
-                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                        {map.description}
-                      </p>
-                    ) : null}
-                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <Shapes className="h-3 w-3 shrink-0" />
-                      <span className="truncate">
-                        {count.toLocaleString('es-MX')} elem.
-                      </span>
-                      <span className="ml-auto shrink-0">
-                        {new Date(map.synced_at).toLocaleDateString('es-MX')}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="relative min-w-0">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                value={mapQuery}
+                onChange={(event) => setMapQuery(event.target.value)}
+                placeholder="Buscar por nombre"
+                aria-label="Buscar mapas por nombre"
+                inputSize="mobile"
+                className={cn('pl-10', mapQuery ? 'pr-10' : undefined)}
+              />
+              {mapQuery ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Limpiar búsqueda"
+                  onClick={() => setMapQuery('')}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </Button>
+              ) : null}
             </div>
+
+            {filteredMaps.length === 0 ? (
+              <div className="rounded-xl border border-dashed bg-muted/20 px-3 py-4 text-center text-sm text-muted-foreground">
+                <p>Ningún mapa coincide con “{mapQuery.trim()}”.</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setMapQuery('')}
+                >
+                  Limpiar búsqueda
+                </Button>
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  'flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                  'lg:flex-col lg:overflow-visible lg:pb-0'
+                )}
+              >
+                {filteredMaps.map((map) => {
+                  const selected = map.map_id === activeMapId;
+                  const count = offlineMaps.featureCounts.get(map.map_id) ?? 0;
+                  return (
+                    <button
+                      key={map.map_id}
+                      type="button"
+                      onClick={() => selectMap(map.map_id)}
+                      aria-pressed={selected}
+                      className={cn(
+                        'shrink-0 rounded-xl border-2 bg-card text-left transition-[border-color,box-shadow,background-color] duration-200',
+                        'w-[min(78vw,18rem)] p-3 lg:w-full lg:p-3',
+                        selected
+                          ? 'bg-primary/5 shadow-sm'
+                          : 'border-transparent hover:bg-muted/40'
+                      )}
+                      style={
+                        selected && accentColor
+                          ? {
+                              borderColor: accentColor,
+                              boxShadow: `0 0 0 1px ${accentColor}33`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-2 text-sm font-semibold leading-snug">
+                          {map.name}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 text-[10px]"
+                        >
+                          v{map.version}
+                        </Badge>
+                      </div>
+                      {map.description ? (
+                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                          {map.description}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Shapes className="h-3 w-3 shrink-0" />
+                        <span className="truncate">
+                          {count.toLocaleString('es-MX')} elem.
+                        </span>
+                        <span className="ml-auto shrink-0">
+                          {new Date(map.synced_at).toLocaleDateString('es-MX')}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <Card

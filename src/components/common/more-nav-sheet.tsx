@@ -61,10 +61,9 @@ export function MoreNavSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-white opacity-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:bg-zinc-950"
+        className="fixed inset-x-0 z-50 overflow-hidden rounded-t-2xl border-t border-border bg-chrome-surface opacity-100 shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
         style={{
           bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))',
-          backgroundColor: 'var(--background)',
         }}
       >
         <div className="flex justify-center pt-2 pb-1">

@@ -155,13 +155,13 @@ Definidos sobre todo en `src/lib/api/*.ts`:
 - Encuestas: `/mobile/surveys`, latest version, `/mobile/responses/batch`, presign documents
 - Sync: `/mobile/sync-status`, freshness/delta según motor
 - Gestiones: `/mobile/gestiones/tracking`, comments. Lista con borde de estado, stepper ámbar/verde vs gris, y detalle sin repetir folio/título; Tracking ID y Referencia se unifican si son iguales.
-- Mapas: `/mobile/maps`, tiles OSM manifest (proxy Next dedicado)
+- Mapas: `/mobile/maps`, tiles OSM manifest (proxy Next dedicado). Lista descargada con búsqueda por nombre (misma columna lista+visor en móvil/desktop).
 - Notificaciones in-app: `/mobile/notifications*`
 - ZIP: `/mobile/zip-lookup/{code}`
 - Recorridos: `/mobile/field-sessions*` (alta, cierre, puntos, historial y track). El aviso de pendientes llama a sincronizar en `/sync`; en otra pantalla abre Mis envíos sin recargar. Lista con borde de selección (como Mapas), barra de búsqueda y, al tocar un recorrido, el visor hace scroll al mapa y permite pantalla completa.
 - Métricas: `GET /mobile/daily-metrics` (`/home`)
 - Redes: `GET /public/app-config` → `social_links` (`/networks`). El proxy de Next deja pasar `public/app-config` sin token (el cliente no manda `Authorization` en `/public/`). La lista se cachea en `localStorage`. El QR se genera en el cliente a partir de `url`, igual que en móvil. UI: cards sin URL cruda, botón Compartir primario + iconos Abrir/QR, icono de plataforma.
-- Bottom nav móvil: 5 slots (Inicio, Encuestas, Mapas, Recorridos, **Más**). Más abre un bottom sheet de ancho completo con fondo **opaco** (`bg-white` / `dark:bg-zinc-950`). Borradores / Gestión / Redes / Envíos / Ayuda / Apoyo. Las prioritarias se resaltan dentro de Encuestas (`/surveys`); `/extras` redirige ahí. La barra de sistema de Android toma `theme_color` de `/manifest.json` (dinámico por esquema).
+- Bottom nav móvil: 5 slots (Inicio, Encuestas, Mapas, Recorridos, **Más**). Más abre un bottom sheet de ancho completo con fondo **opaco** (`bg-chrome-surface`, derivado del esquema). Borradores / Gestión / Redes / Envíos / Ayuda / Apoyo. Las prioritarias se resaltan dentro de Encuestas (`/surveys`); `/extras` redirige ahí. La barra de sistema de Android toma `theme_color` de `/manifest.json` (dinámico por esquema); la franja inferior del sistema depende del navegador (Chrome la fija al instalar el WebAPK), pero el área de la app y el fondo `body` sí siguen el esquema.
 - Ayuda: `/help` FAQ estático (paridad con móvil `app/help.tsx`: tips, mismas secciones, correo de soporte). Visible en sidebar, Inicio y menú de usuario (en móvil la entrada está en Perfil).
 - Modo Apoyo: `/support` (dueño: crear/listar/QR/revocar/reactivar/duplicar) y `/support-join` (helper por código, paridad con `support-mode.tsx` + `support-join.tsx` de `brigadaApp/dev`). Banner en sesión helper. API `/mobile/support/*`.
 - Reporte: `/report` crea vía `POST /issue-reports` con evidencia R2 obligatoria (1–3 imágenes); el móvil aún usa MailComposer (BD-24)

@@ -60,7 +60,9 @@ export function PageHeader({
         <div className="min-w-0 space-y-1">
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
           {description ? (
-            <p className="text-sm text-muted-foreground sm:text-base">{description}</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300 sm:text-base">
+              {description}
+            </p>
           ) : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}

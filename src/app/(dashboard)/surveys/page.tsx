@@ -11,7 +11,7 @@ import {
   prioritySurveyBadge,
   type PriorityUrgency,
 } from '@/lib/campaigns/extras';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/common/page-header';
@@ -281,13 +281,9 @@ export default function SurveysPage() {
     [surveys, sortKey, sortDir]
   );
 
-  const handleSort = (key: SortKey) => {
-    if (key === sortKey) {
-      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
+  const handleSortChange = (key: SortKey, dir: SortDir) => {
     setSortKey(key);
-    setSortDir(DEFAULT_SORT_DIR[key]);
+    setSortDir(dir);
   };
 
   const handleOpenSurvey = async (
@@ -378,7 +374,7 @@ export default function SurveysPage() {
   ).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <PageHeader
         title="Mis Encuestas"
         description={
@@ -391,9 +387,10 @@ export default function SurveysPage() {
             variant="outline"
             size="mobile"
             onClick={loadSurveys}
-            className="hidden sm:flex"
+            aria-label="Actualizar lista de encuestas"
+            className="h-11 min-h-11 gap-2 px-3 sm:min-w-[8.5rem] sm:px-4"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" aria-hidden />
             Actualizar
           </Button>
         }
@@ -404,10 +401,10 @@ export default function SurveysPage() {
       <SurveySortToolbar
         sortKey={sortKey}
         sortDir={sortDir}
-        onSort={handleSort}
+        onChange={handleSortChange}
       />
 
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-col gap-3.5 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
         {sortedSurveys.map((survey) => {
           const isCompleted = survey.entitlement_status === 'completed';
           const isFollowUp = generatesFollowUp(survey);
@@ -418,6 +415,14 @@ export default function SurveysPage() {
           const tone = urgencyTone(survey.ends_at, isCompleted);
           const assignedLabel = formatShortDate(survey.assigned_at);
           const operative = operativeLine(campaignLabel(survey), survey.survey_title);
+          const areas =
+            survey.area_names && survey.area_names.length > 0
+              ? `${survey.area_names.slice(0, 2).join(' · ')}${
+                  survey.area_names.length > 2
+                    ? ` +${survey.area_names.length - 2}`
+                    : ''
+                }`
+              : null;
 
           return (
             <Card
@@ -428,18 +433,18 @@ export default function SurveysPage() {
                 priority && priorityCardTone(priority.level)
               )}
             >
-              <CardHeader className="pb-3">
+              <CardHeader className="space-y-3 pb-3">
                 <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-lg leading-snug line-clamp-2">
+                  <CardTitle className="text-base leading-snug line-clamp-2 sm:text-lg">
                     {survey.survey_title}
                   </CardTitle>
-                  <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex max-w-[42%] flex-shrink-0 flex-col items-end gap-1">
                     <Badge
                       className={cn(
-                        'font-medium',
+                        'font-semibold',
                         isCompleted
-                          ? 'border-green-600/30 bg-green-500/15 text-green-800 dark:text-green-300'
-                          : 'border-amber-600/35 bg-amber-500/15 text-amber-900 dark:text-amber-200'
+                          ? 'border-green-700/35 bg-green-500/15 text-green-900 dark:text-green-300'
+                          : 'border-amber-700/40 bg-amber-500/15 text-amber-950 dark:text-amber-200'
                       )}
                       variant="outline"
                     >
@@ -457,7 +462,7 @@ export default function SurveysPage() {
                     {isFollowUp && (
                       <Badge
                         variant="outline"
-                        className="gap-1 border-sky-600/30 bg-sky-500/15 font-medium text-sky-800 dark:text-sky-300"
+                        className="gap-1 border-slate-300 bg-transparent font-normal text-slate-600 dark:border-slate-600 dark:text-slate-300"
                       >
                         <GitBranch className="h-3 w-3" aria-hidden />
                         Gestión
@@ -465,73 +470,93 @@ export default function SurveysPage() {
                     )}
                   </div>
                 </div>
-                <CardDescription className="space-y-2 pt-1">
+
+                <div className="space-y-1.5 text-sm">
                   {(startLabel || endLabel) && (
-                    <div className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <CalendarRange className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-                      <span className="leading-snug">
-                        {startLabel && (
+                    <div className="flex items-start gap-2 text-slate-700 dark:text-slate-200">
+                      <CalendarRange
+                        className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-500 dark:text-slate-400"
+                        aria-hidden
+                      />
+                      <p className="min-w-0 leading-snug">
+                        {startLabel ? (
                           <>
-                            <span className="text-slate-500">Inicio</span>{' '}
+                            <span className="font-medium text-slate-500 dark:text-slate-400">
+                              Inicio
+                            </span>{' '}
                             {startLabel}
                           </>
-                        )}
-                        {startLabel && endLabel && (
+                        ) : null}
+                        {startLabel && endLabel ? (
                           <span className="mx-1.5 text-slate-400">·</span>
-                        )}
-                        {endLabel && (
+                        ) : null}
+                        {endLabel ? (
                           <>
-                            <span className="text-slate-500">Fin</span>{' '}
+                            <span className="font-medium text-slate-500 dark:text-slate-400">
+                              Fin
+                            </span>{' '}
                             <span
                               className={cn(
                                 tone === 'soon' &&
-                                  'font-medium text-amber-700 dark:text-amber-400',
+                                  'font-semibold text-amber-800 dark:text-amber-300',
                                 tone === 'overdue' &&
-                                  'font-medium text-red-700 dark:text-red-400'
+                                  'font-semibold text-red-800 dark:text-red-300'
                               )}
                             >
                               {endLabel}
                             </span>
                           </>
-                        )}
-                      </span>
+                        ) : null}
+                      </p>
                     </div>
                   )}
-                  {assignedLabel && (
-                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                      <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span>Disponible: {assignedLabel}</span>
-                    </div>
+
+                  {(assignedLabel || operative || areas) && (
+                    <dl className="grid gap-1 border-t border-border/70 pt-1.5 text-[13px] leading-snug text-slate-700 dark:text-slate-300">
+                      {assignedLabel ? (
+                        <div className="flex items-baseline gap-2">
+                          <dt className="flex w-[5.75rem] shrink-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                            <Calendar className="h-3.5 w-3.5" aria-hidden />
+                            Disponible
+                          </dt>
+                          <dd className="min-w-0">{assignedLabel}</dd>
+                        </div>
+                      ) : null}
+                      {operative ? (
+                        <div className="flex items-baseline gap-2">
+                          <dt className="flex w-[5.75rem] shrink-0 items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                            <Users className="h-3.5 w-3.5" aria-hidden />
+                            Operativo
+                          </dt>
+                          <dd className="min-w-0 line-clamp-2">{operative}</dd>
+                        </div>
+                      ) : null}
+                      {areas ? (
+                        <div className="flex items-baseline gap-2">
+                          <dt className="w-[5.75rem] shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                            Ubicación
+                          </dt>
+                          <dd className="min-w-0 line-clamp-2">{areas}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
                   )}
-                  {operative && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <Users className="h-4 w-4 flex-shrink-0 text-slate-400" />
-                      <span>{operative}</span>
-                    </div>
-                  )}
-                  {survey.area_names && survey.area_names.length > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      {survey.area_names.slice(0, 2).join(' · ')}
-                      {survey.area_names.length > 2
-                        ? ` +${survey.area_names.length - 2} más`
-                        : ''}
-                    </div>
-                  )}
-                </CardDescription>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <Link
                   href={fillHref(survey)}
                   onClick={(event) => handleOpenSurvey(event, survey)}
                   className={cn(
-                    'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-all',
+                    'inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-primary px-4 py-3 text-base font-medium text-primary-foreground transition-all',
                     'hover:bg-primary/80 active:translate-y-px',
-                    isCompleted && 'pointer-events-none opacity-50 bg-muted text-muted-foreground'
+                    isCompleted &&
+                      'pointer-events-none bg-muted text-muted-foreground opacity-50'
                   )}
                   aria-disabled={isCompleted}
                   tabIndex={isCompleted ? -1 : 0}
                 >
-                  <Play className="h-5 w-5" />
+                  <Play className="h-5 w-5" aria-hidden />
                   {isCompleted ? 'Completada' : 'Iniciar encuesta'}
                 </Link>
               </CardContent>

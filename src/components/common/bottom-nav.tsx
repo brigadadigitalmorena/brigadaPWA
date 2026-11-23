@@ -44,10 +44,9 @@ export function BottomNav() {
       />
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white md:hidden dark:bg-zinc-950"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-chrome-surface md:hidden"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          backgroundColor: 'var(--background)',
         }}
         aria-label="Navegación principal"
       >
@@ -72,7 +71,7 @@ export function BottomNav() {
                   'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 touch-target',
                   active
                     ? 'text-primary'
-                    : 'text-slate-600 hover:text-foreground dark:text-slate-300'
+                    : 'text-slate-700 hover:text-foreground dark:text-slate-300'
                 )}
               >
                 <div
@@ -105,7 +104,7 @@ export function BottomNav() {
               'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 touch-target',
               moreActive || moreOpen
                 ? 'text-primary'
-                : 'text-slate-600 hover:text-foreground dark:text-slate-300'
+                : 'text-slate-700 hover:text-foreground dark:text-slate-300'
             )}
           >
             <div

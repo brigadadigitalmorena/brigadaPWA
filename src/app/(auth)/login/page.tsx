@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -30,7 +30,6 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 function LoginPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -53,9 +52,10 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace('/home');
+      // Hard nav: soft replace to /home can hang on mobile ("Cargando...").
+      window.location.replace('/home');
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     if (searchParams.get('pending_email_verification') === '1') {
@@ -76,7 +76,7 @@ function LoginPageContent() {
     try {
       await login(data.username, data.password);
       toast.success('Inicio de sesión exitoso');
-      router.replace('/home');
+      window.location.replace('/home');
     } catch (error) {
       console.error('Login error:', error);
       const message = getLoginErrorMessage(error);

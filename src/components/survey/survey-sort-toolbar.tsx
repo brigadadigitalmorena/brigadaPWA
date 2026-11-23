@@ -1,15 +1,6 @@
 'use client';
 
-import {
-  ArrowDown,
-  ArrowUp,
-  BadgeCheck,
-  CalendarArrowUp,
-  CalendarClock,
-  CalendarDays,
-  ClipboardList,
-  LetterText,
-} from 'lucide-react';
+import { ArrowDownUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SortKey =
@@ -27,122 +18,128 @@ export const SORT_OPTIONS: Array<{
   label: string;
   hintAsc: string;
   hintDesc: string;
-  icon: typeof CalendarClock;
 }> = [
   {
     key: 'ends_at',
     label: 'Fecha de fin',
     hintAsc: 'más próxima primero',
     hintDesc: 'más lejana primero',
-    icon: CalendarClock,
   },
   {
     key: 'starts_at',
     label: 'Fecha de inicio',
     hintAsc: 'más próxima primero',
     hintDesc: 'más lejana primero',
-    icon: CalendarArrowUp,
   },
   {
     key: 'assigned_at',
     label: 'Fecha de campaña',
     hintAsc: 'más antigua primero',
     hintDesc: 'más reciente primero',
-    icon: CalendarDays,
   },
   {
     key: 'title',
     label: 'Título',
     hintAsc: 'A-Z',
     hintDesc: 'Z-A',
-    icon: LetterText,
   },
   {
     key: 'status',
     label: 'Estado',
     hintAsc: 'pendientes primero',
     hintDesc: 'completadas primero',
-    icon: BadgeCheck,
   },
   {
     key: 'type',
     label: 'Tipo',
     hintAsc: 'gestión primero',
     hintDesc: 'gestión al final',
-    icon: ClipboardList,
   },
 ];
+
+function optionValue(key: SortKey, dir: SortDir): string {
+  return `${key}:${dir}`;
+}
+
+function parseOptionValue(value: string): { key: SortKey; dir: SortDir } | null {
+  const [rawKey, rawDir] = value.split(':');
+  const option = SORT_OPTIONS.find((item) => item.key === rawKey);
+  if (!option) return null;
+  if (rawDir !== 'asc' && rawDir !== 'desc') return null;
+  return { key: option.key, dir: rawDir };
+}
+
+function optionLabel(
+  option: (typeof SORT_OPTIONS)[number],
+  dir: SortDir
+): string {
+  const hint = dir === 'asc' ? option.hintAsc : option.hintDesc;
+  return `${option.label}: ${hint}`;
+}
 
 interface SurveySortToolbarProps {
   sortKey: SortKey;
   sortDir: SortDir;
-  onSort: (key: SortKey) => void;
+  onChange: (key: SortKey, dir: SortDir) => void;
+  className?: string;
 }
 
 export function SurveySortToolbar({
   sortKey,
   sortDir,
-  onSort,
+  onChange,
+  className,
 }: SurveySortToolbarProps) {
   const active = SORT_OPTIONS.find((option) => option.key === sortKey);
-  const hint = active
-    ? sortDir === 'asc'
-      ? active.hintAsc
-      : active.hintDesc
-    : '';
-  const DirIcon = sortDir === 'asc' ? ArrowUp : ArrowDown;
+  const selectId = 'survey-sort-select';
 
   return (
-    <div className="sticky top-0 z-10 -mx-1 space-y-1.5 border-b bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div
-        className="flex items-center gap-1 overflow-x-auto pb-0.5"
-        role="toolbar"
-        aria-label="Ordenar encuestas"
-      >
-        <span className="mr-1 shrink-0 text-xs font-medium text-muted-foreground">
-          Orden
-        </span>
-        {SORT_OPTIONS.map((option) => {
-          const Icon = option.icon;
-          const isActive = sortKey === option.key;
-          const title = isActive
-            ? `${option.label}: ${hint}. Toca de nuevo para invertir.`
-            : `Ordenar por ${option.label.toLowerCase()}`;
-
-          return (
-            <button
-              key={option.key}
-              type="button"
-              title={title}
-              aria-label={title}
-              aria-pressed={isActive}
-              onClick={() => onSort(option.key)}
-              className={cn(
-                'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors',
-                'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                isActive
-                  ? 'border-primary/40 bg-primary text-primary-foreground shadow-sm'
-                  : 'border-border bg-background text-foreground hover:bg-muted dark:hover:bg-muted/60'
-              )}
-            >
-              <span className="relative inline-flex items-center justify-center">
-                <Icon className="h-5 w-5" aria-hidden />
-                {isActive && (
-                  <DirIcon
-                    className="absolute -right-1.5 -bottom-1.5 h-3 w-3"
-                    aria-hidden
-                  />
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      {active && (
-        <p className="text-xs text-muted-foreground" aria-live="polite">
-          {active.label}: {hint}
-        </p>
+    <div
+      className={cn(
+        'sticky top-0 z-10 -mx-1 space-y-1 border-b bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80',
+        className
       )}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <ArrowDownUp
+          className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400"
+          aria-hidden
+        />
+        <label
+          htmlFor={selectId}
+          className="shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-300"
+        >
+          Orden
+        </label>
+        <select
+          id={selectId}
+          value={optionValue(sortKey, sortDir)}
+          onChange={(event) => {
+            const parsed = parseOptionValue(event.target.value);
+            if (!parsed) return;
+            onChange(parsed.key, parsed.dir);
+          }}
+          aria-label="Criterio de ordenamiento de encuestas"
+          className={cn(
+            'min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2',
+            'text-sm font-medium text-foreground',
+            'outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
+          )}
+        >
+          {SORT_OPTIONS.flatMap((option) =>
+            (['asc', 'desc'] as const).map((dir) => (
+              <option key={optionValue(option.key, dir)} value={optionValue(option.key, dir)}>
+                {optionLabel(option, dir)}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+      {active ? (
+        <p className="sr-only" aria-live="polite">
+          Orden activo: {optionLabel(active, sortDir)}
+        </p>
+      ) : null}
     </div>
   );
 }

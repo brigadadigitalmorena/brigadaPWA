@@ -25,25 +25,22 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium',
+        'inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold',
         isOnline
-          ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-          : 'bg-red-500/10 text-red-700 dark:text-red-400',
+          ? 'bg-green-500/15 text-green-800 dark:bg-green-500/10 dark:text-green-300'
+          : 'bg-red-500/15 text-red-800 dark:bg-red-500/10 dark:text-red-300',
         pendingCount > 0 && 'animate-pulse',
         className
       )}
     >
       {isSyncing ? (
-        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+        <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
       ) : isOnline ? (
-        <Wifi className="h-3.5 w-3.5" />
+        <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden />
       ) : (
-        <WifiOff className="h-3.5 w-3.5" />
+        <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
       )}
-      <span>
-        {statusText}
-        {pendingText}
-      </span>
+      <span className="truncate">{`${statusText}${pendingText}`}</span>
     </span>
   );
 }

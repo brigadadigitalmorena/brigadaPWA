@@ -8,6 +8,7 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-chrome-surface: var(--chrome-surface);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -55,7 +56,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-chrome-surface text-foreground font-sans;
   }
   html {
     @apply font-sans;

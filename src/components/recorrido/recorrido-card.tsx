@@ -21,8 +21,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useFieldSession } from '@/hooks/use-field-session';
 import { DEFAULT_FIELD_TRACKING } from '@/lib/api/field-session.service';
+import { cn } from '@/lib/utils';
 
 function formatElapsed(fromIso: string): string {
   const startedAt = new Date(fromIso).getTime();
@@ -71,79 +73,109 @@ export function RecorridoCard() {
     });
   };
 
+  const active = Boolean(session);
+
   return (
-    <Card className={session ? 'border-green-500/40' : undefined}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3 md:items-center">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2">
+    <Card
+      className={cn(
+        active
+          ? 'border-green-600/45 bg-green-500/5 shadow-sm ring-1 ring-green-500/20'
+          : 'border-border'
+      )}
+    >
+      <CardHeader className={cn('pb-3', !active && 'pb-2')}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-base sm:text-lg">
               <Navigation
-                className={`h-5 w-5 ${session ? 'text-green-600' : 'text-primary'}`}
+                className={cn(
+                  'h-5 w-5 shrink-0',
+                  active ? 'text-green-700 dark:text-green-400' : 'text-primary'
+                )}
               />
-              {session ? 'Recorrido en curso' : 'Recorrido'}
+              <span>{active ? 'Recorrido en curso' : 'Recorrido'}</span>
+              {active ? (
+                <Badge
+                  variant="outline"
+                  className="border-green-600/35 bg-green-500/15 font-medium text-green-800 dark:text-green-300"
+                >
+                  Activo
+                </Badge>
+              ) : null}
             </CardTitle>
-            <CardDescription>
-              {session
-                ? `Iniciado hace ${formatElapsed(session.started_at)}`
+            <CardDescription
+              className={cn(
+                active
+                  ? 'text-sm text-slate-700 dark:text-slate-300'
+                  : 'text-sm text-slate-600 dark:text-slate-300'
+              )}
+            >
+              {active
+                ? `Iniciado hace ${formatElapsed(session!.started_at)}`
                 : 'Registra tu ruta mientras repartes o pegas propaganda.'}
             </CardDescription>
           </div>
           <Button
-            variant={session ? 'destructive' : 'outline'}
-            size="sm"
-            className="shrink-0 md:h-11 md:min-w-28 md:rounded-xl md:px-5 md:text-sm"
+            variant={active ? 'destructive' : 'default'}
+            size="mobile"
+            className="h-11 min-h-11 shrink-0 px-3 text-sm sm:min-w-36 sm:px-5"
             disabled={busy}
-            onClick={session ? handleEnd : handleStart}
+            onClick={active ? handleEnd : handleStart}
           >
-            {session ? 'Finalizar' : 'Iniciar recorrido'}
+            {active ? 'Finalizar' : 'Iniciar recorrido'}
           </Button>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
-        {session ? (
+      <CardContent className={cn('space-y-3', !active && 'pt-0')}>
+        {active ? (
           <>
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div className="flex items-center gap-2">
-                <Ruler className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium">
-                  {formatDistance(session.distance_m)}
+            <div className="grid grid-cols-3 gap-2 text-sm sm:gap-3">
+              <div className="flex min-w-0 items-center gap-1.5 rounded-lg bg-background/70 px-2 py-2">
+                <Ruler className="h-4 w-4 shrink-0 text-slate-500" />
+                <span className="truncate font-semibold text-foreground">
+                  {formatDistance(session!.distance_m)}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium">{session.sample_count} puntos</span>
+              <div className="flex min-w-0 items-center gap-1.5 rounded-lg bg-background/70 px-2 py-2">
+                <MapPin className="h-4 w-4 shrink-0 text-slate-500" />
+                <span className="truncate font-semibold text-foreground">
+                  {session!.sample_count} pts
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <CloudUpload className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium">{pendingSamples} por enviar</span>
+              <div className="flex min-w-0 items-center gap-1.5 rounded-lg bg-background/70 px-2 py-2">
+                <CloudUpload className="h-4 w-4 shrink-0 text-slate-500" />
+                <span className="truncate font-semibold text-foreground">
+                  {pendingSamples} pend.
+                </span>
               </div>
             </div>
 
             {!isCollecting && (
-              <p className="text-sm text-amber-600">
-                La captura está detenida. Finaliza el recorrido y vuelve a
-                iniciarlo para reanudar el registro.
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                La captura está detenida. Finaliza y vuelve a iniciar para
+                reanudar.
               </p>
             )}
 
             {isCollecting && !wakeLockHeld && (
-              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+              <p className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 Tu navegador no permite mantener la pantalla encendida. Si se
                 apaga, el recorrido quedará con huecos.
               </p>
             )}
-            <Link href="/recorridos" className="inline-block">
-              <Button type="button" variant="outline" size="sm">
-                Ver mapa del recorrido
-              </Button>
+            <Link
+              href="/recorridos"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-sky-800 underline-offset-2 hover:underline dark:text-sky-300"
+            >
+              Ver mapa del recorrido
             </Link>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            En la versión web el registro solo ocurre con esta pestaña abierta y
-            visible. Para jornadas largas usa la aplicación de Android.
+          <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+            En web el registro requiere esta pestaña abierta. Para jornadas
+            largas usa la app Android.
           </p>
         )}
       </CardContent>
