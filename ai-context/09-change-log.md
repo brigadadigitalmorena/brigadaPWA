@@ -5,6 +5,51 @@
 
 ---
 
+## [2026-11-25] fix(pwa): barra inferior de Android y cierre de avisos
+
+La barra de estado tomaba el esquema al instante, pero la de navegación se
+quedaba en el rosa de instalación: el manifiesto guardado pedía ese color en
+la URL y el HTML cacheado lo repetía. Ahora la cookie del esquema gana, el
+manifiesto ya no fija el color en la dirección, y en Android un cambio de
+tema recarga una vez con el color nuevo en el primer HTML. El hueco bajo la
+barra de pestañas usa el mismo tono.
+
+Los carteles (`InlineBanner`, incluido el rojo de envío en curso) muestran
+una ×. Cerrar un aviso de envío lo quita de la sesión hasta el próximo
+resultado.
+
+---
+
+## [2026-11-23] fix(pwa): banners informativos descartables
+
+`InlineBanner` es dismissible por defecto (× con área táctil y
+`aria-label="Cerrar notificación"`). El aviso ámbar de borradores separa el
+clic de navegación del cierre (`stopPropagation`). Offline, dead-letter,
+pendientes, schema, storage y sync notices también se pueden ocultar; vuelven
+si cambia el conteo/mensaje o se recupera la red. El banner de recorrido activo
+sigue fijo (consentimiento).
+
+---
+
+## [2026-11-23] fix(pwa): Salir y estado de borrador en ejecución de encuesta
+
+La pantalla de fill añade Salir en el encabezado (separado de Siguiente),
+indicador Guardado / Cambios sin guardar / Guardando…, y un diálogo de tres
+opciones si hay cambios pendientes. Anterior ya no hace de Salir. La tarjeta
+de pregunta usa mejor ancho en desktop y no repite el título en la línea de
+campaña cuando coincide.
+
+---
+
+## [2026-11-23] fix(pwa): menú Orden custom en Mis Encuestas
+
+El criterio de ordenamiento deja el `<select>` nativo (menú azul del sistema)
+y usa el Select de la UI: botón compacto con ícono + chevron, panel blanco
+redondeado con sombra, ícono por opción, resaltado suave de la activa y
+grupos Fechas / Título / Estado y tipo. Misma lógica `SortKey`/`SortDir`.
+
+---
+
 ## [2026-11-23] fix(pwa): UX de Mis Encuestas (orden, recorrido, tarjetas)
 
 El orden de la lista pasa a un `<select>` con el criterio visible (sin íconos

@@ -69,6 +69,18 @@ export function isHexColor(value: string | null | undefined): value is string {
   return normalizeHexColor(value) !== null;
 }
 
+/**
+ * Color for the installed manifest. The cookie wins over `theme_color` in the
+ * URL: Chrome keeps the manifest address from the day the icon was added, so a
+ * query pinned to the old swatch would leave the Android nav bar on that color.
+ */
+export function resolveChromeColor(
+  cookieValue: string | null | undefined,
+  queryValue: string | null | undefined
+): string {
+  return normalizeHexColor(cookieValue) ?? normalizeHexColor(queryValue) ?? '#FF1B8D';
+}
+
 export function buildPwaManifest(themeColor: string) {
   const color = isHexColor(themeColor) ? themeColor : '#FF1B8D';
   return {

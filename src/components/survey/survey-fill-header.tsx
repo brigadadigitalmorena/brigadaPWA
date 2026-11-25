@@ -1,9 +1,12 @@
 'use client';
 
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, LogOut } from 'lucide-react';
 
 import type { SurveySection } from '@/lib/types';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+export type DraftSaveStatus = 'saved' | 'dirty' | 'saving';
 
 interface SurveyFillHeaderProps {
   surveyTitle: string;
@@ -15,10 +18,40 @@ interface SurveyFillHeaderProps {
   currentSectionIndex: number;
   onGoToSection: (index: number) => void;
   compact?: boolean;
+  draftStatus?: DraftSaveStatus;
+  onExit?: () => void;
+  exitDisabled?: boolean;
   fieldSession?: {
     sampleCount: number;
     pendingSamples: number;
   } | null;
+}
+
+function shouldShowCampaignLine(
+  surveyTitle: string,
+  campaignName?: string | null
+): string | null {
+  const title = surveyTitle.trim();
+  const campaign = (campaignName ?? '').trim();
+  if (!campaign) return null;
+  if (!title) return campaign;
+  if (campaign === title) return null;
+  const separators = [' — ', ' – ', ' - ', ' | '];
+  for (const sep of separators) {
+    if (campaign.endsWith(`${sep}${title}`)) {
+      return campaign.slice(0, -(sep.length + title.length)).trim() || null;
+    }
+    if (campaign.startsWith(`${title}${sep}`)) {
+      return campaign.slice(title.length + sep.length).trim() || null;
+    }
+  }
+  return campaign;
+}
+
+function draftStatusLabel(status: DraftSaveStatus): string {
+  if (status === 'saving') return 'Guardando…';
+  if (status === 'dirty') return 'Cambios sin guardar';
+  return 'Guardado';
 }
 
 export function SurveyFillHeader({
@@ -31,41 +64,86 @@ export function SurveyFillHeader({
   currentSectionIndex,
   onGoToSection,
   compact = false,
+  draftStatus = 'saved',
+  onExit,
+  exitDisabled = false,
   fieldSession,
 }: SurveyFillHeaderProps) {
   const roundedProgress = Math.round(progress);
+  const secondaryLine = shouldShowCampaignLine(surveyTitle, campaignName);
 
   return (
     <header className="sticky top-0 z-20 bg-chrome-surface text-secondary-foreground safe-area-top">
       <div
         className={cn(
           'flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-4',
-          compact && 'flex-row items-center gap-2 py-2'
+          compact && 'gap-2 py-2'
         )}
       >
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-start gap-3 md:items-center">
           <div
             className={cn(
               'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground md:h-12 md:w-12',
               compact && 'h-8 w-8'
             )}
           >
-            <ClipboardList className={cn('h-5 w-5 md:h-6 md:w-6', compact && 'h-4 w-4')} aria-hidden="true" />
+            <ClipboardList
+              className={cn('h-5 w-5 md:h-6 md:w-6', compact && 'h-4 w-4')}
+              aria-hidden="true"
+            />
           </div>
-          <div className="min-w-0">
-            <h1
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h1
+                  className={cn(
+                    'truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl',
+                    compact && 'text-base sm:text-base md:text-base'
+                  )}
+                >
+                  {surveyTitle}
+                </h1>
+                {secondaryLine && !compact ? (
+                  <p className="truncate text-sm font-medium tracking-wide text-slate-700 dark:text-slate-300 md:text-base">
+                    {secondaryLine}
+                  </p>
+                ) : null}
+              </div>
+
+              {onExit ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="mobile"
+                  onClick={onExit}
+                  disabled={exitDisabled}
+                  aria-label="Salir de la encuesta"
+                  className={cn(
+                    'h-11 min-h-11 shrink-0 gap-1.5 border-slate-300 bg-background/80 px-3 text-sm font-semibold text-slate-800',
+                    'hover:bg-muted dark:border-slate-600 dark:text-slate-100',
+                    compact && 'h-10 min-h-10 px-2.5'
+                  )}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden />
+                  Salir
+                </Button>
+              ) : null}
+            </div>
+
+            <p
               className={cn(
-                'truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl',
-                compact && 'text-base sm:text-base md:text-base'
+                'mt-1 text-xs font-medium',
+                draftStatus === 'dirty' &&
+                  'text-amber-800 dark:text-amber-300',
+                draftStatus === 'saving' &&
+                  'text-sky-800 dark:text-sky-300',
+                draftStatus === 'saved' &&
+                  'text-slate-600 dark:text-slate-400'
               )}
+              aria-live="polite"
             >
-              {surveyTitle}
-            </h1>
-            {campaignName && !compact ? (
-              <p className="truncate text-base font-semibold tracking-wide text-foreground/85 md:text-lg">
-                {campaignName}
-              </p>
-            ) : null}
+              {draftStatusLabel(draftStatus)}
+            </p>
           </div>
         </div>
 
@@ -77,23 +155,51 @@ export function SurveyFillHeader({
           aria-live="polite"
         >
           <div className="text-left md:text-right">
-            <p className={cn('whitespace-nowrap text-2xl font-bold tabular-nums leading-none text-primary sm:text-3xl', compact && 'text-lg sm:text-lg')}>
+            <p
+              className={cn(
+                'whitespace-nowrap text-2xl font-bold tabular-nums leading-none text-primary sm:text-3xl',
+                compact && 'text-lg sm:text-lg'
+              )}
+            >
               {roundedProgress}%
             </p>
-            <p className={cn('mt-1 text-[11px] font-semibold uppercase tracking-wider text-foreground/70 sm:text-xs', compact && 'sr-only')}>
+            <p
+              className={cn(
+                'mt-1 text-[11px] font-semibold uppercase tracking-wider text-foreground/70 sm:text-xs',
+                compact && 'sr-only'
+              )}
+            >
               Avance
             </p>
           </div>
-          <div className={cn('h-10 w-px bg-foreground/20', compact && 'h-6')} aria-hidden="true" />
+          <div
+            className={cn('h-10 w-px bg-foreground/20', compact && 'h-6')}
+            aria-hidden="true"
+          />
           <div className="text-right">
-            <p className={cn('whitespace-nowrap text-2xl font-bold tabular-nums leading-none text-foreground sm:text-3xl', compact && 'text-lg sm:text-lg')}>
+            <p
+              className={cn(
+                'whitespace-nowrap text-2xl font-bold tabular-nums leading-none text-foreground sm:text-3xl',
+                compact && 'text-lg sm:text-lg'
+              )}
+            >
               {currentQuestionIndex + 1}
-              <span className={cn('text-lg font-semibold text-foreground/60 sm:text-xl', compact && 'text-base sm:text-base')}>
+              <span
+                className={cn(
+                  'text-lg font-semibold text-foreground/60 sm:text-xl',
+                  compact && 'text-base sm:text-base'
+                )}
+              >
                 {' '}
                 / {totalQuestions}
               </span>
             </p>
-            <p className={cn('mt-1 text-[11px] font-semibold uppercase tracking-wider text-foreground/70 sm:text-xs', compact && 'sr-only')}>
+            <p
+              className={cn(
+                'mt-1 text-[11px] font-semibold uppercase tracking-wider text-foreground/70 sm:text-xs',
+                compact && 'sr-only'
+              )}
+            >
               Preguntas
             </p>
           </div>

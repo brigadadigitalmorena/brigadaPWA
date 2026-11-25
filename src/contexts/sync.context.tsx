@@ -40,6 +40,7 @@ interface SyncContextType extends SyncStatus {
   syncNow: (source?: 'user') => Promise<void>;
   retryFailed: () => Promise<void>;
   clearDeadLetter: () => Promise<void>;
+  dismissSyncNotice: () => void;
 }
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
@@ -214,6 +215,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const dismissSyncNotice = useCallback(() => {
+    setError(undefined);
+    setSyncNotice(null);
+  }, []);
+
   // Login / boot with token: drop sticky pre-auth notices and drain with a session.
   useEffect(() => {
     if (authLoading) return;
@@ -337,6 +343,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       syncNow,
       retryFailed,
       clearDeadLetter,
+      dismissSyncNotice,
     }),
     [
       isOnline,
@@ -350,6 +357,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       syncNow,
       retryFailed,
       clearDeadLetter,
+      dismissSyncNotice,
     ]
   );
 

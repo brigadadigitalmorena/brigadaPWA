@@ -83,6 +83,7 @@ export default function SyncPage() {
     syncNow,
     retryFailed,
     clearDeadLetter,
+    dismissSyncNotice,
   } = useSync();
 
   const queueCount = pendingCount + (deadLetterCount ?? 0);
@@ -170,6 +171,7 @@ export default function SyncPage() {
             <InlineBanner
               variant={syncNotice?.tone === 'warning' ? 'warning' : 'error'}
               message={syncNotice?.message || error || ''}
+              onClose={dismissSyncNotice}
             />
           )}
 

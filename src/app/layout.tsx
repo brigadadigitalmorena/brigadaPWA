@@ -11,6 +11,8 @@ import { Toaster } from '@/components/ui/sonner';
 import { ServiceWorkerRegistrar } from '@/components/common/service-worker-registrar';
 import { InstallPrompt } from '@/components/common/install-prompt';
 
+export const dynamic = 'force-dynamic';
+
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -27,11 +29,10 @@ async function chromeColor(): Promise<string> {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const color = await chromeColor();
   return {
     title: 'Brigada PWA',
     description: 'Progressive Web App for Brigada Digital',
-    manifest: `/manifest.json?theme_color=${encodeURIComponent(color)}`,
+    manifest: '/manifest.json',
     appleWebApp: {
       capable: true,
       title: 'Brigada',

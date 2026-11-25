@@ -100,6 +100,8 @@ export function getChromeColor(schemeId: string, isDark: boolean): string {
 }
 
 const CHROME_COOKIE = 'brigada-pwa-chrome';
+const CHROME_RELOAD_KEY = 'brigada-chrome-nav';
+const OWNED_THEME_META = 'data-brigada-chrome';
 
 function updateMeta(name: string, content: string) {
   const node = document.querySelector(`meta[name="${name}"]`);
@@ -115,50 +117,99 @@ function updateMeta(name: string, content: string) {
   }
 }
 
-function syncManifestLink(color: string) {
-  const href = `/manifest.json?theme_color=${encodeURIComponent(color)}&v=${Date.now()}`;
+/** A second theme-color node we own. React never removes it, and some
+ *  Android browsers only retint the nav bar when a theme-color node is added. */
+function pulseOwnedThemeColor(color: string) {
+  const existing = document.querySelector(`meta[${OWNED_THEME_META}]`);
+  if (existing?.getAttribute('content') === color) return;
+  existing?.remove();
+  const meta = document.createElement('meta');
+  meta.setAttribute('name', 'theme-color');
+  meta.setAttribute('content', color);
+  meta.setAttribute(OWNED_THEME_META, '');
+  document.head.appendChild(meta);
+}
+
+function writeChromeCookie(color: string) {
+  const bare = color.replace('#', '');
+  const secure = window.location.protocol === 'https:' ? ';secure' : '';
+  document.cookie = `${CHROME_COOKIE}=${bare};path=/;max-age=31536000;samesite=lax${secure}`;
+}
+
+function syncManifestLink() {
   const existing = document.querySelector('link[rel="manifest"]');
   if (!existing) {
     const next = document.createElement('link');
     next.setAttribute('rel', 'manifest');
-    next.setAttribute('href', href);
+    next.setAttribute('href', '/manifest.json');
     document.head.appendChild(next);
     return;
   }
   const current = existing.getAttribute('href') ?? '';
-  if (current.includes(encodeURIComponent(color))) return;
-  existing.setAttribute('href', href);
+  if (current === '/manifest.json') return;
+  existing.setAttribute('href', '/manifest.json');
 }
 
-function isInstalledPwa() {
-  const nav = navigator as Navigator & { standalone?: boolean };
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    nav.standalone === true
-  );
+function stripChromeParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('_chrome')) return;
+  url.searchParams.delete('_chrome');
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState(window.history.state, '', next);
+}
+
+function androidDevice() {
+  return /Android/i.test(navigator.userAgent);
+}
+
+function reloadForNavBar(color: string) {
+  if (!androidDevice()) return;
+  const painted = (document.documentElement.dataset.chromeColor || '').toLowerCase();
+  const next = color.toLowerCase();
+  if (!painted || painted === next) return;
+
+  let already = '';
+  try {
+    already = sessionStorage.getItem(CHROME_RELOAD_KEY) ?? '';
+    if (already === next) return;
+    sessionStorage.setItem(CHROME_RELOAD_KEY, next);
+  } catch {
+    return;
+  }
+
+  let left = false;
+  const go = () => {
+    if (left) return;
+    left = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('_chrome', Date.now().toString(36));
+    window.location.replace(url.toString());
+  };
+  const timer = window.setTimeout(go, 400);
+  if (!('caches' in window)) return;
+  void caches.delete('manifest-cache-v1').finally(() => {
+    window.clearTimeout(timer);
+    go();
+  });
 }
 
 export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
-  const painted = document.documentElement.dataset.chromeColor || '';
+  stripChromeParam();
+  document.documentElement.style.setProperty('--system-chrome', color);
   // Keep the nodes Next rendered. Removing them makes the next navigation
   // call removeChild on a parent that is already null.
   updateMeta('theme-color', color);
   updateMeta('msapplication-navbutton-color', color);
+  pulseOwnedThemeColor(color);
   try {
-    document.cookie = `${CHROME_COOKIE}=${color};path=/;max-age=31536000;samesite=lax`;
+    writeChromeCookie(color);
   } catch {
     // Private mode.
   }
-  syncManifestLink(color);
-  // The Android nav bar latches the theme-color from the first HTML.
-  // A reload lets the server paint the new color before Chrome draws the bar.
-  if (
-    isInstalledPwa() &&
-    painted &&
-    painted.toLowerCase() !== color.toLowerCase()
-  ) {
-    document.documentElement.dataset.chromeColor = color;
-    window.location.reload();
-  }
+  syncManifestLink();
+  // Android paints the nav bar from the theme-color in the first HTML.
+  // Editing the meta later updates the status bar only, so reload once
+  // with a fresh document that already carries the chosen color.
+  reloadForNavBar(color);
 }

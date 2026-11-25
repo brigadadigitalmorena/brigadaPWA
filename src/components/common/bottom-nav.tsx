@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronUp, Ellipsis } from 'lucide-react';
@@ -21,6 +21,11 @@ export function BottomNav() {
   const draftCount = useDraftCount();
   const [moreOpen, setMoreOpen] = useState(false);
   const [pressedHref, setPressedHref] = useState<string | null>(null);
+  const [pressedOnPath, setPressedOnPath] = useState(pathname);
+  if (pressedOnPath !== pathname) {
+    setPressedOnPath(pathname);
+    setPressedHref(null);
+  }
 
   const primaryItems = getPrimaryNavItems(isOnline);
   const moreItems = getMoreNavItems(isOnline);
@@ -28,10 +33,6 @@ export function BottomNav() {
     pressedHref !== null && moreItems.some((item) => item.href === pressedHref);
   const moreActive =
     morePressed || (pressedHref === null && isMoreRouteActive(pathname, isOnline));
-
-  useEffect(() => {
-    setPressedHref(null);
-  }, [pathname]);
 
   return (
     <>
@@ -44,9 +45,15 @@ export function BottomNav() {
       />
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-chrome-surface md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t md:hidden"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          backgroundColor: 'var(--system-chrome, var(--chrome-surface))',
+          backgroundImage:
+            'linear-gradient(var(--chrome-surface), var(--chrome-surface))',
+          backgroundRepeat: 'no-repeat',
+          backgroundSize: '100% var(--bottom-nav-height)',
+          backgroundPosition: 'top',
         }}
         aria-label="Navegación principal"
       >

@@ -48,6 +48,7 @@
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     var scheme = value && ids.indexOf(value) !== -1 ? value : 'pink';
     var color = (isDark ? dark : light)[scheme] || '#FF1B8D';
+    document.documentElement.style.setProperty('--system-chrome', color);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {
       meta = document.createElement('meta');
@@ -57,22 +58,42 @@
     if (meta.getAttribute('content') !== color) {
       meta.setAttribute('content', color);
     }
+    var owned = document.querySelector('meta[data-brigada-chrome]');
+    if (!owned) {
+      owned = document.createElement('meta');
+      owned.setAttribute('name', 'theme-color');
+      owned.setAttribute('data-brigada-chrome', '');
+      document.head.appendChild(owned);
+    }
+    owned.setAttribute('content', color);
     try {
+      var secure = location.protocol === 'https:' ? ';secure' : '';
       document.cookie =
-        'brigada-pwa-chrome=' + color + ';path=/;max-age=31536000;samesite=lax';
-    } catch (cookieError) {}
-    var encoded = encodeURIComponent(color);
+        'brigada-pwa-chrome=' +
+        color.replace('#', '') +
+        ';path=/;max-age=31536000;samesite=lax' +
+        secure;
+    } catch {
+      /* private mode */
+    }
     var manifest = document.querySelector('link[rel="manifest"]');
-    if (manifest) {
-      var currentHref = manifest.getAttribute('href') || '';
-      if (currentHref.indexOf(encoded) === -1) {
-        manifest.setAttribute(
-          'href',
-          '/manifest.json?theme_color=' + encoded + '&v=' + Date.now()
+    if (manifest && manifest.getAttribute('href') !== '/manifest.json') {
+      manifest.setAttribute('href', '/manifest.json');
+    }
+    try {
+      var current = new URL(location.href);
+      if (current.searchParams.has('_chrome')) {
+        current.searchParams.delete('_chrome');
+        history.replaceState(
+          history.state,
+          '',
+          current.pathname + current.search + current.hash
         );
       }
+    } catch {
+      /* ignore malformed URL */
     }
-  } catch (error) {
+  } catch {
     // FOUC fallback: data-color-scheme="pink" on <html>
   }
 })();

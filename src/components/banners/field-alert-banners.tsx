@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db/database';
 import { InlineBanner } from '@/components/ui/inline-banner';
@@ -11,7 +11,31 @@ import {
   isPendingConfirm,
 } from '@/lib/storage/field-alerts';
 
-const DISMISS_KEY = 'brigada_schema_mismatch_dismissed';
+const SCHEMA_DISMISS_KEY = 'brigada_schema_mismatch_dismissed';
+const LOW_STORAGE_DISMISS_KEY = 'brigada_low_storage_dismissed';
+const sessionFlagListeners = new Set<() => void>();
+
+function subscribeSessionFlags(onStoreChange: () => void) {
+  sessionFlagListeners.add(onStoreChange);
+  return () => sessionFlagListeners.delete(onStoreChange);
+}
+
+function readSessionFlag(key: string) {
+  try {
+    return sessionStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function dismissSessionFlag(key: string) {
+  try {
+    sessionStorage.setItem(key, '1');
+  } catch {
+    /* private mode */
+  }
+  sessionFlagListeners.forEach((listener) => listener());
+}
 
 export function FieldAlertBanners() {
   const schemaMismatchCount =
@@ -25,10 +49,21 @@ export function FieldAlertBanners() {
       []
     ) ?? 0;
   const [lowStorage, setLowStorage] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const schemaDismissed = useSyncExternalStore(
+    subscribeSessionFlags,
+    () => readSessionFlag(SCHEMA_DISMISS_KEY),
+    () => false
+  );
+  const lowStorageDismissed = useSyncExternalStore(
+    subscribeSessionFlags,
+    () => readSessionFlag(LOW_STORAGE_DISMISS_KEY),
+    () => false
+  );
+  const [pendingDismissedFor, setPendingDismissedFor] = useState<number | null>(
+    null
+  );
 
   useEffect(() => {
-    setDismissed(sessionStorage.getItem(DISMISS_KEY) === '1');
     const storage = navigator.storage;
     if (!storage?.estimate) return;
     void storage.persist?.();
@@ -37,8 +72,18 @@ export function FieldAlertBanners() {
     });
   }, []);
 
+  if (
+    pendingDismissedFor !== null &&
+    pendingConfirms !== pendingDismissedFor
+  ) {
+    setPendingDismissedFor(null);
+  }
+
   const schemaCopy = getSyncErrorCopy('schema_mismatch');
-  const showSchema = schemaMismatchCount > 0 && !dismissed;
+  const showSchema = schemaMismatchCount > 0 && !schemaDismissed;
+  const showPending =
+    pendingConfirms > 0 && pendingDismissedFor !== pendingConfirms;
+  const showLowStorage = lowStorage && !lowStorageDismissed;
 
   return (
     <>
@@ -46,22 +91,21 @@ export function FieldAlertBanners() {
         <InlineBanner
           variant="info"
           message={`${schemaCopy.title}. ${schemaCopy.body ?? schemaCopy.action}`}
-          onClose={() => {
-            sessionStorage.setItem(DISMISS_KEY, '1');
-            setDismissed(true);
-          }}
+          onClose={() => dismissSessionFlag(SCHEMA_DISMISS_KEY)}
         />
       )}
-      {pendingConfirms > 0 && (
+      {showPending && (
         <InlineBanner
           variant="warning"
           message={`${pendingConfirms} archivo${pendingConfirms === 1 ? '' : 's'} subido${pendingConfirms === 1 ? '' : 's'} con confirmación pendiente.`}
+          onClose={() => setPendingDismissedFor(pendingConfirms)}
         />
       )}
-      {lowStorage && (
+      {showLowStorage && (
         <InlineBanner
           variant="warning"
           message="Queda poco espacio en el navegador. Sincroniza y evita guardar fotos de más."
+          onClose={() => dismissSessionFlag(LOW_STORAGE_DISMISS_KEY)}
         />
       )}
     </>

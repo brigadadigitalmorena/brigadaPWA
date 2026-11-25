@@ -34,7 +34,10 @@ import { applyOcrAutofill, isIneQuestionType } from '@/lib/forms/ine-answer';
 import { getRendererKind, normalizeQuestionType } from '@/lib/survey/question-type-registry';
 import { parseOptionalScopeId } from '@/lib/campaigns/scope';
 import { QuestionRenderer } from '@/components/survey/QuestionTypes/question-renderer';
-import { SurveyFillHeader } from '@/components/survey/survey-fill-header';
+import {
+  SurveyFillHeader,
+  type DraftSaveStatus,
+} from '@/components/survey/survey-fill-header';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -93,9 +96,12 @@ function SurveyFillPageContent() {
 
   const { isOnline, syncNow } = useSync();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<DraftSaveStatus>('saved');
+  const skipDraftStatusRef = useRef(true);
+  const skipNextAutosaveRef = useRef(false);
   const { height: viewportHeight, inset: keyboardInset } = useKeyboardViewport();
   const compact = viewportHeight !== null && viewportHeight < 560;
-  const { confirm, confirmDialog } = useConfirmDialog();
+  const { confirm, confirmChoice, confirmDialog } = useConfirmDialog();
 
   // Form Engine v2 — keeps visibility/constraints aligned with mobile
   const formEngine = useSurveyFormEngine(version, answers);
@@ -141,6 +147,12 @@ function SurveyFillPageContent() {
     defaultValues: answers,
     mode: 'onChange',
   });
+
+  useEffect(() => {
+    skipDraftStatusRef.current = true;
+    skipNextAutosaveRef.current = false;
+    setDraftStatus('saved');
+  }, [surveyId, resumeDraftId]);
 
   useEffect(() => {
     if (pendingFillReset) {
@@ -248,9 +260,23 @@ function SurveyFillPageContent() {
 
   useEffect(() => {
     if (!isHydrated) return;
+    if (skipDraftStatusRef.current) {
+      skipDraftStatusRef.current = false;
+      setDraftStatus('saved');
+      return;
+    }
 
+    setDraftStatus('dirty');
     const timeout = setTimeout(() => {
-      saveDraft();
+      void (async () => {
+        if (skipNextAutosaveRef.current) {
+          skipNextAutosaveRef.current = false;
+          return;
+        }
+        setDraftStatus('saving');
+        await saveDraft();
+        setDraftStatus('saved');
+      })();
     }, 1200);
 
     return () => clearTimeout(timeout);
@@ -457,18 +483,20 @@ function SurveyFillPageContent() {
     const snapshot = useSurveyFillStore.getState();
     if (!draftPayloadHasContent(snapshot.answers, snapshot.files)) {
       toast.message('Nada que guardar todavía');
+      setDraftStatus('saved');
       return;
     }
+    setDraftStatus('saving');
     await saveDraft();
+    setDraftStatus('saved');
     toast.success('Borrador guardado');
   };
 
-  const handleExit = async () => {
-    if (!isFirstQuestion) {
-      prevQuestion();
-      return;
-    }
+  const leaveToSurveys = () => {
+    router.push('/surveys');
+  };
 
+  const handleExit = async () => {
     const snapshot = useSurveyFillStore.getState();
     const hasContent = draftPayloadHasContent(snapshot.answers, snapshot.files);
 
@@ -477,25 +505,58 @@ function SurveyFillPageContent() {
       if (snapshot.responseId) {
         await deleteDraft(snapshot.responseId);
       }
-      router.push('/surveys');
+      leaveToSurveys();
       return;
     }
 
-    if (isDirty) {
+    const hasUnsaved =
+      draftStatus === 'dirty' || draftStatus === 'saving' || isDirty;
+
+    if (!hasUnsaved) {
       const confirmed = await confirm({
         title: 'Salir de la encuesta',
-        description:
-          'Tu avance queda como borrador. ¿Deseas salir de todos modos?',
+        description: 'Tu borrador ya está guardado. ¿Quieres salir?',
         confirmText: 'Salir',
-        cancelText: 'Continuar',
-        variant: 'warning',
+        cancelText: 'Cancelar',
+        variant: 'neutral',
       });
-
       if (!confirmed) return;
+      leaveToSurveys();
+      return;
     }
 
-    await saveDraft();
-    router.push('/surveys');
+    const choice = await confirmChoice({
+      title: 'Cambios sin guardar',
+      description:
+        'Hay cambios que aún no están guardados. ¿Qué deseas hacer?',
+      variant: 'warning',
+      choices: [
+        {
+          id: 'save',
+          label: 'Guardar borrador y salir',
+          variant: 'default',
+        },
+        {
+          id: 'discard',
+          label: 'Salir sin guardar',
+          variant: 'destructive',
+        },
+        { id: 'cancel', label: 'Cancelar', variant: 'outline' },
+      ],
+    });
+
+    if (choice === 'save') {
+      setDraftStatus('saving');
+      await saveDraft();
+      setDraftStatus('saved');
+      leaveToSurveys();
+      return;
+    }
+
+    if (choice === 'discard') {
+      skipNextAutosaveRef.current = true;
+      leaveToSurveys();
+    }
   };
 
   useEffect(() => {
@@ -642,6 +703,9 @@ function SurveyFillPageContent() {
         currentSectionIndex={currentSectionIndex}
         onGoToSection={goToSection}
         compact={compact}
+        draftStatus={draftStatus}
+        onExit={handleExit}
+        exitDisabled={isSubmitting}
         fieldSession={
           activeFieldSession
             ? {
@@ -654,12 +718,12 @@ function SurveyFillPageContent() {
 
       {showSectionHeader && currentEntry && !compact && (
         <div className="px-4 pt-4 pb-2">
-          <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+          <div className="mx-auto w-full max-w-xl rounded-xl border border-border bg-card p-4 shadow-sm md:max-w-2xl">
             <h2 className="text-xl font-semibold text-foreground">
               {currentEntry.sectionTitle}
             </h2>
             {currentEntry.sectionDescription && (
-              <p className="text-base text-muted-foreground mt-1 leading-relaxed">
+              <p className="mt-1 text-base leading-relaxed text-slate-600 dark:text-slate-300">
                 {currentEntry.sectionDescription}
               </p>
             )}
@@ -673,12 +737,12 @@ function SurveyFillPageContent() {
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3"
       >
         {shownQuestion && (
-          <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+          <div className="mx-auto flex w-full max-w-xl flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5 md:max-w-2xl md:p-6">
             <div className="flex items-start gap-3">
-              <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
+              <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                 {currentQuestionIndex + 1}
               </span>
-              <span className="text-xs font-medium text-primary uppercase tracking-wide pt-1.5">
+              <span className="pt-1.5 text-xs font-medium uppercase tracking-wide text-primary">
                 Pregunta {currentQuestionIndex + 1} de {totalQuestions}
               </span>
             </div>
@@ -761,29 +825,32 @@ function SurveyFillPageContent() {
           keyboardInset === 0 && 'pb-[max(0.5rem,env(safe-area-inset-bottom))]'
         )}
       >
-        <div className="mx-auto flex w-full max-w-lg items-center gap-2">
+        <div className="mx-auto flex w-full max-w-xl items-center gap-2 md:max-w-2xl">
           <Button
             type="button"
             variant="outline"
             size="lg"
-            onClick={handleExit}
-            disabled={isSubmitting}
+            onClick={prevQuestion}
+            disabled={isSubmitting || isFirstQuestion}
             className={cn(
-              'min-w-0 flex-1 gap-1 px-3 text-base',
+              'min-h-12 min-w-0 flex-1 gap-1 px-3 text-base',
               compact ? 'h-12' : 'h-14'
             )}
           >
             <ChevronLeft className="h-5 w-5 shrink-0" />
-            {isFirstQuestion ? 'Salir' : 'Anterior'}
+            Anterior
           </Button>
 
           <Button
             type="button"
             variant="outline"
             onClick={handleSaveDraft}
-            disabled={isSubmitting}
+            disabled={isSubmitting || draftStatus === 'saving'}
             aria-label="Guardar borrador"
-            className={cn('shrink-0 gap-1.5 px-3 text-sm', compact ? 'h-12' : 'h-14')}
+            className={cn(
+              'min-h-12 shrink-0 gap-1.5 px-3 text-sm',
+              compact ? 'h-12' : 'h-14'
+            )}
           >
             <Save className="size-5 shrink-0" strokeWidth={2} />
             Borrador
@@ -793,7 +860,7 @@ function SurveyFillPageContent() {
             type="button"
             size="lg"
             className={cn(
-              'min-w-0 flex-1 gap-1 px-3 text-base',
+              'min-h-12 min-w-0 flex-1 gap-1 px-3 text-base',
               compact ? 'h-12' : 'h-14'
             )}
             onClick={handleNext}

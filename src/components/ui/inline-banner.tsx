@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, type MouseEvent } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -12,6 +15,8 @@ type InlineBannerVariant = 'success' | 'error' | 'info' | 'warning';
 interface InlineBannerProps {
   variant?: InlineBannerVariant;
   message: string;
+  /** When true (default), shows a close control. Pass onClose for parent side-effects. */
+  dismissible?: boolean;
   onClose?: () => void;
   className?: string;
 }
@@ -36,33 +41,50 @@ const variantIcon = {
 export function InlineBanner({
   variant = 'info',
   message,
+  dismissible = true,
   onClose,
   className,
 }: InlineBannerProps) {
   const Icon = variantIcon[variant];
+  const canDismiss = dismissible;
+  const token = `${variant}\0${message}`;
+  const [dismissedToken, setDismissedToken] = useState<string | null>(null);
+
+  if (dismissedToken === token) return null;
+
+  const handleClose = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDismissedToken(token);
+    onClose?.();
+  };
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-xl border px-4 py-3',
+        'flex items-start gap-2 rounded-xl border py-2 pl-4 pr-1.5',
         variantStyles[variant],
         className
       )}
       role="status"
       aria-live="polite"
     >
-      <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
-      <p className="flex-1 text-sm leading-relaxed">{message}</p>
-      {onClose && (
+      <Icon className="mt-2 h-5 w-5 flex-shrink-0" aria-hidden />
+      <p className="min-w-0 flex-1 py-1.5 text-sm leading-relaxed">{message}</p>
+      {canDismiss ? (
         <button
           type="button"
-          onClick={onClose}
-          className="touch-target flex items-center justify-center opacity-70 transition-opacity hover:opacity-100"
-          aria-label="Cerrar aviso"
+          onClick={handleClose}
+          className={cn(
+            'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg',
+            'opacity-80 transition-opacity hover:opacity-100',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          )}
+          aria-label="Cerrar notificación"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" aria-hidden />
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

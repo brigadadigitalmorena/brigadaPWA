@@ -250,7 +250,11 @@ export default function TrackingPage() {
       )}
 
       {error && rows.length > 0 && (
-        <InlineBanner variant="warning" message={error} />
+        <InlineBanner
+          variant="warning"
+          message={error}
+          onClose={() => setError(null)}
+        />
       )}
 
       {rows.length > 0 && (
