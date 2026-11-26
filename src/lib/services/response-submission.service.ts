@@ -8,6 +8,7 @@ import { readCachedEntitlement } from '@/lib/utils/survey-version';
 import { readDurableEntitlements } from '@/lib/services/entitlement-cache.service';
 import { matchEntitlement } from '@/lib/campaigns/scope';
 import { fieldSessionService } from '@/lib/services/field-session.service';
+import { saveFileBlob } from '@/lib/services/file-blob.service';
 import { pruneHiddenAnswers } from '@/lib/forms/prune-hidden-answers';
 import {
   captureLocationIfRequired,
@@ -135,7 +136,13 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
     updated_at: now,
   };
 
-  await db.transaction('rw', db.responses, db.local_files, db.sync_queue, async () => {
+  await db.transaction(
+    'rw',
+    db.responses,
+    db.local_files,
+    db.file_blobs,
+    db.sync_queue,
+    async () => {
     const existing = await db.responses
       .where('response_id')
       .equals(input.responseId)
@@ -184,6 +191,9 @@ export async function finalizeResponse(input: FinalizeResponseInput): Promise<vo
       }
 
       await db.local_files.put(localFile);
+      if (preview.file) {
+        await saveFileBlob(fileId, input.responseId, preview.file);
+      }
 
       await db.sync_queue.add({
         queue_id: generateLocalId(),

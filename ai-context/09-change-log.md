@@ -5,6 +5,18 @@
 
 ---
 
+## [2026-11-26] fix(pwa): un archivo perdido ya no se reencola solo
+
+Al volver la red, las encuestas sí se enviaban, pero el archivo adjunto
+(firma o foto) ya no estaba en el teléfono. Cada intento fallido dejaba el
+archivo como pendiente y creaba otra fila en la cola, así que el aviso de
+error subía y el indicador verde parpadeaba. Ahora ese archivo queda en
+error, no se vuelve a encolar, y al abrir la app las filas repetidas se
+juntan en una sola. Al confirmar la encuesta el archivo se guarda otra vez
+en el teléfono con el mismo identificador de la cola.
+
+---
+
 ## [2026-11-26] fix(pwa): el icono de instalación es la B
 
 Al instalar la app, Android mostraba la E blanca del icono generado. Los

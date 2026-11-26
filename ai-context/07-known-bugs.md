@@ -166,6 +166,7 @@
 
 | ID | Título | Fix | Commit | Fecha |
 |----|--------|-----|--------|-------|
+| PWA-P1-LOST-FILE-REQUEUE | Archivo perdido se reencola y el conteo sube solo | Marcar `local_files` en error, no reencolar si ya hay fila, colapsar duplicados, reguardar el blob al confirmar | `fix(pwa): stop requeueing lost file uploads` | 2026-11-26 |
 | PWA-P0-3 | SW auth cache exposure | Excluir `/api/backend/`, purge en logout, ExpirationPlugin, bump v5 | `fix(sw): secure api cache` | 2026-09-26 |
 | — | Credencial dev en repo | Rotada, removida de `PROJECT_STATUS.md` | `chore(sec): rotate dev cred` | 2026-09-26 |
 

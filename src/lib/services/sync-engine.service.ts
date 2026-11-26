@@ -34,6 +34,7 @@ import {
   SYNC_PRIORITY,
   SYNC_TIMEOUTS,
 } from '@/lib/sync';
+import { planLostFileCollapse } from '@/lib/sync/lost-file-queue';
 import {
   classifySampleReadiness,
   FIELD_SAMPLE_BATCH_SIZE,
@@ -197,6 +198,7 @@ export async function processSyncQueue(options?: SyncEngineOptions): Promise<Syn
 async function drainSyncQueue(options?: SyncEngineOptions): Promise<SyncRunResult> {
   await forceReleaseStaleLocks();
   await reclaimInFlightQueueItems();
+  await collapseDuplicateLostFileUploads();
 
   const summary = emptyRun();
   const now = new Date().toISOString();
@@ -513,6 +515,7 @@ async function processFileItem(
 
   const localFile = await db.local_files.where('file_id').equals(file_id).first();
   if (!localFile) {
+    await markLocalFileUnrecoverable(file_id);
     return {
       success: false,
       error: 'Archivo local no encontrado',
@@ -536,6 +539,7 @@ async function processFileItem(
   try {
     fileBlob = await loadLocalFileBlob(localFile);
   } catch {
+    await markLocalFileUnrecoverable(file_id);
     return {
       success: false,
       error: 'No se pudo recuperar el archivo local',
@@ -758,7 +762,49 @@ async function processConfirmItem(
 }
 
 /**
+ * A missing blob cannot be retried. Leave the local row out of `pending`
+ * so orphan recovery does not insert another UPLOAD_FILE.
+ */
+async function markLocalFileUnrecoverable(fileId: string): Promise<void> {
+  if (!fileId) return;
+  const localFile = await db.local_files.where('file_id').equals(fileId).first();
+  if (localFile?.id === undefined) return;
+  if (localFile.sync_status === 'uploaded') return;
+  await db.local_files.update(localFile.id, { sync_status: 'error' });
+}
+
+/**
+ * Phones that already looped have one failed_permanent row per attempt.
+ * Keep a single terminal row per file and stop treating the file as pending.
+ */
+export async function collapseDuplicateLostFileUploads(): Promise<void> {
+  await db.transaction('rw', db.sync_queue, db.local_files, async () => {
+    const rows = await db.sync_queue.where('operation_type').equals('UPLOAD_FILE').toArray();
+    const plan = planLostFileCollapse(rows);
+    const now = new Date().toISOString();
+
+    for (const id of plan.discardIds) {
+      await db.sync_queue.update(id, {
+        status: 'discarded',
+        updated_at: now,
+        lease_owner: undefined,
+        lease_until: undefined,
+      });
+    }
+
+    for (const fileId of plan.fileIds) {
+      const localFile = await db.local_files.where('file_id').equals(fileId).first();
+      if (localFile?.id === undefined) continue;
+      if (localFile.sync_status === 'uploaded') continue;
+      await db.local_files.update(localFile.id, { sync_status: 'error' });
+    }
+  });
+}
+
+/**
  * Re-queue local files that are pending/uploading without an active queue row.
+ * A failed_permanent upload still counts: the bytes are gone and a new row
+ * would only inflate the error count.
  */
 async function recoverOrphanUploads(options?: SyncEngineOptions): Promise<void> {
   const files = await db.local_files
@@ -785,9 +831,8 @@ async function recoverOrphanUploads(options?: SyncEngineOptions): Promise<void> 
       .filter(
         (q) =>
           q.operation_type === 'UPLOAD_FILE' &&
-          !['completed', 'discarded', 'dead_letter', 'failed_permanent', 'cancelled'].includes(
-            q.status
-          )
+          q.status !== 'discarded' &&
+          q.status !== 'cancelled'
       )
       .first();
 

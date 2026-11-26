@@ -93,6 +93,20 @@
 
 ---
 
+### PWA-P1-LOST-FILE-REQUEUE — Un archivo sin bytes se reencola en cada pasada
+
+**Síntomas**: Tras capturar sin red, al sincronizar el aviso dice «No se envió nada. No se pudo recuperar el archivo local». El número de envíos con error sube solo (50, 58, …), Pendientes muestra las encuestas como enviadas, y el chip verde parpadea.
+
+**Causa raíz**: `BLOB_MISSING` marcaba la fila de cola como `failed_permanent` pero dejaba `local_files.sync_status` en `pending`. `recoverOrphanUploads` no consideraba `failed_permanent` como fila existente e insertaba otro `UPLOAD_FILE`. El efecto de `pendingCount` lanzaba otra sincronización al instante.
+
+**Mitigación aplicada (2026-11-26)**:
+- El archivo local pasa a `error` y no se crea otra fila si ya hay una que no esté descartada o cancelada
+- Al abrir la app se conserva una sola fila terminal por archivo y se descartan las copias
+- Confirmar la encuesta vuelve a guardar el `File` en `file_blobs` con el `fileId` de la cola
+- Una pasada que solo perdió archivos no vuelve a disparar el sync automático hasta que haya un envío nuevo o la persona pulse Reintentar
+
+---
+
 ### PWA-P1-CROSS-TAB-UPLOAD — Subida de archivos sin exclusión mutua entre pestañas
 
 **Causa raíz**: `inFlightUploads` es `Set` a nivel módulo (`sync-engine.service.ts:56`). Dos pestañas = dos uploads concurrentes del mismo `file_id` → duplicados en backend.

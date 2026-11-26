@@ -17,9 +17,11 @@ import {
   makeRetryWaitDueNow,
   discardDeadLetter,
   getQueueStats,
+  collapseDuplicateLostFileUploads,
 } from '@/lib/services/sync-engine.service';
 import { configureOnlineModeKv } from '@/lib/sync';
 import { describeSyncRun, type SyncRunNotice } from '@/lib/sync/sync-run';
+import { isLostFileOnlyRun } from '@/lib/sync/lost-file-queue';
 import { fieldSessionService } from '@/lib/services/field-session.service';
 import { getAccessToken, loadTokensFromStorage } from '@/lib/api/client';
 import { useAuth } from '@/contexts/auth.context';
@@ -61,6 +63,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [extraStats, setExtraStats] = useState({ deadLetter: 0, retryWait: 0 });
   const isSyncingRef = useRef(false);
   const wasAuthenticatedRef = useRef(false);
+  // After a pass that only lost files, don't immediately sync again just
+  // because the error count or a duplicate pending row changed. A larger
+  // pending count (a new survey) still wakes the queue. null = no hold.
+  const lostFileHoldRef = useRef<number | null>(null);
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -129,6 +135,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     isSyncingRef.current = true;
     setIsSyncing(true);
     if (manual) {
+      lostFileHoldRef.current = null;
       setSyncNotice(null);
       setError(undefined);
     }
@@ -158,8 +165,31 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         setSyncNotice(notice);
         setError(undefined);
       } else if (!quietIdle) {
-        setSyncNotice(notice);
-        setError(notice.message);
+        setSyncNotice((current) => {
+          if (
+            !manual &&
+            current?.message === notice.message &&
+            current.tone === notice.tone
+          ) {
+            return current;
+          }
+          return notice;
+        });
+        setError((current) =>
+          !manual && current === notice.message ? current : notice.message
+        );
+      }
+
+      if (!manual && isLostFileOnlyRun(result)) {
+        const [pending, retry, leased, syncing] = await Promise.all([
+          db.sync_queue.where('status').equals('pending').count(),
+          db.sync_queue.where('status').equals('retry_wait').count(),
+          db.sync_queue.where('status').equals('leased').count(),
+          db.sync_queue.where('status').equals('syncing').count(),
+        ]);
+        lostFileHoldRef.current = pending + retry + leased + syncing;
+      } else if (manual || result.succeeded > 0) {
+        lostFileHoldRef.current = null;
       }
 
       if (manual && !quietIdle) {
@@ -281,13 +311,23 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [isOnline, pendingCount, syncNow]);
 
-  // Initial auto-sync when there is work
+  // Wake when work appears. A pass that only lost files holds this wake
+  // until the pending count grows (a new survey) or the user retries.
   useEffect(() => {
-    if (isOnline && pendingCount > 0) {
-      const t = setTimeout(() => syncNow(), 0);
-      return () => clearTimeout(t);
-    }
+    if (!isOnline || pendingCount <= 0) return;
+    const held = lostFileHoldRef.current;
+    if (held !== null && pendingCount <= held) return;
+    lostFileHoldRef.current = null;
+    const t = setTimeout(() => syncNow(), 0);
+    return () => clearTimeout(t);
   }, [isOnline, pendingCount, syncNow]);
+
+  // Drop duplicate rows left by the lost-file loop before the first sync.
+  useEffect(() => {
+    void collapseDuplicateLostFileUploads().catch(() => {
+      /* the next drain collapses again */
+    });
+  }, []);
 
   // Ask SW to register background sync tag (wakes Dexie processor via message)
   useEffect(() => {
