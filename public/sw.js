@@ -3280,19 +3280,49 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     ...precacheUrls.map((url) => ({ url, revision: null }))
   ];
   precacheAndRoute(precacheEntries);
-  registerRoute(
-    ({ url }) => url.pathname === "/manifest.json",
-    new NetworkFirst({
-      cacheName: "manifest-cache-v1",
-      networkTimeoutSeconds: 3,
-      plugins: [
-        new ExpirationPlugin({
-          maxEntries: 4,
-          maxAgeSeconds: 60
-        })
-      ]
-    })
-  );
+  var MANIFEST_CACHE = "manifest-cache-v1";
+  var MANIFEST_COLOR_KEY = "/__brigada_manifest_color__";
+  async function rememberedChromeColor() {
+    try {
+      const cache = await caches.open(MANIFEST_CACHE);
+      const hit = await cache.match(MANIFEST_COLOR_KEY);
+      if (!hit) return "";
+      const text = (await hit.text()).trim();
+      return /^#[0-9A-Fa-f]{6}$/.test(text) ? text : "";
+    } catch {
+      return "";
+    }
+  }
+  async function manifestHandler({ request }) {
+    const color = await rememberedChromeColor();
+    let response;
+    try {
+      response = await fetch(request);
+    } catch {
+      response = await caches.match("/manifest.json");
+    }
+    if (!response) {
+      return new Response("{}", {
+        status: 503,
+        headers: { "Content-Type": "application/manifest+json" }
+      });
+    }
+    if (!color || !response.ok) return response;
+    try {
+      const data = await response.clone().json();
+      data.theme_color = color;
+      data.background_color = color;
+      return new Response(JSON.stringify(data), {
+        headers: {
+          "Content-Type": "application/manifest+json",
+          "Cache-Control": "no-store"
+        }
+      });
+    } catch {
+      return response;
+    }
+  }
+  registerRoute(({ url }) => url.pathname === "/manifest.json", manifestHandler);
   var NAV_NETWORK_TIMEOUT_MS = 4e3;
   async function findCachedFillShell(cache) {
     const shell = await cache.match("/surveys/__fill_shell__");
@@ -3572,12 +3602,21 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
     }
   });
   self.addEventListener("message", (event) => {
-    var _a, _b;
-    if (((_a = event.data) == null ? void 0 : _a.type) === "SKIP_WAITING") {
+    var _a, _b, _c;
+    if (((_a = event.data) == null ? void 0 : _a.type) === "BRIGADA_CHROME_COLOR" && event.data.color) {
+      const color = String(event.data.color);
+      event.waitUntil(
+        caches.open(MANIFEST_CACHE).then(
+          (cache) => cache.put(MANIFEST_COLOR_KEY, new Response(color))
+        )
+      );
+      return;
+    }
+    if (((_b = event.data) == null ? void 0 : _b.type) === "SKIP_WAITING") {
       self.skipWaiting();
       return;
     }
-    if (((_b = event.data) == null ? void 0 : _b.type) === "WARM_URLS" && Array.isArray(event.data.urls)) {
+    if (((_c = event.data) == null ? void 0 : _c.type) === "WARM_URLS" && Array.isArray(event.data.urls)) {
       event.waitUntil(
         (async () => {
           const cache = await caches.open(PAGES_CACHE);
@@ -3644,6 +3683,7 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
           API_CACHE,
           OFFLINE_TILE_CACHE,
           TILE_MANIFEST_CACHE,
+          MANIFEST_CACHE,
           "next-rsc-cache",
           "google-fonts-cache",
           "default-cache"

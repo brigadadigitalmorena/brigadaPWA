@@ -49,6 +49,7 @@
     var scheme = value && ids.indexOf(value) !== -1 ? value : 'pink';
     var color = (isDark ? dark : light)[scheme] || '#FF1B8D';
     document.documentElement.style.setProperty('--system-chrome', color);
+    document.documentElement.style.backgroundColor = color;
     var meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {
       meta = document.createElement('meta');
@@ -58,14 +59,6 @@
     if (meta.getAttribute('content') !== color) {
       meta.setAttribute('content', color);
     }
-    var owned = document.querySelector('meta[data-brigada-chrome]');
-    if (!owned) {
-      owned = document.createElement('meta');
-      owned.setAttribute('name', 'theme-color');
-      owned.setAttribute('data-brigada-chrome', '');
-      document.head.appendChild(owned);
-    }
-    owned.setAttribute('content', color);
     try {
       var secure = location.protocol === 'https:' ? ';secure' : '';
       document.cookie =

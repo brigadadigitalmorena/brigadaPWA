@@ -5,6 +5,32 @@
 
 ---
 
+## [2026-11-26] fix(pwa): el icono de instalación es la B
+
+Al instalar la app, Android mostraba la E blanca del icono generado. Los
+iconos de la PWA y el favicon ahora usan la B blanca sobre rosa.
+
+---
+
+## [2026-11-26] fix(pwa): la barra de navegación no arranca en rosa
+
+Android fija la barra de los botones con el primer fondo de la página. Ese
+fondo era el rosa de reserva hasta que el script aplicaba el esquema, así
+que la barra de estado cambiaba y la de abajo no. El HTML ya sale pintado
+con el color guardado, y el manifiesto que guarda el teléfono usa ese mismo
+color en lugar del de la instalación.
+
+---
+
+## [2026-11-26] fix(pwa): la firma se lee en oscuro y en pantalla completa
+
+El recuadro quedaba transparente sobre la tarjeta oscura y el trazo negro
+no se veía. La hoja de firma queda blanca en los dos temas. En pantalla
+completa, Limpiar y Cerrar van dentro de esa capa, encima de la barra del
+teléfono.
+
+---
+
 ## [2026-11-25] fix(pwa): barra inferior de Android y cierre de avisos
 
 La barra de estado tomaba el esquema al instante, pero la de navegación se

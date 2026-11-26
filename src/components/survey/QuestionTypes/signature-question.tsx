@@ -84,8 +84,10 @@ export function SignatureQuestion({
 
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
       const rect = parent.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
 
-      // Save current signature content before resizing
+      // Setting canvas width clears the bitmap. Keep the strokes and paint
+      // the white sheet again; otherwise the dark card shows through.
       const previousPad = padRef.current;
       const previousData = previousPad?.isEmpty() ? undefined : previousPad?.toData();
 
@@ -96,7 +98,7 @@ export function SignatureQuestion({
 
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.scale(ratio, ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       }
 
       if (!padRef.current) {
@@ -111,9 +113,10 @@ export function SignatureQuestion({
         padRef.current.addEventListener('endStroke', saveSignature);
       }
 
-      // Restore strokes after resize
-      if (previousData && padRef.current) {
+      if (previousData && previousData.length > 0 && padRef.current) {
         padRef.current.fromData(previousData);
+      } else {
+        padRef.current?.clear();
       }
     };
 
@@ -159,44 +162,50 @@ export function SignatureQuestion({
       <div
         className={
           fullscreen
-            ? 'fixed inset-0 z-50 flex flex-col bg-background p-4'
-            : 'rounded-xl border border-input bg-card overflow-hidden touch-none'
+            ? 'fixed inset-0 z-50 flex flex-col bg-background px-4 pt-4'
+            : 'space-y-3'
+        }
+        style={
+          fullscreen
+            ? { paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }
+            : undefined
         }
       >
-        <canvas
-          ref={canvasRef}
-          className={fullscreen ? 'min-h-0 w-full flex-1 cursor-crosshair' : 'block h-40 w-full cursor-crosshair'}
-          aria-label="Área para firmar"
-        />
+        <div className={fullscreen ? 'min-h-0 flex-1 overflow-hidden rounded-xl border border-neutral-300 bg-white touch-none' : 'overflow-hidden rounded-xl border border-neutral-300 bg-white touch-none'}>
+          <canvas
+            ref={canvasRef}
+            className={fullscreen ? 'block h-full w-full cursor-crosshair bg-white' : 'block h-40 w-full cursor-crosshair bg-white'}
+            aria-label="Área para firmar"
+          />
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="mobile"
+            onClick={clearSignature}
+          >
+            <Eraser className="h-4 w-4 mr-2" />
+            Limpiar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="mobile"
+            onClick={() => setFullscreen((current) => !current)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? 'Cerrar' : 'Pantalla completa'}
+          </Button>
+          {hasSignature && (
+            <span className="text-sm text-muted-foreground">Firma capturada</span>
+          )}
+        </div>
+
+        {strokeError && <p className="shrink-0 text-sm text-amber-600 dark:text-amber-400">{strokeError}</p>}
+        {error && <p className="shrink-0 text-sm text-destructive">{error}</p>}
       </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="mobile"
-          onClick={clearSignature}
-        >
-          <Eraser className="h-4 w-4 mr-2" />
-          Limpiar
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="mobile"
-          onClick={() => setFullscreen((current) => !current)}
-        >
-          {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          {fullscreen ? 'Cerrar' : 'Pantalla completa'}
-        </Button>
-        {hasSignature && (
-          <span className="text-sm text-muted-foreground">Firma capturada</span>
-        )}
-      </div>
-
-      {strokeError && <p className="text-sm text-amber-600 dark:text-amber-400">{strokeError}</p>}
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

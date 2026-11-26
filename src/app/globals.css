@@ -61,7 +61,7 @@
   html {
     @apply font-sans;
     font-size: 16px;
-    background-color: var(--system-chrome, #ff1b8d);
+    background-color: var(--system-chrome, var(--background));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

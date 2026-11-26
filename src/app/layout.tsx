@@ -67,6 +67,12 @@ export default async function RootLayout({
       suppressHydrationWarning
       data-color-scheme="pink"
       data-chrome-color={color}
+      style={
+        {
+          backgroundColor: color,
+          '--system-chrome': color,
+        } as React.CSSProperties
+      }
     >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

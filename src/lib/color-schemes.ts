@@ -117,17 +117,29 @@ function updateMeta(name: string, content: string) {
   }
 }
 
-/** A second theme-color node we own. React never removes it, and some
- *  Android browsers only retint the nav bar when a theme-color node is added. */
+/** A second theme-color node we own. React never removes it. Android
+ *  retints the nav bar when this node is inserted, not when the first
+ *  meta's content attribute changes (that only updates the status bar). */
 function pulseOwnedThemeColor(color: string) {
-  const existing = document.querySelector(`meta[${OWNED_THEME_META}]`);
-  if (existing?.getAttribute('content') === color) return;
-  existing?.remove();
-  const meta = document.createElement('meta');
-  meta.setAttribute('name', 'theme-color');
-  meta.setAttribute('content', color);
-  meta.setAttribute(OWNED_THEME_META, '');
-  document.head.appendChild(meta);
+  const paint = () => {
+    document.querySelector(`meta[${OWNED_THEME_META}]`)?.remove();
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    meta.setAttribute('content', color);
+    meta.setAttribute(OWNED_THEME_META, '');
+    document.head.appendChild(meta);
+  };
+  window.setTimeout(paint, 50);
+}
+
+function rememberChromeColor(color: string) {
+  if (!('caches' in window)) return;
+  void caches.open('manifest-cache-v1').then((cache) =>
+    cache.put('/__brigada_manifest_color__', new Response(color))
+  );
+  void navigator.serviceWorker?.ready.then((registration) => {
+    registration.active?.postMessage({ type: 'BRIGADA_CHROME_COLOR', color });
+  });
 }
 
 function writeChromeCookie(color: string) {
@@ -197,6 +209,7 @@ export function applyThemeColorMeta(color: string) {
   if (typeof document === 'undefined') return;
   stripChromeParam();
   document.documentElement.style.setProperty('--system-chrome', color);
+  document.documentElement.style.backgroundColor = color;
   // Keep the nodes Next rendered. Removing them makes the next navigation
   // call removeChild on a parent that is already null.
   updateMeta('theme-color', color);
@@ -207,6 +220,7 @@ export function applyThemeColorMeta(color: string) {
   } catch {
     // Private mode.
   }
+  rememberChromeColor(color);
   syncManifestLink();
   // Android paints the nav bar from the theme-color in the first HTML.
   // Editing the meta later updates the status bar only, so reload once

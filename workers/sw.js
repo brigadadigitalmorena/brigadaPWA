@@ -29,19 +29,52 @@ const precacheEntries = [
 ];
 precacheAndRoute(precacheEntries);
 
-registerRoute(
-  ({ url }) => url.pathname === '/manifest.json',
-  new NetworkFirst({
-    cacheName: 'manifest-cache-v1',
-    networkTimeoutSeconds: 3,
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 4,
-        maxAgeSeconds: 60,
-      }),
-    ],
-  })
-);
+const MANIFEST_CACHE = 'manifest-cache-v1';
+const MANIFEST_COLOR_KEY = '/__brigada_manifest_color__';
+
+async function rememberedChromeColor() {
+  try {
+    const cache = await caches.open(MANIFEST_CACHE);
+    const hit = await cache.match(MANIFEST_COLOR_KEY);
+    if (!hit) return '';
+    const text = (await hit.text()).trim();
+    return /^#[0-9A-Fa-f]{6}$/.test(text) ? text : '';
+  } catch {
+    return '';
+  }
+}
+
+async function manifestHandler({ request }) {
+  const color = await rememberedChromeColor();
+  let response;
+  try {
+    response = await fetch(request);
+  } catch {
+    response = await caches.match('/manifest.json');
+  }
+  if (!response) {
+    return new Response('{}', {
+      status: 503,
+      headers: { 'Content-Type': 'application/manifest+json' },
+    });
+  }
+  if (!color || !response.ok) return response;
+  try {
+    const data = await response.clone().json();
+    data.theme_color = color;
+    data.background_color = color;
+    return new Response(JSON.stringify(data), {
+      headers: {
+        'Content-Type': 'application/manifest+json',
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch {
+    return response;
+  }
+}
+
+registerRoute(({ url }) => url.pathname === '/manifest.json', manifestHandler);
 
 // Cap every document fetch, including navigation preload. Awaiting preload
 // without a limit left the installed app on the splash / "Cargando..." until
@@ -449,6 +482,16 @@ self.addEventListener('periodicsync', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'BRIGADA_CHROME_COLOR' && event.data.color) {
+    const color = String(event.data.color);
+    event.waitUntil(
+      caches.open(MANIFEST_CACHE).then((cache) =>
+        cache.put(MANIFEST_COLOR_KEY, new Response(color))
+      )
+    );
+    return;
+  }
+
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
     return;
@@ -532,6 +575,7 @@ self.addEventListener('activate', (event) => {
         API_CACHE,
         OFFLINE_TILE_CACHE,
         TILE_MANIFEST_CACHE,
+        MANIFEST_CACHE,
         'next-rsc-cache',
         'google-fonts-cache',
         'default-cache',
